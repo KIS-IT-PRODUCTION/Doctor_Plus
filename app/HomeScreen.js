@@ -17,12 +17,12 @@ const HomeScreen = () => {
 
   const handlePatientSelect = () => {
     console.log("Patient selected");
-    navigation.navigate("Register"); // Змінено на 'Register'
+    navigation.navigate("RegisterScreen"); // Змінено на 'Register'
   };
 
   const handleDoctorSelect = () => {
     console.log("Doctor selected");
-    navigation.navigate("RegisterDoctor"); // Вам потрібно буде створити цей екран
+    navigation.navigate("RegisterScreen"); // Вам потрібно буде створити цей екран
   };
 
   const handlePrivacyPolicyToggle = () => {
@@ -100,6 +100,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: "Mont-Regular",
     marginBottom: 72,
+    paddingHorizontal: 20,
+    lineHeight: 22,
+    marginTop: 9,
   },
   chooseText: {
     fontSize: 32,

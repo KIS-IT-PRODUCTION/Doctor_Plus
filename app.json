@@ -1,38 +1,29 @@
 {
   "expo": {
-    "name": "Doctor",
-    "slug": "Doctor",
+    "name": "DOCOTOR",
+    "slug": "DOCOTOR",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.kis-production.Doctor"
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.kis_production.Doctor"
+      "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/icon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "c0f39c9a-7a29-40bc-a5a3-ce92bd54985f"
-      }
-    },
-    "plugins": [
-      "expo-font"
-    ]
+      "favicon": "./assets/favicon.png"
+    }
   }
 }
