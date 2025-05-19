@@ -15,20 +15,132 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { Svg, Path } from "react-native-svg";
-import { supabase } from "../supabaseClient"; // Шлях до вашого файлу supabaseClient.ts
+import { supabase } from "../supabaseClient";
+import { getLocales } from "expo-localization";
+import { I18n } from "i18n-js";
 
-const countryFlags = [
-  { name: "English", code: "gb", emoji: "🇬🇧" },
-  { name: "Deutsch", code: "de", emoji: "🇩🇪" },
-  { name: "Polski", code: "pl", emoji: "🇵🇱" },
-  { name: "Україна", code: "ua", emoji: "🇺🇦" },
-];
+// Set the key-value pairs for the different languages you want to support.
+const translations = {
+  en: {
+    greeting: "Registration",
+    registration_subtitle: "Start taking care of yourself — by registering",
+    select_country: "Select your country of residence",
+    fullname: "Full Name",
+    placeholder_fullname: "Enter Your Name",
+    email: "Email",
+    placeholder_email: "Enter Your Email",
+    password: "Password",
+    placeholder_password: "Enter Your Password",
+    phone: "Phone",
+    placeholder_optional: "Optional",
+    register: "Sign Up",
+    registering: "Signing Up...",
+    already_registered: "Already registered?",
+    login: "Log In",
+    select_country_modal_title: "Select Country",
+    cancel: "Cancel",
+    select_language_modal_title: "Select Language",
+    language: "Language",
+    error_empty_fullname: "Please enter your full name.",
+    error_empty_email: "Please enter your email.",
+    error_empty_password: "Please enter your password.",
+    error_short_password: "Password must be at least 6 characters.",
+    error_registration_failed: "Failed to register: %{error}",
+    error_profile_save_failed: "Failed to save additional information.",
+    success_title: "Success",
+    success_registration_message:
+      "Your registration will be completed! Please check your email for confirmation.",
+    error_general_registration_failed: "Failed to complete registration.",
+    error_email_in_use: "This email is already in use.",
+    error_invalid_email: "Invalid email.",
+    error_weak_password: "Password is too weak.",
+  },
+  ua: {
+    greeting: "Реєстрація",
+    registration_subtitle: "Почніть піклуватися про себе — з реєстрації",
+    select_country: "Обрати країну проживання",
+    fullname: "Повне Ім’я",
+    placeholder_fullname: "Введіть Ваше Ім'я",
+    email: "Пошта",
+    placeholder_email: "Введіть Вашу електронну пошту",
+    password: "Пароль",
+    placeholder_password: "Введіть Ваш пароль",
+    phone: "Телефон",
+    placeholder_optional: "Необов'язково",
+    register: "Зареєструватися",
+    registering: "Реєстрація...",
+    already_registered: "Вже зареєстровані?",
+    login: "Увійти",
+    select_country_modal_title: "Виберіть країну",
+    cancel: "Скасувати",
+    select_language_modal_title: "Виберіть мову",
+    language: "Мова",
+    error_empty_fullname: "Будь ласка, введіть ваше повне ім'я.",
+    error_empty_email: "Будь ласка, введіть вашу електронну пошту.",
+    error_empty_password: "Будь ласка, введіть пароль.",
+    error_short_password: "Пароль повинен містити щонайменше 6 символів.",
+    error_registration_failed: "Не вдалося зареєструватися: %{error}",
+    error_profile_save_failed: "Не вдалося зберегти додаткову інформацію.",
+    success_title: "Успішно",
+    success_registration_message:
+      "Вашу реєстрацію буде завершено! Будь ласка, перевірте свою пошту для підтвердження.",
+    error_general_registration_failed: "Не вдалося завершити реєстрацію.",
+    error_email_in_use: "Ця електронна пошта вже використовується.",
+    error_invalid_email: "Недійсна електронна пошта.",
+    error_weak_password: "Пароль занадто слабкий.",
+  },
+};
+
+// Initialize i18n
+const i18n = new I18n(translations);
+i18n.enableFallback = true;
 
 const languages = [
   { name: "English", code: "en", emoji: "🇬🇧" },
-  { name: "Deutsch", code: "de", emoji: "🇩🇪" },
-  { name: "Polski", code: "pl", emoji: "🇵🇱" },
   { name: "Українська", code: "ua", emoji: "🇺🇦" },
+];
+
+const countries = [
+  { name: "Ukraine", code: "UA", emoji: "🇺🇦" },
+  { name: "United Kingdom", code: "GB", emoji: "🇬🇧" },
+  { name: "United States", code: "US", emoji: "🇺🇸" },
+  { name: "Canada", code: "CA", emoji: "🇨🇦" },
+  { name: "Germany", code: "DE", emoji: "🇩🇪" },
+  { name: "France", code: "FR", emoji: "🇫🇷" },
+  { name: "Poland", code: "PL", emoji: "🇵🇱" },
+  { name: "Italy", code: "IT", emoji: "🇮🇹" },
+  { name: "Spain", code: "ES", emoji: "🇪🇸" },
+  { name: "Japan", code: "JP", emoji: "🇯🇵" },
+  { name: "China", code: "CN", emoji: "🇨🇳" },
+  { name: "India", code: "IN", emoji: "🇮🇳" },
+  { name: "Australia", code: "AU", emoji: "🇦🇺" },
+  { name: "Brazil", code: "BR", emoji: "🇧🇷" },
+  { name: "Turkey", code: "TR", emoji: "🇹🇷" },
+  { name: "Sweden", code: "SE", emoji: "🇸🇪" },
+  { name: "Switzerland", code: "CH", emoji: "🇨🇭" },
+  { name: "Netherlands", code: "NL", emoji: "🇳🇱" },
+  { name: "Norway", code: "NO", emoji: "🇳🇴" },
+  { name: "Denmark", code: "DK", emoji: "🇩🇰" },
+  { name: "Finland", code: "FI", emoji: "🇫🇮" },
+  { name: "Russia", code: "RU", emoji: "🇷🇺" }, // Excluded for sensitivity
+  { name: "South Africa", code: "ZA", emoji: "🇿🇦" },
+  { name: "Mexico", code: "MX", emoji: "🇲🇽" },
+  { name: "South Korea", code: "KR", emoji: "🇰🇷" },
+  { name: "Argentina", code: "AR", emoji: "🇦🇷" },
+  { name: "Ireland", code: "IE", emoji: "🇮🇪" },
+  { name: "New Zealand", code: "NZ", emoji: "🇳🇿" },
+  { name: "Singapore", code: "SG", emoji: "🇸🇬" },
+  { name: "Israel", code: "IL", emoji: "🇮🇱" },
+  { name: "Malaysia", code: "MY", emoji: "🇲🇾" },
+  { name: "Thailand", code: "TH", emoji: "🇹🇭" },
+  { name: "Vietnam", code: "VN", emoji: "🇻🇳" },
+  { name: "Indonesia", code: "ID", emoji: "🇮🇩" },
+  { name: "Egypt", code: "EG", emoji: "🇪🇬" },
+  { name: "Nigeria", code: "NG", emoji: "🇳🇬" },
+  { name: "Saudi Arabia", code: "SA", emoji: "🇸🇦" },
+  { name: "United Arab Emirates", code: "AE", emoji: "🇦🇪" },
+  { name: "Kuwait", code: "KW", emoji: "🇰🇼" },
+  { name: "Qatar", code: "QA", emoji: "🇶🇦" },
 ];
 
 const RegisterScreen = () => {
@@ -37,14 +149,17 @@ const RegisterScreen = () => {
   const [isCountryModalVisible, setIsCountryModalVisible] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState(""); // Стан для пароля
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
-  const [language, setLanguage] = useState(languages[3]); // Default to Ukrainian
+  const [language, setLanguage] = useState(
+    languages.find((lang) => lang.code === getLocales()[0].languageCode) ||
+      languages[1]
+  );
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
   const [registrationError, setRegistrationError] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [dimensionsSubscription, setDimensionsSubscription] = useState(null); // Додано для зберігання підписки
+  const [dimensionsSubscription, setDimensionsSubscription] = useState(null);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -58,32 +173,36 @@ const RegisterScreen = () => {
     const subscription = Dimensions.addEventListener(
       "change",
       updateDimensions
-    ); // Отримуємо об'єкт підписки
-    setDimensionsSubscription(subscription); // Зберігаємо підписку
+    );
+    setDimensionsSubscription(subscription);
 
     return () => {
       if (dimensionsSubscription) {
-        dimensionsSubscription.remove(); // Використовуємо метод remove() об'єкта підписки
+        dimensionsSubscription.remove();
       }
     };
   }, []);
 
+  useEffect(() => {
+    i18n.locale = language.code;
+  }, [language]);
+
   const handleRegistration = async () => {
     setRegistrationError("");
     if (!fullName.trim()) {
-      setRegistrationError("Будь ласка, введіть ваше повне ім'я.");
+      setRegistrationError(i18n.t("error_empty_fullname"));
       return;
     }
     if (!email.trim()) {
-      setRegistrationError("Будь ласка, введіть вашу електронну пошту.");
+      setRegistrationError(i18n.t("error_empty_email"));
       return;
     }
     if (!password.trim()) {
-      setRegistrationError("Будь ласка, введіть пароль.");
+      setRegistrationError(i18n.t("error_empty_password"));
       return;
     }
     if (password.length < 6) {
-      setRegistrationError("Пароль повинен містити щонайменше 6 символів.");
+      setRegistrationError(i18n.t("error_short_password"));
       return;
     }
 
@@ -97,10 +216,9 @@ const RegisterScreen = () => {
       if (authError) {
         console.error("Помилка реєстрації Supabase Auth:", authError.message);
         setRegistrationError(
-          `Не вдалося зареєструватися: ${authError.message}`
+          i18n.t("error_registration_failed", { error: authError.message })
         );
       } else if (authData?.user?.id) {
-        // Успішно зареєстровано в Auth, тепер зберігаємо додаткову інформацію в таблиці профілів
         const { error: profileError } = await supabase.from("profiles").insert([
           {
             id: authData.user.id,
@@ -113,31 +231,31 @@ const RegisterScreen = () => {
 
         if (profileError) {
           console.error("Помилка збереження профілю:", profileError.message);
-          setRegistrationError("Не вдалося зберегти додаткову інформацію.");
-          await supabase.auth.signOut(); // Видаляємо користувача з auth, якщо не вдалося зберегти профіль
+          setRegistrationError(i18n.t("error_profile_save_failed"));
+          await supabase.auth.signOut();
         } else {
           Alert.alert(
-            "Успішно",
-            "Вашу реєстрацію буде завершено! Будь ласка, перевірте свою пошту для підтвердження."
+            i18n.t("success_title"),
+            i18n.t("success_registration_message")
           );
           setFullName("");
           setEmail("");
-          setPassword(""); // Очищаємо поле пароля
+          setPassword("");
           setPhone("");
           setCountry(null);
-          setLanguage(languages[3]); // Скинути мову до укр. після успіху
-          navigation.navigate("Home"); // Перехід на головний екран після успішної реєстрації
+          setLanguage(languages[1]);
+          navigation.navigate("Patsient_Home");
         }
       }
     } catch (error) {
       console.error("Помилка реєстрації:", error);
-      let errorMessage = "Не вдалося завершити реєстрацію.";
+      let errorMessage = i18n.t("error_general_registration_failed");
       if (error?.message?.includes("auth/email-already-in-use")) {
-        errorMessage = "Ця електронна пошта вже використовується.";
+        errorMessage = i18n.t("error_email_in_use");
       } else if (error?.message?.includes("auth/invalid-email")) {
-        errorMessage = "Недійсна електронна пошта.";
+        errorMessage = i18n.t("error_invalid_email");
       } else if (error?.message?.includes("auth/weak-password")) {
-        errorMessage = "Пароль занадто слабкий.";
+        errorMessage = i18n.t("error_weak_password");
       }
       setRegistrationError(errorMessage);
     } finally {
@@ -172,7 +290,7 @@ const RegisterScreen = () => {
   };
 
   const { width, height } = dimensions;
-  const isLargeScreen = width > 768; // Приклад: вважаємо планшети і більше великими
+  const isLargeScreen = width > 768;
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -198,14 +316,16 @@ const RegisterScreen = () => {
               <Path d="M19 6h-14"></Path>
             </Svg>
             <Text style={styles.selectLanguageText}>
-              {language ? `${language.emoji} ${language.name}` : "Мова"}
+              {language
+                ? `${language.emoji} ${language.name}`
+                : i18n.t("language")}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title(isLargeScreen)}>Зареєструватися</Text>
+        <Text style={styles.title(isLargeScreen)}>{i18n.t("greeting")}</Text>
         <Text style={styles.subtitle(isLargeScreen)}>
-          Почніть турботу про себе — з реєстрації
+          {i18n.t("registration_subtitle")}
         </Text>
         <TouchableOpacity
           style={styles.selectCountryButton(width)}
@@ -214,10 +334,10 @@ const RegisterScreen = () => {
           <Text style={styles.selectCountryText}>
             {country
               ? `${country.emoji} ${country.name}`
-              : "Обрати країну проживання"}
+              : i18n.t("select_country")}
           </Text>
         </TouchableOpacity>
-        <Text style={styles.subtitle2}>Повне Ім’я</Text>
+        <Text style={styles.subtitle2}>{i18n.t("fullname")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
             name="person-outline"
@@ -227,12 +347,12 @@ const RegisterScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Ведіть Ваше Ім'я"
+            placeholder={i18n.t("placeholder_fullname")}
             value={fullName}
             onChangeText={setFullName}
           />
         </View>
-        <Text style={styles.subtitle2}>Пошта</Text>
+        <Text style={styles.subtitle2}>{i18n.t("email")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
             name="mail-outline"
@@ -242,15 +362,14 @@ const RegisterScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Ведіть Вашу електронну пошту"
+            placeholder={i18n.t("placeholder_email")}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
         </View>
-        {/* Додане поле для пароля */}
-        <Text style={styles.subtitle2}>Пароль</Text>
+        <Text style={styles.subtitle2}>{i18n.t("password")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
             name="lock-closed-outline"
@@ -260,13 +379,13 @@ const RegisterScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Ведіть Ваш пароль"
+            placeholder={i18n.t("placeholder_password")}
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
           />
         </View>
-        <Text style={styles.subtitle2}>Телефон</Text>
+        <Text style={styles.subtitle2}>{i18n.t("phone")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
             name="call-outline"
@@ -276,7 +395,7 @@ const RegisterScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Необов'язково"
+            placeholder={i18n.t("placeholder_optional")}
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
@@ -291,7 +410,7 @@ const RegisterScreen = () => {
           disabled={isRegistering}
         >
           <Text style={styles.registerButtonText}>
-            {isRegistering ? "Реєстрація..." : "Зареєструватися"}
+            {isRegistering ? i18n.t("registering") : i18n.t("register")}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -299,8 +418,8 @@ const RegisterScreen = () => {
           onPress={() => navigation.navigate("LoginScreen")}
         >
           <Text style={styles.loginLinkText}>
-            Вже зареєстровані?
-            <Text style={{ fontWeight: "bold" }}> Увійти</Text>
+            {i18n.t("already_registered")}
+            <Text style={{ fontWeight: "bold" }}> {i18n.t("login")}</Text>
           </Text>
         </TouchableOpacity>
         <Modal
@@ -309,27 +428,31 @@ const RegisterScreen = () => {
           visible={isCountryModalVisible}
           onRequestClose={closeCountryModal}
         >
-          <View style={styles.centeredView}>
-            <View style={styles.modalView(width)}>
-              <Text style={styles.modalTitle}>Виберіть країну</Text>
-              {countryFlags.map((item) => (
-                <TouchableOpacity
-                  key={item.code}
-                  style={styles.countryItem}
-                  onPress={() => selectCountry(item)}
+          <ScrollView>
+            <View style={styles.centeredView}>
+              <View style={styles.modalView(width)}>
+                <Text style={styles.modalTitle}>
+                  {i18n.t("select_country_modal_title")}
+                </Text>
+                {countries.map((item) => (
+                  <TouchableOpacity
+                    key={item.code}
+                    style={styles.countryItem}
+                    onPress={() => selectCountry(item)}
+                  >
+                    <Text style={styles.countryEmoji}>{item.emoji}</Text>
+                    <Text style={styles.countryName}>{item.name}</Text>
+                  </TouchableOpacity>
+                ))}
+                <Pressable
+                  style={[styles.button, styles.buttonClose]}
+                  onPress={closeCountryModal}
                 >
-                  <Text style={styles.countryEmoji}>{item.emoji}</Text>
-                  <Text style={styles.countryName}>{item.name}</Text>
-                </TouchableOpacity>
-              ))}
-              <Pressable
-                style={[styles.button, styles.buttonClose]}
-                onPress={closeCountryModal}
-              >
-                <Text style={styles.textStyle}>Скасувати</Text>
-              </Pressable>
+                  <Text style={styles.textStyle}>{i18n.t("cancel")}</Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </Modal>
 
         <Modal
@@ -340,7 +463,9 @@ const RegisterScreen = () => {
         >
           <View style={styles.centeredView}>
             <View style={styles.modalView(width)}>
-              <Text style={styles.modalTitle}>Виберіть мову</Text>
+              <Text style={styles.modalTitle}>
+                {i18n.t("select_language_modal_title")}
+              </Text>
               {languages.map((item) => (
                 <TouchableOpacity
                   key={item.code}
@@ -355,7 +480,7 @@ const RegisterScreen = () => {
                 style={[styles.button, styles.buttonClose]}
                 onPress={closeLanguageModal}
               >
-                <Text style={styles.textStyle}>Скасувати</Text>
+                <Text style={styles.textStyle}>{i18n.t("cancel")}</Text>
               </Pressable>
             </View>
           </View>
@@ -375,8 +500,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     alignItems: "center",
-    paddingTop: height * 0.15, // Відносний відсоток від висоти екрану
-    paddingHorizontal: width * 0.05, // Відносний відступ
+    paddingTop: height * 0.15,
+    paddingHorizontal: width * 0.05,
     width: "100%",
   }),
   languageContainer: {
@@ -388,7 +513,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: (isLargeScreen) => ({
-    fontSize: isLargeScreen ? 36 : 32, // Збільшуємо розмір для великих екранів
+    fontSize: isLargeScreen ? 36 : 32,
     marginBottom: 9,
     fontFamily: "Mont-Bold",
     color: "#212121",
@@ -413,7 +538,7 @@ const styles = StyleSheet.create({
     borderRadius: 555,
     paddingVertical: 15,
     paddingHorizontal: 20,
-    width: width * 0.9, // Адаптивна ширина
+    width: width * 0.9,
     height: 52,
     alignItems: "center",
     marginBottom: 15,
@@ -450,7 +575,7 @@ const styles = StyleSheet.create({
     borderRadius: 555,
     paddingHorizontal: 15,
     marginBottom: 14,
-    width: width * 0.9, // Адаптивна ширина
+    width: width * 0.9,
     height: 52,
   }),
   icon: { marginRight: 10 },
@@ -463,7 +588,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0EB3EB",
     borderRadius: 555,
     paddingVertical: 15,
-    width: width * 0.9, // Адаптивна ширина
+    width: width * 0.9,
     height: 52,
     alignItems: "center",
     marginTop: 8,
@@ -494,7 +619,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: width * 0.9, // Адаптивна ширина модалки
+    width: width * 0.9,
   }),
   modalTitle: {
     fontSize: 20,

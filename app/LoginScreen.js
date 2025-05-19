@@ -51,7 +51,7 @@ const LoginScreen = () => {
         // Успішний вхід
         setEmail("");
         setPassword("");
-        navigation.navigate("Home"); // Перехід на головний екран після успішного входу
+        navigation.navigate("Patsient_Home"); // Перехід на головний екран після успішного входу
       }
     } catch (error) {
       console.error("Помилка входу:", error);
