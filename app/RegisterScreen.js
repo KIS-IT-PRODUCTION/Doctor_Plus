@@ -10,17 +10,17 @@ import {
   Alert,
   ScrollView,
   Dimensions,
-  Platform, // Додано для перевірки платформи
+  Platform,
+  TouchableWithoutFeedback, // Додано для закриття модального вікна при дотику до фону
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { Svg, Path } from "react-native-svg";
-import { supabase } from "../supabaseClient"; // Шлях до вашого supabaseClient.js
+// Svg та Path більше не потрібні для кнопки мови, якщо використовуємо Ionicons
+// import { Svg, Path } from "react-native-svg";
+import { supabase } from "../providers/supabaseClient";
 import { getLocales } from "expo-localization";
 import { I18n } from "i18n-js";
-
-// Clerk більше не використовується, тому імпорт видалено
 
 // Встановіть пари ключ-значення для різних мов, які ви хочете підтримувати.
 const translations = {
@@ -43,7 +43,7 @@ const translations = {
     select_country_modal_title: "Select Country",
     cancel: "Cancel",
     select_language_modal_title: "Select Language",
-    language: "Language",
+    language: "Language", // Це більше не буде використовуватися як основний текст кнопки, але можна залишити
     error_empty_fullname: "Please enter your full name.",
     error_empty_email: "Please enter your email.",
     error_empty_password: "Please enter your password.",
@@ -57,7 +57,10 @@ const translations = {
     error_email_in_use: "This email is already in use.",
     error_invalid_email: "Invalid email.",
     error_weak_password: "Password is too weak.",
-    // Clerk-специфічні переклади видалено
+    // Додаємо переклади для модального вікна мови, як у Patsient_Home
+    selectLanguage: "Select Language",
+    ukrainian: "🇺🇦 Ukrainian",
+    english: "🇬🇧 English",
   },
   ua: {
     greeting: "Реєстрація",
@@ -78,8 +81,8 @@ const translations = {
     select_country_modal_title: "Виберіть країну",
     cancel: "Скасувати",
     select_language_modal_title: "Виберіть мову",
-    language: "Мова",
-    error_empty_fullname: "Будь ласка, введіть ваше повне ім'я.",
+    language: "Мова", // Це більше не буде використовуватися як основний текст кнопки, але можна залишити
+    error_empty_fullname: "Будь ла ласка, введіть ваше повне ім'я.",
     error_empty_email: "Будь ласка, введіть вашу електронну пошту.",
     error_empty_password: "Будь ласка, введіть пароль.",
     error_short_password: "Пароль повинен містити щонайменше 6 символів.",
@@ -92,7 +95,10 @@ const translations = {
     error_email_in_use: "Ця електронна пошта вже використовується.",
     error_invalid_email: "Недійсна електронна пошта.",
     error_weak_password: "Пароль занадто слабкий.",
-    // Clerk-специфічні переклади видалено
+    // Додаємо переклади для модального вікна мови, як у Patsient_Home
+    selectLanguage: "Оберіть мову",
+    ukrainian: "🇺🇦 Українська",
+    english: "🇬🇧 Англійська",
   },
 };
 
@@ -100,10 +106,18 @@ const translations = {
 const i18n = new I18n(translations);
 i18n.enableFallback = true;
 
-const languages = [
-  { name: "English", code: "en", emoji: "🇬🇧" },
-  { name: "Українська", code: "ua", emoji: "🇺🇦" },
-];
+// Встановлюємо початкову мову з налаштувань пристрою або за замовчуванням
+const getDeviceLanguage = () => {
+  const locales = getLocales();
+  if (locales && locales.length > 0) {
+    const deviceLanguageCode = locales[0].languageCode;
+    // Перевіряємо, чи підтримуємо ми цю мову, інакше встановлюємо 'ua'
+    return translations[deviceLanguageCode] ? deviceLanguageCode : "ua";
+  }
+  return "ua"; // За замовчуванням українська
+};
+
+i18n.locale = getDeviceLanguage();
 
 const countries = [
   { name: "Ukraine", code: "UA", emoji: "🇺🇦" },
@@ -156,15 +170,17 @@ const RegisterScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
-  const [language, setLanguage] = useState(
-    languages.find((lang) => lang.code === getLocales()[0].languageCode) ||
-      languages[1]
-  );
+  // Ми більше не зберігаємо вибрану мову як окремий об'єкт 'language'
+  // i18n.locale буде керувати поточною мовою
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
   const [registrationError, setRegistrationError] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [dimensionsSubscription, setDimensionsSubscription] = useState(null);
+  // Стан для відображення поточної вибраної мови на кнопці
+  const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
+    i18n.locale.toUpperCase()
+  );
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -175,36 +191,33 @@ const RegisterScreen = () => {
     };
 
     updateDimensions();
-    // Dimensions.addEventListener повертає об'єкт Subscription, який має метод remove()
-    // Для веб-платформи (React Native for Web) addEventListener може бути відсутнім
-    if (Platform.OS === 'web') {
-        const handleResize = () => updateDimensions();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+    if (Platform.OS === "web") {
+      const handleResize = () => updateDimensions();
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
     } else {
-        const subscription = Dimensions.addEventListener(
-            "change",
-            updateDimensions
-        );
-        setDimensionsSubscription(subscription);
+      const subscription = Dimensions.addEventListener(
+        "change",
+        updateDimensions
+      );
+      setDimensionsSubscription(subscription);
 
-        return () => {
-            // Перевіряємо, чи існує підписка, перш ніж її видаляти
-            if (subscription) {
-                subscription.remove();
-            }
-        };
+      return () => {
+        if (subscription) {
+          subscription.remove();
+        }
+      };
     }
   }, []);
 
+  // Оновлюємо displayedLanguageCode при зміні i18n.locale
   useEffect(() => {
-    i18n.locale = language.code;
-  }, [language]);
+    setDisplayedLanguageCode(i18n.locale.toUpperCase());
+  }, [i18n.locale]);
 
   const handleRegistration = async () => {
-    setRegistrationError(""); // Очистити попередні помилки
+    setRegistrationError("");
 
-    // Валідація полів
     if (!fullName.trim()) {
       setRegistrationError(i18n.t("error_empty_fullname"));
       return;
@@ -217,16 +230,14 @@ const RegisterScreen = () => {
       setRegistrationError(i18n.t("error_empty_password"));
       return;
     }
-    // Supabase за замовчуванням вимагає мінімум 6 символів для пароля
     if (password.length < 6) {
       setRegistrationError(i18n.t("error_short_password"));
       return;
     }
 
-    setIsRegistering(true); // Встановити стан реєстрації в true
+    setIsRegistering(true);
 
     try {
-      // 1. Реєстрація користувача через Supabase Auth
       const { data, error: authError } = await supabase.auth.signUp({
         email: email,
         password: password,
@@ -248,18 +259,16 @@ const RegisterScreen = () => {
         return;
       }
 
-      // 2. Якщо реєстрація в Supabase Auth успішна, зберегти додаткові дані профілю
-      // Перевіряємо, чи є користувач у даних відповіді
       if (data.user) {
         console.log("Supabase user registered. User ID:", data.user.id);
 
         const { error: profileError } = await supabase.from("profiles").insert([
           {
-            id: data.user.id, // Використовуємо ID користувача від Supabase Auth
+            id: data.user.id,
             full_name: fullName.trim(),
-            phone: phone.trim() || null, // Залишаємо null, якщо порожнє
-            country: country?.name || null, // Залишаємо null, якщо не вибрано
-            language: language?.name || null, // Залишаємо null, якщо не вибрано
+            phone: phone.trim() || null,
+            country: country?.name || null,
+            language: i18n.locale || null, // Зберігаємо поточну локаль i18n
           },
         ]);
 
@@ -269,27 +278,20 @@ const RegisterScreen = () => {
             profileError.message
           );
           setRegistrationError(i18n.t("error_profile_save_failed"));
-          // У реальному додатку тут потрібно подумати про відкат або додаткову логіку обробки
-          // Наприклад, видалити користувача з Supabase Auth, якщо профіль не вдалося зберегти.
         } else {
-          // Успішна реєстрація та збереження профілю
           Alert.alert(
             i18n.t("success_title"),
             i18n.t("success_registration_message")
           );
-          // Очистити поля форми
           setFullName("");
           setEmail("");
           setPassword("");
           setPhone("");
           setCountry(null);
-          setLanguage(languages[1]); // Повернути мову за замовчуванням
-          // Перенаправити користувача на екран входу (або головний екран, якщо авто-вхід)
-          navigation.navigate("LoginScreen"); // Зазвичай перенаправляють на вхід, щоб користувач підтвердив пошту
+          // Мову не потрібно скидати, оскільки вона керується i18n.locale
+          navigation.navigate("LoginScreen");
         }
       } else {
-        // Це може статися, якщо signUp повертає успіх, але user об'єкт відсутній
-        // (наприклад, якщо використовується потік без підтвердження пошти, але без автоматичного входу)
         console.warn("Supabase signUp completed, but user object is missing.");
         Alert.alert(
           i18n.t("success_title"),
@@ -301,7 +303,7 @@ const RegisterScreen = () => {
       console.error("Загальна помилка при реєстрації:", err);
       setRegistrationError(i18n.t("error_general_registration_failed"));
     } finally {
-      setIsRegistering(false); // Завжди повертати стан реєстрації в false
+      setIsRegistering(false);
     }
   };
 
@@ -326,42 +328,38 @@ const RegisterScreen = () => {
     closeCountryModal();
   };
 
-  const selectLanguage = (selectedLanguage) => {
-    setLanguage(selectedLanguage);
+  // Оновлена функція вибору мови
+  const handleLanguageSelect = (langCode) => {
+    i18n.locale = langCode; // Змінюємо поточну локаль i18n
+    setDisplayedLanguageCode(langCode.toUpperCase()); // Оновлюємо код мови на кнопці
     closeLanguageModal();
   };
 
   const { width, height } = dimensions;
   const isLargeScreen = width > 768;
 
+  // Оновлені languages для модального вікна
+  const languagesForModal = [
+    { nameKey: "english", code: "en", emoji: "🇬🇧" },
+    { nameKey: "ukrainian", code: "ua", emoji: "🇺🇦" },
+  ];
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container(width, height)}>
         <StatusBar style="auto" />
-        <View style={styles.languageContainer}>
+        {/* Оновлена кнопка вибору мови */}
+        <View style={styles.languageContainerRegister}>
           <TouchableOpacity
-            style={styles.selectLanguageButton}
+            style={styles.languageButtonRegister}
             onPress={openLanguageModal}
           >
-            <Svg
-              width={24}
-              height={24}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="black"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></Path>
-              <Path d="M10 11l-5-5 5-5"></Path>
-              <Path d="M19 6h-14"></Path>
-            </Svg>
-            <Text style={styles.selectLanguageText}>
-              {language
-                ? `${language.emoji} ${language.name}`
-                : i18n.t("language")}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={styles.languageTextRegister}>
+                {displayedLanguageCode}
+              </Text>
+              <Ionicons name="chevron-down-outline" size={16} color="white" />
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -497,35 +495,35 @@ const RegisterScreen = () => {
           </ScrollView>
         </Modal>
 
+        {/* Оновлене модальне вікно для вибору мови */}
         <Modal
-          animationType="slide"
+          animationType="fade"
           transparent={true}
           visible={isLanguageModalVisible}
           onRequestClose={closeLanguageModal}
         >
-          <View style={styles.centeredView}>
-            <View style={styles.modalView(width)}>
-              <Text style={styles.modalTitle}>
-                {i18n.t("select_language_modal_title")}
-              </Text>
-              {languages.map((item) => (
-                <TouchableOpacity
-                  key={item.code}
-                  style={styles.countryItem}
-                  onPress={() => selectLanguage(item)}
-                >
-                  <Text style={styles.countryEmoji}>{item.emoji}</Text>
-                  <Text style={styles.countryName}>{item.name}</Text>
-                </TouchableOpacity>
-              ))}
-              <Pressable
-                style={[styles.button, styles.buttonClose]}
-                onPress={closeLanguageModal}
-              >
-                <Text style={styles.textStyle}>{i18n.t("cancel")}</Text>
-              </Pressable>
+          <TouchableWithoutFeedback onPress={closeLanguageModal}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.languageModalContent}>
+                  <Text style={styles.modalTitle}>
+                    {i18n.t("selectLanguage")}
+                  </Text>
+                  {languagesForModal.map((item) => (
+                    <TouchableOpacity
+                      key={item.code}
+                      style={styles.languageOption}
+                      onPress={() => handleLanguageSelect(item.code)}
+                    >
+                      <Text style={styles.languageOptionText}>
+                        {i18n.t(item.nameKey)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </Modal>
       </View>
     </ScrollView>
@@ -546,13 +544,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: width * 0.05,
     width: "100%",
   }),
-  languageContainer: {
+  // Оновлені стилі для кнопки мови
+  languageContainerRegister: {
     flexDirection: "row",
     position: "absolute",
-    top: 40,
-    left: 20,
+    marginTop: 50,
     zIndex: 10,
     alignItems: "center",
+  },
+  languageButtonRegister: {
+    backgroundColor: "#0EB3EB", // Синій фон
+    borderRadius: 10,
+    width: 71, // Фіксована ширина
+    paddingVertical: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  languageTextRegister: {
+    fontSize: 14,
+    fontFamily: "Mont-Bold",
+    color: "white",
+    marginHorizontal: 5,
   },
   title: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 36 : 32,
@@ -592,24 +605,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Mont-Medium",
   },
-  selectLanguageButton: {
-    backgroundColor: "transparent",
-    borderRadius: 555,
-    paddingVertical: 15,
-    paddingHorizontal: 0,
-    width: "auto",
-    height: "auto",
-    alignItems: "center",
-    marginBottom: 15,
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  selectLanguageText: {
-    color: "#00ACC1",
-    fontSize: 16,
-    fontFamily: "Mont-Medium",
-    marginLeft: 8,
-  },
+  // Ці стилі для старої кнопки selectLanguageButton та selectLanguageText більше не потрібні
+  // оскільки ми замінюємо їх на languageButtonRegister та languageTextRegister
+  // selectLanguageButton: {
+  //   backgroundColor: "transparent",
+  //   borderRadius: 555,
+  //   paddingVertical: 15,
+  //   paddingHorizontal: 0,
+  //   width: "auto",
+  //   height: "auto",
+  //   alignItems: "center",
+  //   marginBottom: 15,
+  //   flexDirection: "row",
+  //   justifyContent: "center",
+  // },
+  // selectLanguageText: {
+  //   color: "#00ACC1",
+  //   fontSize: 16,
+  //   fontFamily: "Mont-Medium",
+  //   marginLeft: 8,
+  // },
   inputContainer: (width) => ({
     flexDirection: "row",
     alignItems: "center",
@@ -695,12 +710,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-  logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#fff",
-  },
   errorText: {
     color: "red",
     marginBottom: 10,
@@ -713,6 +722,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#757575",
     fontFamily: "Mont-Regular",
+  },
+  // Стилі для нового модального вікна мови (як у Patsient_Home)
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  languageModalContent: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    width: Dimensions.get("window").width * 0.8, // Використовуємо Dimensions.get("window").width
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  languageOption: {
+    paddingVertical: 15,
+    width: "100%",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECECEC",
+  },
+  languageOptionText: {
+    fontSize: 18,
+    fontFamily: "Mont-Regular",
+    color: "#333333",
   },
 });
 

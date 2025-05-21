@@ -12,9 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-     "extra": {
+    "extra": {
       "clerkPublishableKey": "pk_test_YmV0dGVyLWxhbXByZXktMjkuY2xlcmsuYWNjb3VudHMuZGV2JA",
-      "supabaseUrl": "https://cznwzsrpgookgxhfgysd.supabase.co", 
+      "supabaseUrl": "https://cznwzsrpgookgxhfgysd.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6bnd6c3JwZ29va2d4aGZneXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc1MDI1MjIsImV4cCI6MjA2MzA3ODUyMn0.b-tQQWpOe4EeoUHa1dAO23iDy5QjdUihrYEGqVey5vY"
     },
     "ios": {
@@ -32,7 +32,8 @@
     },
     "plugins": [
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ]
   }
 }

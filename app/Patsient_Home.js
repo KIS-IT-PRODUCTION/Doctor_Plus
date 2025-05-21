@@ -10,69 +10,234 @@ import {
   Alert,
   ScrollView,
   Platform,
+  Modal,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Svg, Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
+import Icon from "../assets/icon.svg";
+import People from "../assets/Main/people.svg";
 import { useNavigation } from "@react-navigation/native";
-import Icon from "../assets/Icon.js"; // Шлях до вашого SVG компонента
-import { supabase } from "../supabaseClient";
-import { useAuth } from "../AuthProvider";
+import { supabase } from "../providers/supabaseClient";
+import { useAuth } from "../providers/AuthProvider";
+import TabBar from "../components/TopBar.js"; // Переконайтеся, що шлях правильний
+
+// --- Імпорти для i18n ---
+import { getLocales } from "expo-localization";
+import { I18n } from "i18n-js";
 
 const { width } = Dimensions.get("window");
 const containerWidth = width * 0.9;
+
+// --- Об'єкт з перекладами для Patsient_Home ---
+const translations = {
+  en: {
+    selectLanguage: "Select Language",
+    ukrainian: "🇺🇦 Ukrainian",
+    english: "🇬🇧 English",
+    chooseDoctorSpecialization: "Choose Doctor's Specialization",
+    search: "Search",
+    notifications: "Notifications",
+    home: "Home",
+    questions: "Questions",
+    support: "Support",
+    favorites: "Favorites",
+    error: "Error",
+    pleaseEnterText: "Please enter text to save.",
+    loadingUserData: "Loading user data...",
+    notAuthorized: "You are not authorized. Please log in.",
+    saveError: "Failed to save information: %{error}",
+    saveSuccess: "Information successfully successfully saved!",
+    unknownError: "An unknown error occurred.",
+    signOut: "Sign Out",
+    signOutError: "Failed to sign out: %{error}",
+    signOutSuccess: "You have successfully signed out.",
+    // Додано переклади для спеціалізацій (мінімум 20)
+    traumatologist: "Traumatologist",
+    pediatrician: "Pediatrician",
+    gynecologist: "Gynecologist",
+    ent: "ENT",
+    surgeon: "Surgeon",
+    cardiologist: "Cardiologist",
+    dentist: "Dentist",
+    dermatologist: "Dermatologist",
+    ophthalmologist: "Ophthalmologist",
+    neurologist: "Neurologist",
+    endocrinologist: "Endocrinologist",
+    gastroenterologist: "Gastroenterologist",
+    urologist: "Urologist",
+    pulmonologist: "Pulmonologist",
+    nephrologist: "Nephrologist",
+    rheumatologist: "Rheumatologist",
+    oncologist: "Oncologist",
+    allergist: "Allergist",
+    infectiousDiseasesSpecialist: "Infectious Diseases Specialist",
+    psychiatrist: "Psychiatrist",
+    psychologist: "Psychologist",
+    physiotherapist: "Physiotherapist",
+    nutritionist: "Nutritionist",
+    radiologist: "Radiologist",
+    anesthesiologist: "Anesthesiologist",
+    goTo: "Go to",
+    selectSpecialization: "Select Specialization",
+    cancel: "Cancel", // Переклад для кнопки "Скасувати"
+  },
+  ua: {
+    selectLanguage: "Оберіть мову",
+    ukrainian: "🇺🇦 Українська",
+    english: "🇬🇧 English",
+    chooseDoctorSpecialization: "Оберіть спеціалізацію лікаря",
+    search: "Пошук",
+    notifications: "Сповіщення",
+    home: "Головна",
+    questions: "Питання",
+    support: "Підтримка",
+    favorites: "Вибране",
+    error: "Помилка",
+    pleaseEnterText: "Будь ласка, введіть текст для збереження.",
+    loadingUserData: "Завантаження даних користувача...",
+    notAuthorized: "Ви не авторизовані. Будь ласка, увійдіть.",
+    saveError: "Не вдалося зберегти інформацію: %{error}",
+    saveSuccess: "Інформація успішно збережена!",
+    unknownError: "Виникла невідома помилка.",
+    signOut: "Вихід",
+    signOutError: "Не вдалося вийти: %{error}",
+    signOutSuccess: "Ви успішно вийшли.",
+    // Додано переклади для спеціалізацій (мінімум 20)
+    traumatologist: "Травматолог",
+    pediatrician: "Педіатр",
+    gynecologist: "Гінеколог",
+    ent: "Лор",
+    surgeon: "Хірург",
+    cardiologist: "Кардіолог",
+    dentist: "Стоматолог",
+    dermatologist: "Дерматолог",
+    ophthalmologist: "Офтальмолог",
+    neurologist: "Невролог",
+    endocrinologist: "Ендокринолог",
+    gastroenterologist: "Гастроентеролог",
+    urologist: "Уролог",
+    pulmonologist: "Пульмонолог",
+    nephrologist: "Нефролог",
+    rheumatologist: "Ревматолог",
+    oncologist: "Онколог",
+    allergist: "Алерголог",
+    infectiousDiseasesSpecialist: "Інфекціоніст",
+    psychiatrist: "Психіатр",
+    psychologist: "Психолог",
+    physiotherapist: "Фізіотерапевт",
+    nutritionist: "Дієтолог",
+    radiologist: "Радіолог",
+    anesthesiologist: "Анестезіолог",
+    goTo: "Перейти",
+    selectSpecialization: "Оберіть спеціалізацію",
+    cancel: "Скасувати", // Переклад для кнопки "Скасувати"
+  },
+};
+
+// Ініціалізація i18n
+const i18n = new I18n(translations);
+i18n.enableFallback = true; // Використовувати резервну мову, якщо переклад відсутній
+
+// Встановлюємо початкову мову з налаштувань пристрою або за замовчуванням
+const getDeviceLanguage = () => {
+  const locales = getLocales();
+  if (locales && locales.length > 0) {
+    const deviceLanguageCode = locales[0].languageCode;
+    // Перевіряємо, чи підтримуємо ми цю мову, інакше встановлюємо 'ua'
+    return translations[deviceLanguageCode] ? deviceLanguageCode : "ua";
+  }
+  return "ua"; // За замовчуванням українська
+};
+
+i18n.locale = getDeviceLanguage();
+
+// Список спеціалізацій лікарів (мінімум 20)
+const doctorSpecializations = [
+  { key: "traumatologist", nameKey: "traumatologist" },
+  { key: "pediatrician", nameKey: "pediatrician" },
+  { key: "gynecologist", nameKey: "gynecologist" },
+  { key: "ent", nameKey: "ent" },
+  { key: "surgeon", nameKey: "surgeon" },
+  { key: "cardiologist", nameKey: "cardiologist" },
+  { key: "dentist", nameKey: "dentist" },
+  { key: "dermatologist", nameKey: "dermatologist" },
+  { key: "ophthalmologist", nameKey: "ophthalmologist" },
+  { key: "neurologist", nameKey: "neurologist" },
+  { key: "endocrinologist", nameKey: "endocrinologist" },
+  { key: "gastroenterologist", nameKey: "gastroenterologist" },
+  { key: "urologist", nameKey: "urologist" },
+  { key: "pulmonologist", nameKey: "pulmonologist" },
+  { key: "nephrologist", nameKey: "nephrologist" },
+  { key: "rheumatologist", nameKey: "rheumatologist" },
+  { key: "oncologist", nameKey: "oncologist" },
+  { key: "allergist", nameKey: "allergist" },
+  {
+    key: "infectiousDiseasesSpecialist",
+    nameKey: "infectiousDiseasesSpecialist",
+  },
+  { key: "psychiatrist", nameKey: "psychiatrist" },
+  { key: "psychologist", nameKey: "psychologist" },
+  { key: "physiotherapist", nameKey: "physiotherapist" },
+  { key: "nutritionist", nameKey: "nutritionist" },
+  { key: "radiologist", nameKey: "radiologist" },
+  { key: "anesthesiologist", nameKey: "anesthesiologist" },
+];
 
 const Patsient_Home = () => {
   const navigation = useNavigation();
   const { session, loading: authLoading } = useAuth();
   const [personalInfoText, setPersonalInfoText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [dimensionsSubscription, setDimensionsSubscription] = useState(null);
+  const [activeTab, setActiveTab] = useState("Home"); // Початкова активна вкладка
+  const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
+  const [isSpecializationModalVisible, setSpecializationModalVisible] =
+    useState(false);
+
+  // Стан для відображення поточної вибраної мови на кнопці
+  const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
+    i18n.locale.toUpperCase()
+  );
 
   useEffect(() => {
-    const updateDimensions = () => {
-      setDimensions({
-        width: Dimensions.get("window").width,
-        height: Dimensions.get("window").height,
-      });
-    };
-
+    const updateDimensions = () => {};
     updateDimensions();
-    if (Platform.OS === 'web') {
-        const handleResize = () => updateDimensions();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+    if (Platform.OS === "web") {
+      const handleResize = () => updateDimensions();
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
     } else {
-        const subscription = Dimensions.addEventListener(
-            "change",
-            updateDimensions
-        );
-        setDimensionsSubscription(subscription);
-
-        return () => {
-            if (subscription) {
-                subscription.remove();
-            }
-        };
+      const subscription = Dimensions.addEventListener(
+        "change",
+        updateDimensions
+      );
+      return () => {
+        if (subscription) {
+          subscription.remove();
+        }
+      };
     }
   }, []);
 
+  // Оновлюємо мову i18n та текст на кнопці, коли користувач змінює мову через модальне вікно
+  useEffect(() => {
+    setDisplayedLanguageCode(i18n.locale.toUpperCase());
+  }, [i18n.locale]);
+
   const handleSaveInfo = async () => {
     if (!personalInfoText.trim()) {
-      Alert.alert("Помилка", "Будь ласка, введіть текст для збереження.");
+      Alert.alert(i18n.t("error"), i18n.t("pleaseEnterText"));
       return;
     }
 
     if (authLoading) {
-      Alert.alert("Зачекайте", "Завантаження даних користувача...");
+      Alert.alert(i18n.t("loadingUserData"));
       return;
     }
 
     if (!session?.user) {
-      Alert.alert("Помилка", "Ви не авторизовані. Будь ласка, увійдіть.");
-      navigation.navigate("LoginScreen");
+      Alert.alert(i18n.t("error"), i18n.t("notAuthorized"));
+      navigation.navigate("LoginScreen"); // Можливо, "Auth" або "Welcome"
       return;
     }
 
@@ -88,16 +253,16 @@ const Patsient_Home = () => {
       if (error) {
         console.error("Помилка збереження інформації:", error);
         Alert.alert(
-          "Помилка",
-          "Не вдалося зберегти інформацію: " + error.message
+          i18n.t("error"),
+          i18n.t("saveError", { error: error.message })
         );
       } else {
-        Alert.alert("Успіх", "Інформація успішно збережена!");
+        Alert.alert(i18n.t("saveSuccess"));
         setPersonalInfoText("");
       }
     } catch (err) {
       console.error("Загальна помилка при збереженні інформації:", err);
-      Alert.alert("Помилка", "Виникла невідома помилка.");
+      Alert.alert(i18n.t("error"), i18n.t("unknownError"));
     } finally {
       setIsSaving(false);
     }
@@ -107,168 +272,254 @@ const Patsient_Home = () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("Помилка виходу:", error.message);
-      Alert.alert("Помилка", "Не вдалося вийти: " + error.message);
+      Alert.alert(
+        i18n.t("error"),
+        i18n.t("signOutError", { error: error.message })
+      );
     } else {
-      Alert.alert("Вихід", "Ви успішно вийшли.");
-      navigation.navigate("LoginScreen");
+      Alert.alert(i18n.t("signOut"), i18n.t("signOutSuccess"));
+      navigation.navigate("LoginScreen"); // Перенаправлення на екран входу
     }
   };
 
+  const openLanguageModal = () => {
+    setLanguageModalVisible(true);
+  };
+
+  const closeLanguageModal = () => {
+    setLanguageModalVisible(false);
+  };
+
+  const handleLanguageSelect = (langCode) => {
+    i18n.locale = langCode; // Змінюємо поточну локаль i18n
+    setDisplayedLanguageCode(langCode.toUpperCase()); // Оновлюємо код мови на кнопці
+    closeLanguageModal();
+  };
+
+  // Функції для модального вікна спеціалізацій
+  const openSpecializationModal = () => {
+    setSpecializationModalVisible(true);
+  };
+
+  const closeSpecializationModal = () => {
+    setSpecializationModalVisible(false);
+  };
+
+  const handleSpecializationSelect = (specializationKey) => {
+    Alert.alert("Обрано спеціалізацію", i18n.t(specializationKey));
+    closeSpecializationModal();
+    // Тут можна додати логіку для переходу до відповідного екрана або фільтрації лікарів
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContentContainer}>
-        <View style={styles.container}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            {/* Логотип */}
-            <View style={styles.logoContainer}>
-              <Icon width={50} height={50} />
-            </View>
-            {/* Кнопка вибору мови */}
-            <TouchableOpacity style={styles.languageButton}>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Svg width={20} height={20} viewBox="0 0 24 24">
-                  <Path
-                    fill="#4285F4"
-                    d="M12 4v4l-3-3-3 3V4c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2z"
-                  />
-                  <Path
-                    fill="#34A853"
-                    d="M12 20v-4l3 3 3-3v4c0 1.1-.9 2-2 2h-2c-1.1 0-2-.9-2-2z"
-                  />
-                  <Path
-                    fill="#FBBC05"
-                    d="M4 12h4l-3 3 3 3h-4c-1.1 0-2-.9-2-2v-2c0-1.1.9-2 2-2z"
-                  />
-                  <Path
-                    fill="#EA4335"
-                    d="M20 12h-4l3-3-3-3h4c1.1 0 2 .9 2 2v2c0 1.1-.9 2-2 2z"
-                  />
-                </Svg>
-                <Text style={styles.languageText}>UA</Text>
-                <Ionicons name="chevron-down-outline" size={16} color="black" />
+    <View style={styles.fullScreenContainer}>
+      <SafeAreaView style={styles.safeAreaContent}>
+        <ScrollView contentContainerStyle={styles.scrollContentContainer}>
+          <View style={styles.container}>
+            {/* Header Section */}
+            <View style={styles.header}>
+              {/* Логотип */}
+              <View style={styles.logoContainer}>
+                <Icon width={50} height={50} />
               </View>
-            </TouchableOpacity>
-            {/* Іконка сповіщень */}
-            <TouchableOpacity style={styles.notificationButton}>
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color="#81D4FA"
-              />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationNumber}>5</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Main Content Section */}
-          <View style={styles.mainContent}>
-            {/* Кнопка вибору спеціалізації лікаря */}
-            <TouchableOpacity style={styles.specializationButton}>
-              <Text style={styles.specializationText}>
-                Оберіть спеціалізацію лікаря
-              </Text>
-            </TouchableOpacity>
-
-            {/* Зображення лікарів */}
-            <View style={styles.doctorsImageContainer}>
-              <Image
-                source={{ uri: "https://placehold.co/300x200/FFFFFF/000000?text=Doctors+Illustration" }}
-                style={styles.doctorImage}
-                resizeMode="contain"
-              />
-            </View>
-
-            {/* Поле пошуку */}
-            <View style={styles.searchContainer}>
-              <Ionicons
-                name="search"
-                size={20}
-                color="#BDBDBD"
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Пошук"
-                placeholderTextColor="#BDBDBD"
-              />
-            </View>
-
-            {/* НОВЕ ПОЛЕ ДЛЯ ІНФОРМАЦІЇ (зберігаємо, хоча його немає на знімку екрана) */}
-            <Text style={styles.infoTitle}>Ваша особиста інформація:</Text>
-            <TextInput
-              style={styles.infoInput}
-              placeholder="Введіть важливу інформацію тут..."
-              multiline={true}
-              numberOfLines={6}
-              value={personalInfoText}
-              onChangeText={setPersonalInfoText}
-            />
-            <TouchableOpacity
-              style={styles.saveInfoButton}
-              onPress={handleSaveInfo}
-              disabled={isSaving || authLoading}
-            >
-              <Text style={styles.saveInfoButtonText}>
-                {isSaving
-                  ? "Збереження..."
-                  : authLoading
-                  ? "Завантаження..."
-                  : "Зберегти інформацію"}
-              </Text>
-            </TouchableOpacity>
-            {/* Кнопка виходу (зберігаємо, хоча її немає на знімку екрана) */}
-            <TouchableOpacity
-              style={styles.signOutButton}
-              onPress={handleSignOut}
-            >
-              <Text style={styles.signOutButtonText}>Вийти</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Footer Section */}
-          {/* Змінено LinearGradient на View з фоном для відповідності зображенню */}
-          <View style={styles.footerContainer}>
-            <View style={styles.footer}>
-              <TouchableOpacity style={styles.footerButton}>
-                <Ionicons name="home-outline" size={24} color="#757575" />
-                <Text style={styles.footerButtonText}>Головна</Text>
+              {/* Кнопка вибору мови */}
+              <TouchableOpacity
+                style={styles.languageButton}
+                onPress={openLanguageModal}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={styles.languageText}>
+                    {displayedLanguageCode}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down-outline"
+                    size={16}
+                    color="white"
+                  />
+                </View>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.footerButton}>
+              {/* Іконка сповіщень */}
+              <TouchableOpacity style={styles.notificationButton}>
                 <Ionicons
-                  name="chatbubble-ellipses-outline"
+                  name="notifications-outline"
                   size={24}
-                  color="#757575"
+                  color="white"
                 />
-                <Text style={styles.footerButtonText}>Питання</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.footerButton}>
-                <Ionicons name="headset-outline" size={24} color="#757575" />
-                <Text style={styles.footerButtonText}>Записи</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.footerButton}>
-                {/* Змінено іконку на chatbox-outline для відповідності зображенню */}
-                <Ionicons name="chatbox-outline" size={24} color="#757575" />
-                <Text style={styles.footerButtonText}>Чат</Text>
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationNumber}>5</Text>
+                </View>
               </TouchableOpacity>
             </View>
+
+            {/* Main Content Section */}
+            <View style={styles.mainContent}>
+              {/* Кнопка вибору спеціалізації лікаря */}
+              <TouchableOpacity
+                style={styles.specializationButton}
+                onPress={openSpecializationModal}
+              >
+                <Text style={styles.specializationText}>
+                  {i18n.t("chooseDoctorSpecialization")}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Зображення лікарів */}
+              <View style={styles.doctorsImageContainer}>
+                <People style={styles.peopleImage} />
+              </View>
+
+              {/* Поле пошуку */}
+              <View style={styles.searchContainer}>
+                <Ionicons
+                  name="search"
+                  size={20}
+                  color="#BDBDBD"
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={i18n.t("search")}
+                  placeholderTextColor="#BDBDBD"
+                />
+              </View>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* TabBar внизу екрана */}
+      <TabBar activeTab={activeTab} onTabPress={setActiveTab} i18n={i18n} />
+
+      {/* Модальне вікно для вибору мови */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isLanguageModalVisible}
+        onRequestClose={closeLanguageModal}
+      >
+        <TouchableWithoutFeedback onPress={closeLanguageModal}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback
+              onPress={() => {
+                /* Залишаємо порожньою, щоб не закривати модалку при натисканні всередині */
+              }}
+            >
+              <View style={styles.languageModalContent}>
+                <Text style={styles.modalTitle}>
+                  {i18n.t("selectLanguage")}
+                </Text>
+                <TouchableOpacity
+                  style={styles.languageOption}
+                  onPress={() => handleLanguageSelect("ua")}
+                >
+                  <Text style={styles.languageOptionText}>
+                    {i18n.t("ukrainian")}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.languageOption, { borderBottomWidth: 0 }]}
+                  onPress={() => handleLanguageSelect("en")}
+                >
+                  <Text style={styles.languageOptionText}>
+                    {i18n.t("english")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Модальне вікно для вибору спеціалізації лікаря */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isSpecializationModalVisible}
+        onRequestClose={closeSpecializationModal}
+      >
+        {/* Зовнішній TouchableWithoutFeedback для закриття модального вікна при натисканні поза ним */}
+        <TouchableWithoutFeedback onPress={closeSpecializationModal}>
+          <View style={styles.modalOverlay}>
+            {/* Внутрішній TouchableWithoutFeedback, щоб натискання на вміст модального вікна не закривало його.
+                ВАЖЛИВО: додаємо onPress={() => {}} */}
+            <TouchableWithoutFeedback
+              onPress={() => {
+                /* Залишаємо порожньою, щоб не закривати модалку */
+              }}
+            >
+              <View style={styles.specializationModalContent}>
+                <View style={styles.specializationModalHeader}>
+                  <Text style={styles.specializationModalTitle}>
+                    {i18n.t("selectSpecialization")}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={closeSpecializationModal}
+                  >
+                    <Text style={styles.modalCloseButtonText}>
+                      {i18n.t("cancel")}
+                    </Text>
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={24}
+                      color="#0EB3EB"
+                      style={{ marginLeft: 5 }}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {/* ScrollView для прокрутки списку спеціалізацій */}
+                <ScrollView
+                  style={styles.specializationScrollView}
+                  contentContainerStyle={styles.specializationScrollViewContent}
+                  // Додано для Android, щоб прокрутка працювала за межами вмісту
+                  // removeClippedSubviews={false} // Може бути корисним, але потенційно знижує продуктивність
+                  // scrollEnabled={true} // Явно вмикаємо прокрутку (за замовчуванням true)
+                >
+                  {doctorSpecializations.map((spec) => (
+                    <View key={spec.key} style={styles.specializationItem}>
+                      <Text style={styles.specializationItemText}>
+                        {i18n.t(spec.nameKey)}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.goToButton}
+                        onPress={() => handleSpecializationSelect(spec.nameKey)}
+                      >
+                        <Text style={styles.goToButtonText}>
+                          {i18n.t("goTo")}
+                        </Text>
+                        <Ionicons
+                          name="play"
+                          size={14}
+                          color="white"
+                          style={{ marginLeft: 5 }}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  fullScreenContainer: {
     flex: 1,
-    backgroundColor: "#F5FCFF",
+    backgroundColor: "#FFFFFF",
+  },
+  safeAreaContent: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
   },
   scrollContentContainer: {
     flexGrow: 1,
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
+    paddingBottom: 90,
   },
   container: {
     flex: 1,
@@ -277,66 +528,56 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "space-between", // Розподіляє елементи по ширині
     alignItems: "center",
     width: containerWidth,
+    height: 60,
     marginTop: 10,
     zIndex: 10,
-    paddingHorizontal: 10, // Додано відступи для кращого вигляду
   },
   logoContainer: {
-    // Стилі для контейнера логотипу, щоб він був ліворуч
-    position: 'absolute', // Абсолютне позиціонування
-    left: 0, // Прив'язка до лівого краю
-    top: 0, // Прив'язка до верху
-    paddingLeft: 10, // Відступ від лівого краю
-    paddingTop: 5, // Відступ від верхнього краю
+    paddingLeft: 5,
   },
   languageButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.69)",
+    backgroundColor: "#0EB3EB",
     borderRadius: 10,
     width: 71,
     paddingVertical: 5,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    // Змінено позиціонування для центру
-    position: 'absolute',
-    top: 5,
-    left: '50%',
-    transform: [{ translateX: -35.5 }], // Центруємо кнопку
+    alignSelf: "center", // Центрування в межах row
   },
   languageText: {
     fontSize: 14,
-    fontWeight: "bold",
-    color: "#757575",
+    fontFamily: "Mont-Bold",
+    color: "white",
     marginHorizontal: 5,
   },
   notificationButton: {
-    position: "absolute", // Абсолютне позиціонування
-    right: 0, // Прив'язка до правого краю
-    top: 0, // Прив'язка до верху
-    width: 30,
-    height: 30,
+    width: width * 0.12,
+    height: width * 0.12,
+    backgroundColor: "rgba(14, 179, 235, 0.69)",
+    borderRadius: width * 0.06,
     justifyContent: "center",
     alignItems: "center",
-    paddingRight: 10, // Відступ від правого краю
-    paddingTop: 5, // Відступ від верхнього краю
   },
   notificationBadge: {
     position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF4500",
-    color: "white",
-    fontSize: 10,
-    borderRadius: 10,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    top: 5,
+    right: 10,
+    backgroundColor: "#E04D53",
+    borderRadius: 1000,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    borderColor: "white",
+    borderWidth: 1,
   },
   notificationNumber: {
     color: "white",
-    fontSize: 12,
+    fontSize: 10,
   },
   mainContent: {
     flex: 1,
@@ -346,57 +587,44 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   specializationButton: {
-    backgroundColor: "#42A5F5",
-    borderRadius: 10,
+    marginTop: 30,
+    backgroundColor: "#0EB3EB",
+    borderRadius: 555,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    width: "100%",
+    width: "90%",
+    height: 52,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    marginBottom: 20,
+    marginBottom: 50,
   },
   specializationText: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontFamily: "Mont-Bold",
     color: "white",
   },
   doctorsImageContainer: {
-    marginTop: 10,
+    marginTop: 20,
     alignItems: "center",
     justifyContent: "center",
-    height: 200,
+    height: 300,
     width: "100%",
     marginBottom: 10,
   },
-  doctorImage: {
-    width: "90%",
+  peopleImage: {
+    width: "100%",
     height: "100%",
     resizeMode: "contain",
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-    marginTop: 10,
-    marginBottom: 20,
+    backgroundColor: "rgba(14, 179, 235, 0.2)",
+    borderRadius: 555,
+    paddingHorizontal: 15,
+    marginBottom: 14,
+    width: width * 0.9,
+    height: 52,
+    marginTop: 50,
   },
   searchIcon: {
     marginRight: 10,
@@ -409,83 +637,135 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
     borderWidth: 0,
     color: "#212121",
+    fontFamily: "Mont-Regular",
   },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#212121",
-    marginTop: 20,
-    marginBottom: 10,
-    alignSelf: "flex-start",
-    width: "100%",
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
-  infoInput: {
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    width: "100%",
-    minHeight: 120,
-    textAlignVertical: "top",
-    fontSize: 16,
-    borderColor: "#0EB3EB",
-    borderWidth: 1,
+  languageModalContent: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    width: width * 0.8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: "Mont-Bold",
     marginBottom: 20,
+    color: "#0EB3EB",
   },
-  saveInfoButton: {
-    backgroundColor: "#28A745",
-    borderRadius: 555,
+  languageOption: {
     paddingVertical: 15,
     width: "100%",
-    height: 52,
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECECEC",
   },
-  saveInfoButtonText: {
-    color: "#fff",
+  languageOptionText: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontFamily: "Mont-Regular",
+    color: "#333333",
   },
-  signOutButton: {
-    backgroundColor: "#FF5733",
-    borderRadius: 555,
-    paddingVertical: 15,
-    width: "100%",
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
+
+  // Стилі для модального вікна спеціалізацій
+  specializationModalContent: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    width: width * 0.9,
+    maxHeight: Dimensions.get("window").height * 0.75,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    flexDirection: "column",
+    justifyContent: "flex-start",
   },
-  signOutButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  // Новий стиль для контейнера футера, щоб задати фон
-  footerContainer: {
-    width: "100%",
-    backgroundColor: "#81D4FA", // Колір, схожий на зображення
-    paddingBottom: 20, // Відступ знизу
-    borderTopLeftRadius: 20, // Закруглені кути
-    borderTopRightRadius: 20, // Закруглені кути
-    overflow: 'hidden', // Обрізати вміст, щоб кути були закругленими
-  },
-  footer: {
+  specializationModalHeader: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "transparent", // Фон вже задано в footerContainer
-    paddingTop: 10,
+    marginBottom: 20,
+    width: "100%",
   },
-  footerButton: {
+  specializationModalTitle: {
+    fontSize: 22,
+    fontFamily: "Mont-Bold",
+    color: "#0EB3EB",
+    flex: 1,
+    textAlign: "center",
+    marginRight: 40,
+    marginLeft: 40,
+  },
+  modalCloseButton: {
+    flexDirection: "row",
     alignItems: "center",
+    padding: 5,
   },
-  footerButtonText: {
-    fontSize: 12,
-    color: "#757575",
-    marginTop: 5,
+  modalCloseButtonText: {
+    fontSize: 16,
+    fontFamily: "Mont-Regular",
+    color: "#0EB3EB",
+  },
+  // *** Ключові стилі для ScrollView в модальному вікні ***
+  specializationScrollView: {
+    width: "100%", // Дозволяє ScrollView займати всю доступну ширину
+  },
+  specializationScrollViewContent: {
+    flexGrow: 1, // Не потрібно, якщо flex: 1 на specializationScrollView
+  },
+  specializationItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  specializationItemText: {
+    fontSize: 18,
+    fontFamily: "Mont-Regular",
+    color: "#333333",
+    flex: 1,
+    marginRight: 10,
+  },
+  goToButton: {
+    backgroundColor: "#0EB3EB",
+    borderRadius: 555,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  goToButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontFamily: "Mont-Bold",
   },
 });
 
