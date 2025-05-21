@@ -15,13 +15,14 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { Svg, Path } from "react-native-svg";
-import { supabase } from "../supabaseClient";
+import { supabase } from "../supabaseClient"; // Шлях до вашого supabaseClient.js
 import { getLocales } from "expo-localization";
 import { I18n } from "i18n-js";
-import { useSignUp } from "@clerk/clerk-expo";
-import { useClerk } from "@clerk/clerk-expo";
 
-// Визначення перекладів для різних мов
+// Імпортуємо необхідні компоненти та хуки Clerk
+import { useSignUp } from "@clerk/clerk-expo";
+
+// Встановіть пари ключ-значення для різних мов, які ви хочете підтримувати.
 const translations = {
   en: {
     greeting: "Registration",
@@ -50,14 +51,18 @@ const translations = {
     error_registration_failed: "Failed to register: %{error}",
     error_profile_save_failed: "Failed to save additional information.",
     success_title: "Success",
-    success_registration_message: "Your registration is complete!",
+    success_registration_message:
+      "Your registration will be completed! Please check your email for confirmation.",
     error_general_registration_failed: "Failed to complete registration.",
     error_email_in_use: "This email is already in use.",
     error_invalid_email: "Invalid email.",
     error_weak_password: "Password is too weak.",
-    error_clerk_not_loaded: "Clerk is not ready. Please try again.",
-    error_password_pwned:
-      "This password was compromised in a data breach. Please choose another password.",
+    clerk_error_base: "Clerk error: %{error}",
+    clerk_email_exists: "An account with this email already exists.",
+    clerk_password_too_short: "Password is too short. Minimum 8 characters.", // Clerk зазвичай вимагає 8 символів
+    clerk_invalid_email: "Invalid email address format.",
+    clerk_email_verification_needed:
+      "Please check your email to verify your account.",
   },
   ua: {
     greeting: "Реєстрація",
@@ -86,14 +91,18 @@ const translations = {
     error_registration_failed: "Не вдалося зареєструватися: %{error}",
     error_profile_save_failed: "Не вдалося зберегти додаткову інформацію.",
     success_title: "Успішно",
-    success_registration_message: "Вашу реєстрацію завершено!",
+    success_registration_message:
+      "Вашу реєстрацію буде завершено! Будь ласка, перевірте свою пошту для підтвердження.",
     error_general_registration_failed: "Не вдалося завершити реєстрацію.",
     error_email_in_use: "Ця електронна пошта вже використовується.",
     error_invalid_email: "Недійсна електронна пошта.",
     error_weak_password: "Пароль занадто слабкий.",
-    error_clerk_not_loaded: "Clerk не готовий. Будь ласка, спробуйте ще раз.",
-    error_password_pwned:
-      "Цей пароль був скомпрометований у витоку даних. Будь ласка, оберіть інший пароль.",
+    clerk_error_base: "Помилка Clerk: %{error}",
+    clerk_email_exists: "Обліковий запис з цією електронною поштою вже існує.",
+    clerk_password_too_short: "Пароль занадто короткий. Мінімум 8 символів.",
+    clerk_invalid_email: "Недійсний формат електронної пошти.",
+    clerk_email_verification_needed:
+      "Будь ласка, перевірте свою пошту, щоб підтвердити обліковий запис.",
   },
 };
 
@@ -101,7 +110,6 @@ const translations = {
 const i18n = new I18n(translations);
 i18n.enableFallback = true;
 
-// Списки мов та країн
 const languages = [
   { name: "English", code: "en", emoji: "🇬🇧" },
   { name: "Українська", code: "ua", emoji: "🇺🇦" },
@@ -126,9 +134,10 @@ const countries = [
   { name: "Sweden", code: "SE", emoji: "🇸🇪" },
   { name: "Switzerland", code: "CH", emoji: "🇨🇭" },
   { name: "Netherlands", code: "NL", emoji: "🇳🇱" },
-  { name: "Norway", code: "NO", emoji: "🇳🇴" },
+  { name: "Norway", code: "🇳🇴" },
   { name: "Denmark", code: "DK", emoji: "🇩🇰" },
   { name: "Finland", code: "FI", emoji: "🇫🇮" },
+  // { name: "Russia", code: "RU", emoji: "🇷🇺" }, // Виключено з міркувань конфіденційності
   { name: "South Africa", code: "ZA", emoji: "🇿🇦" },
   { name: "Mexico", code: "MX", emoji: "🇲🇽" },
   { name: "South Korea", code: "KR", emoji: "🇰🇷" },
@@ -151,6 +160,8 @@ const countries = [
 
 const RegisterScreen = () => {
   const navigation = useNavigation();
+  const { isLoaded, signUp, setActive } = useSignUp(); // Хук Clerk для реєстрації
+
   const [country, setCountry] = useState(null);
   const [isCountryModalVisible, setIsCountryModalVisible] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -166,8 +177,6 @@ const RegisterScreen = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [dimensionsSubscription, setDimensionsSubscription] = useState(null);
-  const { isLoaded, signUp } = useSignUp();
-  const { user } = useClerk();
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -178,13 +187,24 @@ const RegisterScreen = () => {
     };
 
     updateDimensions();
-    const subscription = Dimensions.addEventListener(
-      "change",
-      updateDimensions
-    );
-    setDimensionsSubscription(subscription);
+    // Перевірка наявності addEventListener перед використанням
+    if (Dimensions && Dimensions.addEventListener) {
+      const subscription = Dimensions.addEventListener(
+        "change",
+        updateDimensions
+      );
+      setDimensionsSubscription(subscription);
 
+      return () => {
+        if (dimensionsSubscription) {
+          dimensionsSubscription.remove();
+        }
+      };
+    } else {
+      console.warn("Dimensions.addEventListener is not available.");
+    }
     return () => {
+      // Cleanup if addEventListener was not available
       if (dimensionsSubscription) {
         dimensionsSubscription.remove();
       }
@@ -195,16 +215,17 @@ const RegisterScreen = () => {
     i18n.locale = language.code;
   }, [language]);
 
-  useEffect(() => {
-    // Перенаправлення, якщо користувач вже автентифікований і не перебуває в процесі реєстрації
-    if (user && user.id && !isRegistering) {
-      navigation.navigate("Patsient_Home");
-    }
-  }, [user, navigation, isRegistering]);
-
   const handleRegistration = async () => {
-    setRegistrationError("");
-    // Перевірка заповнення обов'язкових полів
+    setRegistrationError(""); // Очистити попередні помилки
+
+    if (!isLoaded) {
+      // Clerk ще не завантажено, виходимо
+      console.warn("Clerk is not loaded yet.");
+      setRegistrationError("Clerk is not ready. Please try again.");
+      return;
+    }
+
+    // Валідація полів
     if (!fullName.trim()) {
       setRegistrationError(i18n.t("error_empty_fullname"));
       return;
@@ -217,209 +238,126 @@ const RegisterScreen = () => {
       setRegistrationError(i18n.t("error_empty_password"));
       return;
     }
-    if (password.length < 6) {
-      setRegistrationError(i18n.t("error_short_password"));
+    // Clerk зазвичай вимагає 8 символів для пароля за замовчуванням
+    if (password.length < 8) {
+      setRegistrationError(i18n.t("clerk_password_too_short"));
       return;
     }
 
-    if (!isLoaded) {
-      setRegistrationError(i18n.t("error_clerk_not_loaded"));
-      return;
-    }
+    setIsRegistering(true); // Встановити стан реєстрації в true
 
-    setIsRegistering(true);
     try {
+      // 1. Реєстрація користувача через Clerk
+      // `create` повертає об'єкт `signUp` з оновленим станом
       const result = await signUp.create({
+        // Зберігаємо результат для логування
         emailAddress: email,
         password: password,
       });
 
-      console.log("Clerk signUp result:", result);
+      console.log("Clerk signUp object after create:", result); // Логуємо об'єкт signUp після створення
 
-      // Оскільки верифікація email відключена в Clerk Dashboard,
-      // ми очікуємо статус "complete" одразу після signUp.create()
+      // 2. Якщо реєстрація в Clerk успішна, перевірити статус
       if (result.status === "complete") {
-        let userId = result.createdUserId;
+        console.log("Clerk signup status is complete.");
 
-        // Запасний варіант: якщо userId все ще null/undefined, спробуємо отримати з поточного user об'єкта Clerk
-        if (!userId && user && user.id) {
-          console.log("Fallback: Getting userId from useClerk().user.id");
-          userId = user.id;
-        }
+        // Якщо потрібно автоматично увійти користувача після реєстрації
+        // Це створить активну сесію в Clerk
+        await setActive({ session: result.createdSessionId });
+        console.log("Clerk session set active.");
 
-        console.log("Clerk registration complete. Resolved User ID:", userId);
-
-        if (userId) {
-          console.log("Attempting to save profile to Supabase...");
-
-          // *** Додаємо логування даних, що відправляються в Supabase ***
-          const profileDataToInsert = {
-            id: userId,
-            full_name: fullName.trim(),
-            phone: phone.trim() || null,
-            country: country?.name || null,
-            language: language?.name || null,
-          };
-          console.log("Supabase profile data to insert:", profileDataToInsert);
-          // ************************************************************
-
-          const { data, error: profileError } = await supabase
+        // ДОДАТКОВА ПЕРЕВІРКА: Переконайтеся, що createdSession та user існують
+        if (result.createdSession && result.createdSession.user) {
+          console.log(
+            "Clerk createdSession and user are available. User ID:",
+            result.createdSession.user.id
+          );
+          // 3. Зберегти додаткові дані профілю в Supabase
+          // Використовуємо ID користувача від Clerk для зв'язку
+          const { error: profileError } = await supabase
             .from("profiles")
-            .insert([profileDataToInsert]) // Використовуємо підготовлений об'єкт
-            .select();
+            .insert([
+              {
+                id: result.createdSession.user.id, // Використовуємо ID користувача від Clerk
+                full_name: fullName.trim(),
+                phone: phone.trim() || null, // Залишаємо null, якщо порожнє
+                country: country?.name || null, // Залишаємо null, якщо не вибрано
+                language: language?.name || null, // Залишаємо null, якщо не вибрано
+              },
+            ]);
 
           if (profileError) {
-            // *** Детальне логування помилки Supabase ***
             console.error(
               "Помилка збереження профілю в Supabase:",
-              profileError.message,
-              "Деталі:",
-              profileError.details,
-              "Підказка:",
-              profileError.hint,
-              "Код:",
-              profileError.code,
-              "Повний об'єкт помилки:",
-              profileError // Логуємо весь об'єкт помилки
+              profileError.message
             );
-            // ********************************************
             setRegistrationError(i18n.t("error_profile_save_failed"));
+            // У реальному додатку тут потрібно подумати про відкат або додаткову логіку обробки
+            // Наприклад, видалити користувача з Clerk, якщо Supabase не вдалося зберегти дані.
           } else {
-            console.log("Дані профілю успішно збережено в Supabase:", data);
+            // Успішна реєстрація та збереження профілю
             Alert.alert(
               i18n.t("success_title"),
               i18n.t("success_registration_message")
             );
-            // Очищаємо поля після успішної реєстрації та збереження даних
+            // Очистити поля форми
             setFullName("");
             setEmail("");
             setPassword("");
             setPhone("");
             setCountry(null);
-            setLanguage(languages[1]);
-            // Перенаправляємо користувача на домашній екран після успішної реєстрації та збереження даних
+            setLanguage(languages[1]); // Повернути мову за замовчуванням
+            // Перенаправити користувача на головний екран (або екран входу/верифікації)
             navigation.navigate("Patsient_Home");
           }
         } else {
-          const errorMessage = i18n.t("error_general_registration_failed");
+          // Якщо createdSession або user відсутні, незважаючи на status === "complete"
           console.error(
-            "Clerk user ID is still null after attempts to get it."
+            "Clerk signup completed, but createdSession or user is missing. Full signUp object:",
+            result
           );
-          setRegistrationError(errorMessage);
+          setRegistrationError(i18n.t("error_general_registration_failed"));
+        }
+      } else if (result.status === "needs_email_verification") {
+        // Якщо Clerk вимагає верифікацію пошти
+        console.warn("Clerk signup status: needs_email_verification");
+        Alert.alert(
+          i18n.t("success_title"),
+          i18n.t("clerk_email_verification_needed")
+        );
+        // Можливо, перенаправити на екран для верифікації пошти
+        // Наприклад: navigation.navigate("EmailVerificationScreen", { signUp: result });
+        navigation.navigate("Patsient_Home"); // Тимчасово, поки не буде екрану верифікації
+      } else {
+        // Інші статуси Clerk, які можуть виникнути
+        console.warn("Clerk signup status:", result.status);
+        setRegistrationError(i18n.t("error_general_registration_failed"));
+      }
+    } catch (err) {
+      console.error("Помилка реєстрації Clerk:", err);
+      // Обробка специфічних помилок Clerk
+      if (err.errors && err.errors.length > 0) {
+        const errorCode = err.errors[0].code;
+        if (errorCode === "form_identifier_exists") {
+          setRegistrationError(i18n.t("clerk_email_exists"));
+        } else if (errorCode === "form_password_pwned") {
+          setRegistrationError(i18n.t("error_weak_password")); // Або більш специфічне повідомлення
+        } else if (errorCode === "form_password_not_strong_enough") {
+          setRegistrationError(i18n.t("clerk_password_too_short")); // Або більш специфічне повідомлення
+        } else if (errorCode === "form_password_too_short") {
+          setRegistrationError(i18n.t("clerk_password_too_short"));
+        } else if (errorCode === "form_field_format_invalid") {
+          setRegistrationError(i18n.t("clerk_invalid_email"));
+        } else {
+          setRegistrationError(
+            i18n.t("clerk_error_base", { error: err.errors[0].longMessage })
+          );
         }
       } else {
-        // Цей блок виконається, якщо Clerk поверне неочікуваний статус.
-        // Це може вказувати на іншу проблему або неправильне налаштування Clerk.
-        console.warn(
-          "Unexpected Clerk status after sign up:",
-          result.status,
-          "Attempting to proceed with user from Clerk if available."
-        );
-        // Якщо статус не "complete", але користувач вже є в Clerk,
-        // спробуйте отримати ID з user об'єкта Clerk і зберегти в Supabase.
-        if (user && user.id) {
-          console.log(
-            "Found user from useClerk(). Proceeding to save profile."
-          );
-
-          // *** Додаємо логування даних для запасного варіанту ***
-          const fallbackProfileData = {
-            id: user.id,
-            full_name: fullName.trim(),
-            phone: phone.trim() || null,
-            country: country?.name || null,
-            language: language?.name || null,
-          };
-          console.log(
-            "Supabase fallback profile data to insert:",
-            fallbackProfileData
-          );
-          // *****************************************************
-
-          const { data, error: profileError } = await supabase
-            .from("profiles")
-            .insert([fallbackProfileData])
-            .select();
-
-          if (profileError) {
-            // *** Детальне логування помилки Supabase для запасного варіанту ***
-            console.error(
-              "Помилка збереження профілю в Supabase (fallback):",
-              profileError.message,
-              "Деталі:",
-              profileError.details,
-              "Підказка:",
-              profileError.hint,
-              "Код:",
-              profileError.code,
-              "Повний об'єкт помилки:",
-              profileError // Логуємо весь об'єкт помилки
-            );
-            // *******************************************************************
-            setRegistrationError(i18n.t("error_profile_save_failed"));
-          } else {
-            console.log(
-              "Дані профілю успішно збережено в Supabase (fallback):",
-              data
-            );
-            Alert.alert(
-              i18n.t("success_title"),
-              i18n.t("success_registration_message")
-            );
-            setFullName("");
-            setEmail("");
-            setPassword("");
-            setPhone("");
-            setCountry(null);
-            setLanguage(languages[1]);
-            navigation.navigate("Patsient_Home");
-          }
-        } else {
-          const errorMessage = i18n.t("error_general_registration_failed");
-          console.error(
-            "Clerk did not return 'complete' status and user object is not available."
-          );
-          setRegistrationError(errorMessage);
-        }
+        setRegistrationError(i18n.t("error_general_registration_failed"));
       }
-    } catch (error) {
-      console.error("Помилка реєстрації в Clerk:", error);
-      let errorMessage = i18n.t("error_general_registration_failed");
-
-      if (error?.errors && error.errors.length > 0) {
-        const clerkError = error.errors[0];
-        if (
-          clerkError.code === "form_param_nil" &&
-          clerkError.field === "email_address"
-        ) {
-          errorMessage = i18n.t("error_empty_email");
-        } else if (
-          clerkError.code === "form_param_nil" &&
-          clerkError.field === "password"
-        ) {
-          errorMessage = i18n.t("error_empty_password");
-        } else if (clerkError.code === "form_identifier_exists") {
-          errorMessage = i18n.t("error_email_in_use");
-        } else if (
-          clerkError.code === "form_param_format_invalid" &&
-          clerkError.field === "email_address"
-        ) {
-          errorMessage = i18n.t("error_invalid_email");
-        } else if (clerkError.code === "form_password_pwned") {
-          errorMessage = i18n.t("error_password_pwned");
-        } else if (clerkError.code === "form_password_not_strong_enough") {
-          errorMessage = i18n.t("error_weak_password");
-        } else if (clerkError.code === "form_password_too_short") {
-          errorMessage = i18n.t("error_short_password");
-        } else {
-          errorMessage = `${i18n.t("error_registration_failed", {
-            error: clerkError.longMessage || clerkError.message,
-          })}`;
-        }
-      }
-      setRegistrationError(errorMessage);
     } finally {
-      setIsRegistering(false);
+      setIsRegistering(false); // Завжди повертати стан реєстрації в false
     }
   };
 
@@ -482,6 +420,7 @@ const RegisterScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
+
         <Text style={styles.title(isLargeScreen)}>{i18n.t("greeting")}</Text>
         <Text style={styles.subtitle(isLargeScreen)}>
           {i18n.t("registration_subtitle")}
@@ -566,7 +505,7 @@ const RegisterScreen = () => {
         <TouchableOpacity
           style={styles.registerButton(width)}
           onPress={handleRegistration}
-          disabled={isRegistering || !isLoaded}
+          disabled={isRegistering}
         >
           <Text style={styles.registerButtonText}>
             {isRegistering ? i18n.t("registering") : i18n.t("register")}
@@ -613,6 +552,7 @@ const RegisterScreen = () => {
             </View>
           </ScrollView>
         </Modal>
+
         <Modal
           animationType="slide"
           transparent={true}
@@ -654,7 +594,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   container: (width, height) => ({
     flex: 1,
     backgroundColor: "#fff",
