@@ -1,74 +1,36 @@
 // AuthProvider.js
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "./supabaseClient"; // Переконайтеся, що шлях правильний
-import { useAuth as useClerkAuth } from "@clerk/clerk-expo"; // Для отримання сесії Clerk
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { supabase } from './supabaseClient'; // Шлях до вашого Supabase клієнта
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const {
-    session: clerkSession,
-    isSignedIn,
-    isLoaded,
-    getToken,
-  } = useClerkAuth();
-  const [session, setSession] = useState(null); // Сесія Supabase
-  const [loading, setLoading] = useState(true); // Стан завантаження сесії Supabase
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const syncClerkAndSupabase = async () => {
-      if (!isLoaded) return; // Чекаємо, поки Clerk завантажиться
+    // Отримати початкову сесію
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
 
-      try {
-        if (isSignedIn && clerkSession) {
-          // Отримати JWT від Clerk з шаблоном "supabase"
-          const clerkToken = await getToken({ template: "supabase" }); // Використовуємо ваш налаштований шаблон Clerk JWT
-          if (clerkToken) {
-            // Встановити сесію Supabase
-            const {
-              data: { session: supabaseSession },
-              error: supabaseError,
-            } = await supabase.auth.setSession({ access_token: clerkToken });
-
-            if (supabaseError) {
-              console.error(
-                "Supabase setSession error:",
-                supabaseError.message
-              );
-              setSession(null);
-            } else {
-              setSession(supabaseSession);
-              console.log("Supabase session updated with Clerk token.");
-            }
-          } else {
-            console.warn("Clerk token not available for Supabase sync.");
-            setSession(null);
-          }
-        } else {
-          // Користувач не увійшов у Clerk, тому очистіть сесію Supabase
-          if (session) {
-            // Якщо сесія Supabase є, але Clerk її немає
-            await supabase.auth.signOut();
-            console.log("Supabase session signed out due to Clerk signOut.");
-          }
-          setSession(null);
-        }
-      } catch (error) {
-        console.error(
-          "Error syncing Clerk and Supabase session in AuthProvider:",
-          error
-        );
-        setSession(null);
-      } finally {
-        setLoading(false); // Після спроби синхронізації встановлюємо loading в false
+    // Підписатися на зміни стану автентифікації
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        setLoading(false);
       }
-    };
+    );
 
-    syncClerkAndSupabase();
-  }, [isLoaded, isSignedIn, clerkSession, getToken]);
+    // Очистка підписки при розмонтуванні компонента
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ session, loading }}>
+    <AuthContext.Provider value={{ session, loading, supabase }}>
       {children}
     </AuthContext.Provider>
   );
@@ -77,7 +39,8 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
+

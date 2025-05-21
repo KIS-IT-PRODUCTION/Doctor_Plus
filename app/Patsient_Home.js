@@ -9,25 +9,23 @@ import {
   Dimensions,
   Alert,
   ScrollView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Svg, Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
-import Icon from "../assets/icon.svg";
+import Icon from "../assets/Icon.js"; // Шлях до вашого SVG компонента
 import { supabase } from "../supabaseClient";
-// Змінено шлях імпорту AuthProvider. Якщо у вас папка providers, то шлях має бути "../providers/AuthProvider"
-// Якщо AuthProvider.js знаходиться безпосередньо в корені проекту, тоді './AuthProvider' або '../AuthProvider'
-// Я припускаю, що він знаходиться в папці `providers`, яка є сусідом `app`
-import { useAuth } from "../AuthProvider"; // <-- Виправлено шлях до AuthProvider
+import { useAuth } from "../AuthProvider";
 
 const { width } = Dimensions.get("window");
 const containerWidth = width * 0.9;
 
 const Patsient_Home = () => {
   const navigation = useNavigation();
-  const { session, loading: authLoading } = useAuth(); // Отримайте сесію та стан завантаження автентифікації
+  const { session, loading: authLoading } = useAuth();
   const [personalInfoText, setPersonalInfoText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -42,19 +40,23 @@ const Patsient_Home = () => {
     };
 
     updateDimensions();
-    // Dimensions.addEventListener повертає об'єкт Subscription, який має метод remove()
-    const subscription = Dimensions.addEventListener(
-      "change",
-      updateDimensions
-    );
-    setDimensionsSubscription(subscription);
+    if (Platform.OS === 'web') {
+        const handleResize = () => updateDimensions();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    } else {
+        const subscription = Dimensions.addEventListener(
+            "change",
+            updateDimensions
+        );
+        setDimensionsSubscription(subscription);
 
-    return () => {
-      // Перевіряємо, чи існує підписка, перш ніж її видаляти
-      if (subscription) {
-        subscription.remove();
-      }
-    };
+        return () => {
+            if (subscription) {
+                subscription.remove();
+            }
+        };
+    }
   }, []);
 
   const handleSaveInfo = async () => {
@@ -63,7 +65,6 @@ const Patsient_Home = () => {
       return;
     }
 
-    // Додано перевірку authLoading, щоб не робити запити до завершення завантаження сесії
     if (authLoading) {
       Alert.alert("Зачекайте", "Завантаження даних користувача...");
       return;
@@ -173,7 +174,7 @@ const Patsient_Home = () => {
             {/* Зображення лікарів */}
             <View style={styles.doctorsImageContainer}>
               <Image
-                source={{ uri: "https://via.placeholder.com/300x200" }}
+                source={{ uri: "https://placehold.co/300x200/FFFFFF/000000?text=Doctors+Illustration" }}
                 style={styles.doctorImage}
                 resizeMode="contain"
               />
@@ -194,7 +195,7 @@ const Patsient_Home = () => {
               />
             </View>
 
-            {/* НОВЕ ПОЛЕ ДЛЯ ІНФОРМАЦІЇ */}
+            {/* НОВЕ ПОЛЕ ДЛЯ ІНФОРМАЦІЇ (зберігаємо, хоча його немає на знімку екрана) */}
             <Text style={styles.infoTitle}>Ваша особиста інформація:</Text>
             <TextInput
               style={styles.infoInput}
@@ -207,7 +208,7 @@ const Patsient_Home = () => {
             <TouchableOpacity
               style={styles.saveInfoButton}
               onPress={handleSaveInfo}
-              disabled={isSaving || authLoading} // Заборонити натискання, якщо зберігаємо або завантажуємо автентифікацію
+              disabled={isSaving || authLoading}
             >
               <Text style={styles.saveInfoButtonText}>
                 {isSaving
@@ -217,7 +218,7 @@ const Patsient_Home = () => {
                   : "Зберегти інформацію"}
               </Text>
             </TouchableOpacity>
-            {/* Кнопка виходу */}
+            {/* Кнопка виходу (зберігаємо, хоча її немає на знімку екрана) */}
             <TouchableOpacity
               style={styles.signOutButton}
               onPress={handleSignOut}
@@ -227,10 +228,8 @@ const Patsient_Home = () => {
           </View>
 
           {/* Footer Section */}
-          <LinearGradient
-            colors={["#FFFFFF00", "rgba(255,255,255,0.9)", "#FFFFFF"]}
-            style={styles.footerGradient}
-          >
+          {/* Змінено LinearGradient на View з фоном для відповідності зображенню */}
+          <View style={styles.footerContainer}>
             <View style={styles.footer}>
               <TouchableOpacity style={styles.footerButton}>
                 <Ionicons name="home-outline" size={24} color="#757575" />
@@ -249,11 +248,12 @@ const Patsient_Home = () => {
                 <Text style={styles.footerButtonText}>Записи</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.footerButton}>
-                <Ionicons name="star-outline" size={24} color="#757575" />
+                {/* Змінено іконку на chatbox-outline для відповідності зображенню */}
+                <Ionicons name="chatbox-outline" size={24} color="#757575" />
                 <Text style={styles.footerButtonText}>Чат</Text>
               </TouchableOpacity>
             </View>
-          </LinearGradient>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -282,8 +282,16 @@ const styles = StyleSheet.create({
     width: containerWidth,
     marginTop: 10,
     zIndex: 10,
+    paddingHorizontal: 10, // Додано відступи для кращого вигляду
   },
-  logoContainer: {},
+  logoContainer: {
+    // Стилі для контейнера логотипу, щоб він був ліворуч
+    position: 'absolute', // Абсолютне позиціонування
+    left: 0, // Прив'язка до лівого краю
+    top: 0, // Прив'язка до верху
+    paddingLeft: 10, // Відступ від лівого краю
+    paddingTop: 5, // Відступ від верхнього краю
+  },
   languageButton: {
     backgroundColor: "rgba(14, 179, 235, 0.69)",
     borderRadius: 10,
@@ -292,6 +300,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    // Змінено позиціонування для центру
+    position: 'absolute',
+    top: 5,
+    left: '50%',
+    transform: [{ translateX: -35.5 }], // Центруємо кнопку
   },
   languageText: {
     fontSize: 14,
@@ -300,11 +313,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   notificationButton: {
-    position: "relative",
+    position: "absolute", // Абсолютне позиціонування
+    right: 0, // Прив'язка до правого краю
+    top: 0, // Прив'язка до верху
     width: 30,
     height: 30,
     justifyContent: "center",
     alignItems: "center",
+    paddingRight: 10, // Відступ від правого краю
+    paddingTop: 5, // Відступ від верхнього краю
   },
   notificationBadge: {
     position: "absolute",
@@ -391,7 +408,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingLeft: 0,
     borderWidth: 0,
-    outline: "none",
     color: "#212121",
   },
   infoTitle: {
@@ -447,15 +463,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-  footerGradient: {
+  // Новий стиль для контейнера футера, щоб задати фон
+  footerContainer: {
     width: "100%",
-    paddingBottom: 20,
+    backgroundColor: "#81D4FA", // Колір, схожий на зображення
+    paddingBottom: 20, // Відступ знизу
+    borderTopLeftRadius: 20, // Закруглені кути
+    borderTopRightRadius: 20, // Закруглені кути
+    overflow: 'hidden', // Обрізати вміст, щоб кути були закругленими
   },
   footer: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    backgroundColor: "transparent",
+    backgroundColor: "transparent", // Фон вже задано в footerContainer
     paddingTop: 10,
   },
   footerButton: {
