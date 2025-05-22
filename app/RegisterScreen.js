@@ -17,7 +17,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 // Svg та Path більше не потрібні для кнопки мови, якщо використовуємо Ionicons
-// import { Svg, Path } from "react-native-svg";
+import { Svg, Path } from "react-native-svg";
 import { supabase } from "../providers/supabaseClient"; // Переконайтеся, що цей файл правильно налаштований
 import { getLocales } from "expo-localization";
 import { I18n } from "i18n-js";
@@ -562,9 +562,9 @@ const styles = StyleSheet.create({
   languageContainerRegister: {
     flexDirection: "row",
     position: "absolute",
-    marginTop: 50,
     zIndex: 10,
     alignItems: "center",
+    paddingVertical: 70,
   },
   languageButtonRegister: {
     backgroundColor: "#0EB3EB", // Синій фон
