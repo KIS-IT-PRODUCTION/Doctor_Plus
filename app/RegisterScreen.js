@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 // Svg та Path більше не потрібні для кнопки мови, якщо використовуємо Ionicons
 // import { Svg, Path } from "react-native-svg";
-import { supabase } from "../providers/supabaseClient";
+import { supabase } from "../providers/supabaseClient"; // Переконайтеся, що цей файл правильно налаштований
 import { getLocales } from "expo-localization";
 import { I18n } from "i18n-js";
 
@@ -83,8 +83,8 @@ const translations = {
     select_language_modal_title: "Виберіть мову",
     language: "Мова", // Це більше не буде використовуватися як основний текст кнопки, але можна залишити
     error_empty_fullname: "Будь ла ласка, введіть ваше повне ім'я.",
-    error_empty_email: "Будь ласка, введіть вашу електронну пошту.",
-    error_empty_password: "Будь ласка, введіть пароль.",
+    error_empty_email: "Будь ла ласка, введіть вашу електронну пошту.",
+    error_empty_password: "Будь ла ласка, введіть пароль.",
     error_short_password: "Пароль повинен містити щонайменше 6 символів.",
     error_registration_failed: "Не вдалося зареєструватися: %{error}",
     error_profile_save_failed: "Не вдалося зберегти додаткову інформацію.",
@@ -259,16 +259,18 @@ const RegisterScreen = () => {
         return;
       }
 
+      // Перевіряємо, чи користувач успішно зареєстрований
       if (data.user) {
         console.log("Supabase user registered. User ID:", data.user.id);
 
+        // Збереження додаткових даних профілю в таблицю "profiles"
         const { error: profileError } = await supabase.from("profiles").insert([
           {
-            id: data.user.id,
-            full_name: fullName.trim(),
-            phone: phone.trim() || null,
-            country: country?.name || null,
-            language: i18n.locale || null, // Зберігаємо поточну локаль i18n
+            id: data.user.id, // ID користувача з Supabase Auth
+            full_name: fullName.trim(), // Повне ім'я з поля вводу
+            phone: phone.trim() || null, // Номер телефону (або null, якщо поле пусте)
+            country: country?.name || null, // Назва обраної країни (або null, якщо не обрано)
+            language: i18n.locale || null, // Поточна мова інтерфейсу
           },
         ]);
 
@@ -279,19 +281,22 @@ const RegisterScreen = () => {
           );
           setRegistrationError(i18n.t("error_profile_save_failed"));
         } else {
+          // Успішна реєстрація та збереження профілю
           Alert.alert(
             i18n.t("success_title"),
             i18n.t("success_registration_message")
           );
+          // Очищення полів форми
           setFullName("");
           setEmail("");
           setPassword("");
           setPhone("");
           setCountry(null);
-          // Мову не потрібно скидати, оскільки вона керується i18n.locale
+          // Перехід на екран входу
           navigation.navigate("LoginScreen");
         }
       } else {
+        // Якщо реєстрація Supabase Auth завершилася, але об'єкт користувача відсутній (рідкісний випадок)
         console.warn("Supabase signUp completed, but user object is missing.");
         Alert.alert(
           i18n.t("success_title"),
@@ -377,10 +382,12 @@ const RegisterScreen = () => {
               : i18n.t("select_country")}
           </Text>
         </TouchableOpacity>
+
+        {/* Поле вводу для повного імені з іконкою */}
         <Text style={styles.subtitle2}>{i18n.t("fullname")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="person-outline"
+            name="person-outline" // Іконка для імені
             size={20}
             color="#B0BEC5"
             style={styles.icon}
@@ -392,10 +399,12 @@ const RegisterScreen = () => {
             onChangeText={setFullName}
           />
         </View>
+
+        {/* Поле вводу для електронної пошти з іконкою */}
         <Text style={styles.subtitle2}>{i18n.t("email")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="mail-outline"
+            name="mail-outline" // Іконка для пошти
             size={20}
             color="#B0BEC5"
             style={styles.icon}
@@ -409,10 +418,12 @@ const RegisterScreen = () => {
             autoCapitalize="none"
           />
         </View>
+
+        {/* Поле вводу для пароля з іконкою */}
         <Text style={styles.subtitle2}>{i18n.t("password")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="lock-closed-outline"
+            name="lock-closed-outline" // Іконка для пароля
             size={20}
             color="#B0BEC5"
             style={styles.icon}
@@ -425,12 +436,14 @@ const RegisterScreen = () => {
             secureTextEntry={true}
           />
         </View>
+
+        {/* Поле вводу для телефону з іконкою */}
         <Text style={styles.subtitle2}>{i18n.t("phone")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="call-outline"
+            name="call-outline" // Іконка для телефону
             size={20}
-            color="#B0BEC5"
+            color="black"
             style={styles.icon}
           />
           <TextInput
@@ -441,6 +454,7 @@ const RegisterScreen = () => {
             keyboardType="phone-pad"
           />
         </View>
+
         {registrationError ? (
           <Text style={styles.errorText}>{registrationError}</Text>
         ) : null}
@@ -605,26 +619,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Mont-Medium",
   },
-  // Ці стилі для старої кнопки selectLanguageButton та selectLanguageText більше не потрібні
-  // оскільки ми замінюємо їх на languageButtonRegister та languageTextRegister
-  // selectLanguageButton: {
-  //   backgroundColor: "transparent",
-  //   borderRadius: 555,
-  //   paddingVertical: 15,
-  //   paddingHorizontal: 0,
-  //   width: "auto",
-  //   height: "auto",
-  //   alignItems: "center",
-  //   marginBottom: 15,
-  //   flexDirection: "row",
-  //   justifyContent: "center",
-  // },
-  // selectLanguageText: {
-  //   color: "#00ACC1",
-  //   fontSize: 16,
-  //   fontFamily: "Mont-Medium",
-  //   marginLeft: 8,
-  // },
+
   inputContainer: (width) => ({
     flexDirection: "row",
     alignItems: "center",
@@ -635,7 +630,9 @@ const styles = StyleSheet.create({
     width: width * 0.9,
     height: 52,
   }),
-  icon: { marginRight: 10 },
+  icon: {
+    marginRight: 10,
+  },
   input: {
     flex: 1,
     fontSize: 16,
