@@ -14,12 +14,7 @@ config.resolver.assetExts = config.resolver.assetExts.filter(
 );
 config.resolver.sourceExts = [...config.resolver.sourceExts, "svg"];
 
-// Виключення проблемних бібліотек (ws)
-config.resolver.blockList = [
-  /node_modules\/ws\/index\.js/,
-  /node_modules\/ws\/lib\/.*/,
-  /node_modules\/stream-browserify\//, // Якщо десь використовується
-  /node_modules\/readable-stream\//, // Можлива залежність
-];
+// !!! Важливо: Вимкнення unstable_enablePackageExports для вирішення проблем з 'ws' та подібними Node.js модулями
+config.resolver.unstable_enablePackageExports = false;
 
 module.exports = config;
