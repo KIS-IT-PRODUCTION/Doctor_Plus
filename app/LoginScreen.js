@@ -14,74 +14,21 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { supabase } from "../providers/supabaseClient"; // Ваш Supabase клієнт
 import { useAuth } from "../providers/AuthProvider"; // Ваш AuthProvider для отримання сесії
-import { getLocales } from "expo-localization";
-import { I18n } from "i18n-js";
 
-// Встановіть пари ключ-значення для різних мов, які ви хочете підтримувати.
-const translations = {
-  en: {
-    login_greeting: "Log In",
-    login_subtitle: "Welcome back! Log in to continue.",
-    email: "Email",
-    placeholder_email: "Enter Your Email",
-    password: "Password",
-    placeholder_password: "Enter Your Password",
-    login_button: "Log In",
-    logging_in: "Logging In...",
-    not_registered: "Not registered yet?",
-    register_link: "Sign Up",
-    error_empty_email: "Please enter your email.",
-    error_empty_password: "Please enter your password.",
-    error_login_failed: "Failed to log in: %{error}",
-    error_general_login_failed:
-      "Failed to log in. Check your network connection.",
-    // Ці помилки специфічні для Clerk, їх можна адаптувати або видалити для Supabase
-    // clerk_error_base: "Clerk error: %{error}",
-    // clerk_invalid_credentials: "Invalid email or password.",
-    // clerk_email_verification_needed: "Please check your email to verify your account.",
-    // clerk_password_too_short: "Password is too short. Minimum 8 characters.",
-  },
-  ua: {
-    login_greeting: "Увійти",
-    login_subtitle: "Ласкаво просимо назад! Увійдіть, щоб продовжити.",
-    email: "Пошта",
-    placeholder_email: "Введіть Вашу електронну пошту",
-    password: "Пароль",
-    placeholder_password: "Введіть Ваш пароль",
-    login_button: "Увійти",
-    logging_in: "Вхід...",
-    not_registered: "Ще не зареєстровані?",
-    register_link: "Зареєструватися",
-    error_empty_email: "Будь ласка, введіть вашу електронну пошту.",
-    error_empty_password: "Будь ласка, введіть пароль.",
-    error_login_failed: "Не вдалося увійти: %{error}",
-    error_general_login_failed:
-      "Не вдалося увійти. Перевірте підключення до мережі.",
-    // clerk_error_base: "Помилка Clerk: %{error}",
-    // clerk_invalid_credentials: "Неправильна електронна пошта або пароль.",
-    // clerk_email_verification_needed: "Будь ласка, перевірте свою пошту, щоб підтвердити обліковий запис.",
-    // clerk_password_too_short: "Пароль занадто короткий. Мінімум 8 символів.",
-  },
-};
+// --- ВАЖЛИВО: Використовуємо хук useTranslation з react-i18next ---
+import { useTranslation } from "react-i18next";
 
-// Ініціалізація i18n
-const i18n = new I18n(translations);
-i18n.enableFallback = true;
-
-// Встановлюємо початкову мову на основі локалі пристрою
-const setInitialLocale = () => {
-  const deviceLocale = getLocales()[0].languageCode;
-  if (translations[deviceLocale]) {
-    i18n.locale = deviceLocale;
-  } else {
-    i18n.locale = "ua"; // Мова за замовчуванням, якщо локаль пристрою не підтримується
-  }
-};
-setInitialLocale();
+// ВИДАЛЕНО:
+// - const translations = {...}; (більше не потрібно, переклади у .json файлах)
+// - import { getLocales } from "expo-localization";
+// - import { I18n } from "i18n-js";
+// - Ініціалізація i18n = new I18n(...) та setInitialLocale() (все це робиться глобально в i18n.js)
 
 const LoginScreen = () => {
   const navigation = useNavigation();
   const { session } = useAuth(); // Отримуємо сесію з вашого AuthProvider
+  // --- Використовуємо хук useTranslation для доступу до t ---
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -103,11 +50,11 @@ const LoginScreen = () => {
 
     // Валідація полів
     if (!email.trim()) {
-      setLoginError(i18n.t("error_empty_email"));
+      setLoginError(t("error_empty_email")); // Використовуємо t()
       return;
     }
     if (!password.trim()) {
-      setLoginError(i18n.t("error_empty_password"));
+      setLoginError(t("error_empty_password")); // Використовуємо t()
       return;
     }
 
@@ -121,7 +68,8 @@ const LoginScreen = () => {
 
       if (error) {
         console.error("Помилка входу Supabase:", error.message);
-        setLoginError(i18n.t("error_login_failed", { error: error.message }));
+        // Зверніть увагу: ми передаємо об'єкт з 'error' для динамічного значення в перекладі
+        setLoginError(t("error_login_failed", { error: error.message }));
       } else {
         console.log("Вхід Supabase успішний. Дані користувача:", data.user?.id);
         // Сесія оновиться в AuthProvider, і useEffect тут спрацює для навігації
@@ -131,7 +79,7 @@ const LoginScreen = () => {
       }
     } catch (err) {
       console.error("Загальна помилка входу:", err);
-      setLoginError(i18n.t("error_general_login_failed"));
+      setLoginError(t("error_general_login_failed")); // Використовуємо t()
     } finally {
       setIsLoggingIn(false); // Завжди повертати стан входу в false
     }
@@ -141,14 +89,12 @@ const LoginScreen = () => {
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container(width)}>
         <StatusBar style="auto" />
-        <Text style={styles.title(isLargeScreen)}>
-          {i18n.t("login_greeting")}
-        </Text>
+        <Text style={styles.title(isLargeScreen)}>{t("login_greeting")}</Text>
         <Text style={styles.subtitle(isLargeScreen)}>
-          {i18n.t("login_subtitle")}
+          {t("login_subtitle")}
         </Text>
 
-        <Text style={styles.subtitle2}>{i18n.t("email")}</Text>
+        <Text style={styles.subtitle2}>{t("email")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
             name="mail-outline"
@@ -158,7 +104,7 @@ const LoginScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder={i18n.t("placeholder_email")}
+            placeholder={t("placeholder_email")}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -166,7 +112,7 @@ const LoginScreen = () => {
           />
         </View>
 
-        <Text style={styles.subtitle2}>{i18n.t("password")}</Text>
+        <Text style={styles.subtitle2}>{t("password")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
             name="lock-closed-outline"
@@ -176,7 +122,7 @@ const LoginScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder={i18n.t("placeholder_password")}
+            placeholder={t("placeholder_password")}
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
@@ -191,7 +137,7 @@ const LoginScreen = () => {
           disabled={isLoggingIn}
         >
           <Text style={styles.loginButtonText}>
-            {isLoggingIn ? i18n.t("logging_in") : i18n.t("login_button")}
+            {isLoggingIn ? t("logging_in") : t("login_button")}{" "}
           </Text>
         </TouchableOpacity>
 
@@ -200,11 +146,8 @@ const LoginScreen = () => {
           onPress={() => navigation.navigate("RegisterScreen")}
         >
           <Text style={styles.registerLinkText}>
-            {i18n.t("not_registered")}
-            <Text style={{ fontWeight: "bold" }}>
-              {" "}
-              {i18n.t("register_link")}
-            </Text>
+            {t("not_registered")}
+            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
           </Text>
         </TouchableOpacity>
       </View>

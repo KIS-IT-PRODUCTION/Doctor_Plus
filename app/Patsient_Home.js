@@ -1,3 +1,4 @@
+// Patsient_Home.js
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -22,137 +23,14 @@ import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import TabBar from "../components/TopBar.js"; // Переконайтеся, що шлях правильний
 
-// --- Імпорти для i18n ---
-import { getLocales } from "expo-localization";
-import { I18n } from "i18n-js";
+// --- ВАЖЛИВО: ВИКОРИСТОВУЄМО ХУК useTranslation З react-i18next ---
+import { useTranslation } from "react-i18next";
 
 const { width } = Dimensions.get("window");
 const containerWidth = width * 0.9;
 
-// --- Об'єкт з перекладами для Patsient_Home ---
-const translations = {
-  en: {
-    selectLanguage: "Select Language",
-    ukrainian: "🇺🇦 Ukrainian",
-    english: "🇬🇧 English",
-    chooseDoctorSpecialization: "Choose Doctor's Specialization",
-    search: "Search",
-    notifications: "Notifications",
-    home: "Home",
-    questions: "Questions",
-    support: "Support",
-    favorites: "Favorites",
-    error: "Error",
-    pleaseEnterText: "Please enter text to save.",
-    loadingUserData: "Loading user data...",
-    notAuthorized: "You are not authorized. Please log in.",
-    saveError: "Failed to save information: %{error}",
-    saveSuccess: "Information successfully successfully saved!",
-    unknownError: "An unknown error occurred.",
-    signOut: "Sign Out",
-    signOutError: "Failed to sign out: %{error}",
-    signOutSuccess: "You have successfully signed out.",
-    // Додано переклади для спеціалізацій (мінімум 20)
-    traumatologist: "Traumatologist",
-    pediatrician: "Pediatrician",
-    gynecologist: "Gynecologist",
-    ent: "ENT",
-    surgeon: "Surgeon",
-    cardiologist: "Cardiologist",
-    dentist: "Dentist",
-    dermatologist: "Dermatologist",
-    ophthalmologist: "Ophthalmologist",
-    neurologist: "Neurologist",
-    endocrinologist: "Endocrinologist",
-    gastroenterologist: "Gastroenterologist",
-    urologist: "Urologist",
-    pulmonologist: "Pulmonologist",
-    nephrologist: "Nephrologist",
-    rheumatologist: "Rheumatologist",
-    oncologist: "Oncologist",
-    allergist: "Allergist",
-    infectiousDiseasesSpecialist: "Infectious Diseases Specialist",
-    psychiatrist: "Psychiatrist",
-    psychologist: "Psychologist",
-    physiotherapist: "Physiotherapist",
-    nutritionist: "Nutritionist",
-    radiologist: "Radiologist",
-    anesthesiologist: "Anesthesiologist",
-    goTo: "Go to",
-    selectSpecialization: "Select Specialization",
-    cancel: "Cancel", // Переклад для кнопки "Скасувати"
-  },
-  ua: {
-    selectLanguage: "Оберіть мову",
-    ukrainian: "🇺🇦 Українська",
-    english: "🇬🇧 English",
-    chooseDoctorSpecialization: "Оберіть спеціалізацію лікаря",
-    search: "Пошук",
-    notifications: "Сповіщення",
-    home: "Головна",
-    questions: "Питання",
-    support: "Підтримка",
-    favorites: "Вибране",
-    error: "Помилка",
-    pleaseEnterText: "Будь ласка, введіть текст для збереження.",
-    loadingUserData: "Завантаження даних користувача...",
-    notAuthorized: "Ви не авторизовані. Будь ласка, увійдіть.",
-    saveError: "Не вдалося зберегти інформацію: %{error}",
-    saveSuccess: "Інформація успішно збережена!",
-    unknownError: "Виникла невідома помилка.",
-    signOut: "Вихід",
-    signOutError: "Не вдалося вийти: %{error}",
-    signOutSuccess: "Ви успішно вийшли.",
-    // Додано переклади для спеціалізацій (мінімум 20)
-    traumatologist: "Травматолог",
-    pediatrician: "Педіатр",
-    gynecologist: "Гінеколог",
-    ent: "Лор",
-    surgeon: "Хірург",
-    cardiologist: "Кардіолог",
-    dentist: "Стоматолог",
-    dermatologist: "Дерматолог",
-    ophthalmologist: "Офтальмолог",
-    neurologist: "Невролог",
-    endocrinologist: "Ендокринолог",
-    gastroenterologist: "Гастроентеролог",
-    urologist: "Уролог",
-    pulmonologist: "Пульмонолог",
-    nephrologist: "Нефролог",
-    rheumatologist: "Ревматолог",
-    oncologist: "Онколог",
-    allergist: "Алерголог",
-    infectiousDiseasesSpecialist: "Інфекціоніст",
-    psychiatrist: "Психіатр",
-    psychologist: "Психолог",
-    physiotherapist: "Фізіотерапевт",
-    nutritionist: "Дієтолог",
-    radiologist: "Радіолог",
-    anesthesiologist: "Анестезіолог",
-    goTo: "Перейти",
-    selectSpecialization: "Оберіть спеціалізацію",
-    cancel: "Скасувати", // Переклад для кнопки "Скасувати"
-  },
-};
-
-// Ініціалізація i18n
-const i18n = new I18n(translations);
-i18n.enableFallback = true; // Використовувати резервну мову, якщо переклад відсутній
-
-// Встановлюємо початкову мову з налаштувань пристрою або за замовчуванням
-const getDeviceLanguage = () => {
-  const locales = getLocales();
-  if (locales && locales.length > 0) {
-    const deviceLanguageCode = locales[0].languageCode;
-    // Перевіряємо, чи підтримуємо ми цю мову, інакше встановлюємо 'ua'
-    return translations[deviceLanguageCode] ? deviceLanguageCode : "ua";
-  }
-  return "ua"; // За замовчуванням українська
-};
-
-i18n.locale = getDeviceLanguage();
-
-// Список спеціалізацій лікарів (мінімум 20)
+// Список спеціалізацій лікарів (ключі повинні відповідати ключам у файлах перекладів)
+// Цей список можна також винести у окремий файл або навіть завантажувати динамічно.
 const doctorSpecializations = [
   { key: "traumatologist", nameKey: "traumatologist" },
   { key: "pediatrician", nameKey: "pediatrician" },
@@ -187,20 +65,34 @@ const doctorSpecializations = [
 const Patsient_Home = () => {
   const navigation = useNavigation();
   const { session, loading: authLoading } = useAuth();
+  // --- ВИКОРИСТОВУЄМО ХУК useTranslation ДЛЯ ДОСТУПУ ДО t ТА i18n ---
+  const { t, i18n } = useTranslation();
+
   const [personalInfoText, setPersonalInfoText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("Home"); // Початкова активна вкладка
+  const [activeTab, setActiveTab] = useState("Home");
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isSpecializationModalVisible, setSpecializationModalVisible] =
     useState(false);
 
-  // Стан для відображення поточної вибраної мови на кнопці
+  // Стан для відображення поточної вибраної мови на кнопці.
+  // Завдяки i18next і React, цей стан буде автоматично оновлюватися,
+  // коли змінюється i18n.language.
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
-    i18n.locale.toUpperCase()
+    i18n.language.toUpperCase() // i18n.language містить поточний код мови
   );
 
+  // Оновлюємо код мови на кнопці, коли змінюється мова i18n
   useEffect(() => {
-    const updateDimensions = () => {};
+    setDisplayedLanguageCode(i18n.language.toUpperCase());
+  }, [i18n.language]); // Залежність від i18n.language
+
+  // Обробка розмірів екрана (залишаємо без змін, оскільки це не стосується i18n)
+  useEffect(() => {
+    const updateDimensions = () => {
+      // Додано логіку оновлення розмірів, якщо потрібно
+      // setDimensions({ width: Dimensions.get("window").width, height: Dimensions.get("window").height });
+    };
     updateDimensions();
     if (Platform.OS === "web") {
       const handleResize = () => updateDimensions();
@@ -219,25 +111,20 @@ const Patsient_Home = () => {
     }
   }, []);
 
-  // Оновлюємо мову i18n та текст на кнопці, коли користувач змінює мову через модальне вікно
-  useEffect(() => {
-    setDisplayedLanguageCode(i18n.locale.toUpperCase());
-  }, [i18n.locale]);
-
   const handleSaveInfo = async () => {
     if (!personalInfoText.trim()) {
-      Alert.alert(i18n.t("error"), i18n.t("pleaseEnterText"));
+      Alert.alert(t("error_title"), t("pleaseEnterText")); // Використовуємо t()
       return;
     }
 
     if (authLoading) {
-      Alert.alert(i18n.t("loadingUserData"));
+      Alert.alert(t("loadingUserData")); // Використовуємо t()
       return;
     }
 
     if (!session?.user) {
-      Alert.alert(i18n.t("error"), i18n.t("notAuthorized"));
-      navigation.navigate("LoginScreen"); // Можливо, "Auth" або "Welcome"
+      Alert.alert(t("error_title"), t("notAuthorized")); // Використовуємо t()
+      navigation.navigate("LoginScreen");
       return;
     }
 
@@ -253,33 +140,50 @@ const Patsient_Home = () => {
       if (error) {
         console.error("Помилка збереження інформації:", error);
         Alert.alert(
-          i18n.t("error"),
-          i18n.t("saveError", { error: error.message })
+          t("error_title"), // Використовуємо t()
+          t("saveError", { error: error.message }) // Використовуємо t()
         );
       } else {
-        Alert.alert(i18n.t("saveSuccess"));
+        Alert.alert(t("saveSuccessTitle"), t("saveSuccessMessage")); // Використовуємо t()
         setPersonalInfoText("");
       }
     } catch (err) {
       console.error("Загальна помилка при збереженні інформації:", err);
-      Alert.alert(i18n.t("error"), i18n.t("unknownError"));
+      Alert.alert(t("error_title"), t("unknownError")); // Використовуємо t()
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error("Помилка виходу:", error.message);
-      Alert.alert(
-        i18n.t("error"),
-        i18n.t("signOutError", { error: error.message })
-      );
-    } else {
-      Alert.alert(i18n.t("signOut"), i18n.t("signOutSuccess"));
-      navigation.navigate("LoginScreen"); // Перенаправлення на екран входу
-    }
+    // Підтвердження виходу
+    Alert.alert(
+      t("logout_confirm_title"), // Заголовок
+      t("logout_confirm_message"), // Повідомлення
+      [
+        {
+          text: t("no"), // Кнопка "Ні"
+          style: "cancel",
+        },
+        {
+          text: t("yes"), // Кнопка "Так"
+          onPress: async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+              console.error("Помилка виходу:", error.message);
+              Alert.alert(
+                t("error_title"), // Використовуємо t()
+                t("signOutError", { error: error.message }) // Використовуємо t()
+              );
+            } else {
+              Alert.alert(t("signOutSuccessTitle"), t("signOutSuccessMessage")); // Використовуємо t()
+              navigation.navigate("LoginScreen");
+            }
+          },
+        },
+      ],
+      { cancelable: false }
+    );
   };
 
   const openLanguageModal = () => {
@@ -291,12 +195,10 @@ const Patsient_Home = () => {
   };
 
   const handleLanguageSelect = (langCode) => {
-    i18n.locale = langCode; // Змінюємо поточну локаль i18n
-    setDisplayedLanguageCode(langCode.toUpperCase()); // Оновлюємо код мови на кнопці
+    i18n.changeLanguage(langCode); // --- ВАЖЛИВО: Правильний метод для i18next ---
     closeLanguageModal();
   };
 
-  // Функції для модального вікна спеціалізацій
   const openSpecializationModal = () => {
     setSpecializationModalVisible(true);
   };
@@ -306,10 +208,20 @@ const Patsient_Home = () => {
   };
 
   const handleSpecializationSelect = (specializationKey) => {
-    Alert.alert("Обрано спеціалізацію", i18n.t(specializationKey));
+    // --- ВИПРАВЛЕНО: Використовуємо повний шлях до ключа спеціалізації ---
+    Alert.alert(
+      t("selectSpecialization"),
+      t("categories." + specializationKey)
+    ); // Використовуємо t()
     closeSpecializationModal();
     // Тут можна додати логіку для переходу до відповідного екрана або фільтрації лікарів
   };
+
+  // Оновлені languages для модального вікна
+  const languagesForModal = [
+    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" }, // Змінено "ua" на "uk"
+    { nameKey: "english", code: "en", emoji: "🇬🇧" },
+  ];
 
   return (
     <View style={styles.fullScreenContainer}>
@@ -359,7 +271,7 @@ const Patsient_Home = () => {
                 onPress={openSpecializationModal}
               >
                 <Text style={styles.specializationText}>
-                  {i18n.t("chooseDoctorSpecialization")}
+                  {t("chooseDoctorSpecialization")} {/* Використовуємо t() */}
                 </Text>
               </TouchableOpacity>
 
@@ -369,7 +281,11 @@ const Patsient_Home = () => {
               </View>
 
               {/* Поле пошуку */}
-              <View style={styles.searchContainer}>
+              <TouchableOpacity
+                style={styles.searchContainer}
+                onPress={() => navigation.navigate("Search")}
+                activeOpacity={0.8}
+              >
                 <Ionicons
                   name="search"
                   size={20}
@@ -378,16 +294,19 @@ const Patsient_Home = () => {
                 />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder={i18n.t("search")}
+                  placeholder={t("search_placeholder")} // Використовуємо t()
                   placeholderTextColor="#BDBDBD"
+                  editable={false}
+                  pointerEvents="none"
                 />
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </SafeAreaView>
 
       {/* TabBar внизу екрана */}
+      {/* Передаємо i18n до TabBar, якщо він також використовує переклади */}
       <TabBar activeTab={activeTab} onTabPress={setActiveTab} i18n={i18n} />
 
       {/* Модальне вікно для вибору мови */}
@@ -405,25 +324,23 @@ const Patsient_Home = () => {
               }}
             >
               <View style={styles.languageModalContent}>
-                <Text style={styles.modalTitle}>
-                  {i18n.t("selectLanguage")}
-                </Text>
-                <TouchableOpacity
-                  style={styles.languageOption}
-                  onPress={() => handleLanguageSelect("ua")}
-                >
-                  <Text style={styles.languageOptionText}>
-                    {i18n.t("ukrainian")}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.languageOption, { borderBottomWidth: 0 }]}
-                  onPress={() => handleLanguageSelect("en")}
-                >
-                  <Text style={styles.languageOptionText}>
-                    {i18n.t("english")}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
+                {languagesForModal.map((item) => (
+                  <TouchableOpacity
+                    key={item.code}
+                    style={[
+                      styles.languageOption,
+                      {
+                        borderBottomWidth: item.code === "en" ? 0 : 1, // Останній елемент без нижньої лінії
+                      },
+                    ]}
+                    onPress={() => handleLanguageSelect(item.code)}
+                  >
+                    <Text style={styles.languageOptionText}>
+                      {t(item.nameKey)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -437,11 +354,8 @@ const Patsient_Home = () => {
         visible={isSpecializationModalVisible}
         onRequestClose={closeSpecializationModal}
       >
-        {/* Зовнішній TouchableWithoutFeedback для закриття модального вікна при натисканні поза ним */}
         <TouchableWithoutFeedback onPress={closeSpecializationModal}>
           <View style={styles.modalOverlay}>
-            {/* Внутрішній TouchableWithoutFeedback, щоб натискання на вміст модального вікна не закривало його.
-                ВАЖЛИВО: додаємо onPress={() => {}} */}
             <TouchableWithoutFeedback
               onPress={() => {
                 /* Залишаємо порожньою, щоб не закривати модалку */
@@ -450,14 +364,14 @@ const Patsient_Home = () => {
               <View style={styles.specializationModalContent}>
                 <View style={styles.specializationModalHeader}>
                   <Text style={styles.specializationModalTitle}>
-                    {i18n.t("selectSpecialization")}
+                    {t("selectSpecialization")}
                   </Text>
                   <TouchableOpacity
                     style={styles.modalCloseButton}
                     onPress={closeSpecializationModal}
                   >
                     <Text style={styles.modalCloseButtonText}>
-                      {i18n.t("cancel")}
+                      {t("cancel")}
                     </Text>
                     <Ionicons
                       name="close-circle-outline"
@@ -467,26 +381,21 @@ const Patsient_Home = () => {
                     />
                   </TouchableOpacity>
                 </View>
-                {/* ScrollView для прокрутки списку спеціалізацій */}
                 <ScrollView
                   style={styles.specializationScrollView}
                   contentContainerStyle={styles.specializationScrollViewContent}
-                  // Додано для Android, щоб прокрутка працювала за межами вмісту
-                  // removeClippedSubviews={false} // Може бути корисним, але потенційно знижує продуктивність
-                  // scrollEnabled={true} // Явно вмикаємо прокрутку (за замовчуванням true)
                 >
                   {doctorSpecializations.map((spec) => (
                     <View key={spec.key} style={styles.specializationItem}>
+                      {/* --- ВИПРАВЛЕНО: Використовуємо повний шлях до ключа спеціалізації --- */}
                       <Text style={styles.specializationItemText}>
-                        {i18n.t(spec.nameKey)}
+                        {t("categories." + spec.nameKey)}
                       </Text>
                       <TouchableOpacity
                         style={styles.goToButton}
                         onPress={() => handleSpecializationSelect(spec.nameKey)}
                       >
-                        <Text style={styles.goToButtonText}>
-                          {i18n.t("goTo")}
-                        </Text>
+                        <Text style={styles.goToButtonText}>{t("goTo")}</Text>
                         <Ionicons
                           name="play"
                           size={14}
@@ -528,7 +437,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between", // Розподіляє елементи по ширині
+    justifyContent: "space-between",
     alignItems: "center",
     width: containerWidth,
     height: 60,
@@ -546,11 +455,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "center", // Центрування в межах row
+    alignSelf: "center",
   },
   languageText: {
     fontSize: 14,
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
     color: "white",
     marginHorizontal: 5,
   },
@@ -599,7 +508,7 @@ const styles = StyleSheet.create({
   },
   specializationText: {
     fontSize: 18,
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
     color: "white",
   },
   doctorsImageContainer: {
@@ -637,7 +546,7 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
     borderWidth: 0,
     color: "#212121",
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
   },
 
   modalOverlay: {
@@ -663,7 +572,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 22,
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
     marginBottom: 20,
     color: "#0EB3EB",
   },
@@ -676,11 +585,10 @@ const styles = StyleSheet.create({
   },
   languageOptionText: {
     fontSize: 18,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
     color: "#333333",
   },
 
-  // Стилі для модального вікна спеціалізацій
   specializationModalContent: {
     backgroundColor: "white",
     borderRadius: 20,
@@ -707,7 +615,7 @@ const styles = StyleSheet.create({
   },
   specializationModalTitle: {
     fontSize: 22,
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
     color: "#0EB3EB",
     flex: 1,
     textAlign: "center",
@@ -721,15 +629,14 @@ const styles = StyleSheet.create({
   },
   modalCloseButtonText: {
     fontSize: 16,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
     color: "#0EB3EB",
   },
-  // *** Ключові стилі для ScrollView в модальному вікні ***
   specializationScrollView: {
-    width: "100%", // Дозволяє ScrollView займати всю доступну ширину
+    width: "100%",
   },
   specializationScrollViewContent: {
-    flexGrow: 1, // Не потрібно, якщо flex: 1 на specializationScrollView
+    flexGrow: 1,
   },
   specializationItem: {
     flexDirection: "row",
@@ -748,7 +655,7 @@ const styles = StyleSheet.create({
   },
   specializationItemText: {
     fontSize: 18,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
     color: "#333333",
     flex: 1,
     marginRight: 10,
@@ -765,7 +672,7 @@ const styles = StyleSheet.create({
   goToButtonText: {
     color: "white",
     fontSize: 14,
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
   },
 });
 
