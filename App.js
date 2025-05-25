@@ -5,45 +5,36 @@ import {
   View,
   ActivityIndicator,
   StyleSheet,
-  LogBox,
-} from "react-native"; // Додано LogBox
+  LogBox, // Додано LogBox
+} from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
-
-// --- ІМПОРТ ДЛЯ i18n ---
-// Просто імпортуємо файл конфігурації i18n, щоб він ініціалізувався
-// Якщо ваш i18n.js знаходиться в іншій папці, оновіть шлях.
-import "./i18n"; // <-- ВАЖЛИВО: переконайтеся, що шлях правильний!
-
-// Імпорти екранів
+import "./i18n";
 import LoginScreen from "./app/LoginScreen";
 import Patsient_Home from "./app/Patsient_Home";
 import RegisterScreen from "./app/RegisterScreen";
 import HomeScreen from "./app/HomeScreen";
 import Search from "./app/Search";
+import Messege from "./app/Messege";
+import Faq from "./app/Faq";
+import Support from "./app/Support";
+import Review from "./app/Rewiew";
+import WriteReviewReview from "./app/WriteRewiew";
 
 SplashScreen.preventAutoHideAsync();
-
 const Stack = createNativeStackNavigator();
 
-// LogBox.ignoreLogs([
-//   "Warning: Text strings must be rendered within a <Text> component.",
-// ]);
-// LogBox.ignoreAllLogs(true);
-
-// Компонент, який визначає початковий маршрут на основі стану автентифікації
 function InitialNavigator() {
-  const { session, loading } = useAuth(); // Отримуємо сесію та стан завантаження
+  const { session, loading } = useAuth();
 
   if (loading) {
     return (
       <View style={styles.centeredContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Завантаження автентифікації...</Text>{" "}
-        {/* Цей текст вже коректно обгорнутий в <Text> */}
+        <Text>Завантаження автентифікації...</Text>
       </View>
     );
   }
@@ -52,32 +43,25 @@ function InitialNavigator() {
     session && session.user ? "Patsient_Home" : "HomeScreen";
 
   return (
-    <Stack.Navigator initialRouteName={initialRouteName}>
-      <Stack.Screen
-        name="HomeScreen"
-        component={HomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="LoginScreen"
-        component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="RegisterScreen"
-        component={RegisterScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Patsient_Home"
-        component={Patsient_Home}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Search"
-        component={Search}
-        options={{ headerShown: false }}
-      />
+    <Stack.Navigator
+      initialRouteName={initialRouteName}
+      screenOptions={{
+        headerShown: false,
+        // Оновлені властивості для вимкнення анімації
+        animation: "fade", // Використовуємо анімацію "fade"
+        animationDuration: 0, // Встановлюємо тривалість анімації на 0
+      }}
+    >
+      <Stack.Screen name="HomeScreen" component={HomeScreen} />
+      <Stack.Screen name="LoginScreen" component={LoginScreen} />
+      <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
+      <Stack.Screen name="Patsient_Home" component={Patsient_Home} />
+      <Stack.Screen name="Search" component={Search} />
+      <Stack.Screen name="Messege" component={Messege} />
+      <Stack.Screen name="Faq" component={Faq} />
+      <Stack.Screen name="Support" component={Support} />
+      <Stack.Screen name="Review" component={Review} />
+      <Stack.Screen name="WriteReview" component={WriteReviewReview} />
     </Stack.Navigator>
   );
 }
@@ -88,14 +72,12 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Завантаження шрифтів
         await Font.loadAsync({
           "Mont-Regular": require("./assets/Font/static/Montserrat-Regular.ttf"),
           "Mont-Medium": require("./assets/Font/static/Montserrat-Medium.ttf"),
           "Mont-Bold": require("./assets/Font/static/Montserrat-Bold.ttf"),
+          "Mont-SemiBold": require("./assets/Font/static/Montserrat-SemiBold.ttf"),
         });
-        // Додаткові асинхронні операції, якщо є
-        // Тут немає потреби чекати на i18n, оскільки він ініціалізується при імпорті файлу i18n.js
       } catch (e) {
         console.warn(e);
       } finally {
@@ -113,7 +95,7 @@ export default function App() {
   }, [appIsReady]);
 
   if (!appIsReady) {
-    return null; // Тут можна відобразити власний екран завантаження, поки шрифти та i18n не готові
+    return null;
   }
 
   return (

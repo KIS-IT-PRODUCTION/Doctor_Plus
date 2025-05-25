@@ -6,25 +6,21 @@ import {
   TouchableOpacity,
   Text,
   ScrollView,
+  SafeAreaView, // Додаємо SafeAreaView для відступів на iOS
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useNavigation } from "@react-navigation/native";
-
-// --- ВАЖЛИВО: Імпортуємо useTranslation з react-i18next ---
 import { useTranslation } from "react-i18next";
 
 const Search = () => {
   const navigation = useNavigation();
-  // --- Отримуємо функцію t для перекладів ---
   const { t } = useTranslation();
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
-  // Визначення всіх категорій
-  // Тепер ми використовуємо ключі, які відповідають перекладам у ваших .json файлах
   const categories = [
     "traumatologist",
     "pediatrician",
@@ -54,55 +50,56 @@ const Search = () => {
   ];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-        <View style={styles.searchBar}>
-          <Ionicons
-            name="search"
-            size={20}
-            color="#888"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t("search_placeholder")} // Використовуємо t() для перекладу плейсхолдера
-            placeholderTextColor="#888"
-          />
+    <SafeAreaView style={styles.safeArea}>
+      {" "}
+      {/* Додаємо SafeAreaView тут */}
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+            <Ionicons name="arrow-back" size={24} color="black" />
+          </TouchableOpacity>
+          <View style={styles.searchBar}>
+            <Ionicons
+              name="search"
+              size={20}
+              color="#888"
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={t("search_placeholder")}
+              placeholderTextColor="#888"
+            />
+          </View>
         </View>
-      </View>
-      {/* Горизонтальний ScrollView для категорій */}
-      <ScrollView
-        horizontal // Вмикаємо горизонтальну прокрутку
-        showsHorizontalScrollIndicator={false} // Приховуємо індикатор прокрутки
-        contentContainerStyle={styles.categoryScrollContainer} // Застосовуємо стилі до контейнера всередині ScrollView
-      >
-        {categories.map(
-          (
-            categoryKey,
-            index // Використовуємо categoryKey для перекладу
-          ) => (
+        {/* Горизонтальний ScrollView для категорій */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryScrollContainer}
+        >
+          {categories.map((categoryKey, index) => (
             <TouchableOpacity key={index} style={styles.categoryButton}>
-              {/* --- ВИПРАВЛЕНО: Використовуємо повний шлях до ключа спеціалізації --- */}
               <Text style={styles.categoryButtonText}>
                 {String(t("categories." + categoryKey))}
-              </Text>{" "}
-              {/* Перекладаємо категорію за її ключем */}
+              </Text>
             </TouchableOpacity>
-          )
-        )}
-      </ScrollView>
-    </View>
+          ))}
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+    // paddingTop: Constants.statusBarHeight, // Може бути не потрібен з SafeAreaView
+  },
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: Constants.statusBarHeight,
   },
   header: {
     flexDirection: "row",
@@ -125,7 +122,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(14, 179, 235, 0.2)",
     borderRadius: 555,
     paddingHorizontal: 15,
-    width: "85%", // Змінено на відсотки для адаптивності
+    width: "85%",
     height: 50,
   },
   searchIcon: {
@@ -136,17 +133,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
-  // Стиль для контейнера всередині горизонтального ScrollView
   categoryScrollContainer: {
-    paddingHorizontal: 15, // Забезпечуємо відступ зліва та справа для прокрутки
-    paddingVertical: 10, // Додамо трохи вертикального відступу
+    paddingHorizontal: 15,
+    paddingVertical: 10,
   },
   categoryButton: {
     backgroundColor: "rgba(14, 179, 235, 0.7)",
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 15,
-    marginRight: 10, // Відступ між кнопками
+    marginRight: 10,
     justifyContent: "center",
     alignItems: "center",
     height: 40,

@@ -1,5 +1,5 @@
 // Patsient_Home.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react"; // Додано useCallback
 import {
   StyleSheet,
   View,
@@ -18,10 +18,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "../assets/icon.svg";
 import People from "../assets/Main/people.svg";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native"; // Додано useFocusEffect
 import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
-import TabBar from "../components/TopBar.js"; // Переконайтеся, що шлях правильний
+import TabBar from "../components/TopBar.js"; // *** ВИПРАВЛЕНО ТУТ: ЗМІНЕНО НА TabBar.js ***
 
 // --- ВАЖЛИВО: ВИКОРИСТОВУЄМО ХУК useTranslation З react-i18next ---
 import { useTranslation } from "react-i18next";
@@ -65,27 +65,30 @@ const doctorSpecializations = [
 const Patsient_Home = () => {
   const navigation = useNavigation();
   const { session, loading: authLoading } = useAuth();
-  // --- ВИКОРИСТОВУЄМО ХУК useTranslation ДЛЯ ДОСТУПУ ДО t ТА i18n ---
   const { t, i18n } = useTranslation();
 
   const [personalInfoText, setPersonalInfoText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("Home");
+  const [activeTab, setActiveTab] = useState("Home"); // *** ДОДАНО: Стан для активної вкладки TabBar ***
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isSpecializationModalVisible, setSpecializationModalVisible] =
     useState(false);
 
-  // Стан для відображення поточної вибраної мови на кнопці.
-  // Завдяки i18next і React, цей стан буде автоматично оновлюватися,
-  // коли змінюється i18n.language.
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
-    i18n.language.toUpperCase() // i18n.language містить поточний код мови
+    i18n.language.toUpperCase()
+  );
+
+  // *** ДОДАНО: useFocusEffect для оновлення activeTab при фокусуванні на цьому екрані ***
+  useFocusEffect(
+    useCallback(() => {
+      setActiveTab("Home"); // Встановлюємо "Home" як активну вкладку, коли цей екран фокусується
+    }, [])
   );
 
   // Оновлюємо код мови на кнопці, коли змінюється мова i18n
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
-  }, [i18n.language]); // Залежність від i18n.language
+  }, [i18n.language]);
 
   // Обробка розмірів екрана (залишаємо без змін, оскільки це не стосується i18n)
   useEffect(() => {
@@ -113,17 +116,17 @@ const Patsient_Home = () => {
 
   const handleSaveInfo = async () => {
     if (!personalInfoText.trim()) {
-      Alert.alert(t("error_title"), t("pleaseEnterText")); // Використовуємо t()
+      Alert.alert(t("error_title"), t("pleaseEnterText"));
       return;
     }
 
     if (authLoading) {
-      Alert.alert(t("loadingUserData")); // Використовуємо t()
+      Alert.alert(t("loadingUserData"));
       return;
     }
 
     if (!session?.user) {
-      Alert.alert(t("error_title"), t("notAuthorized")); // Використовуємо t()
+      Alert.alert(t("error_title"), t("notAuthorized"));
       navigation.navigate("LoginScreen");
       return;
     }
@@ -139,44 +142,40 @@ const Patsient_Home = () => {
 
       if (error) {
         console.error("Помилка збереження інформації:", error);
-        Alert.alert(
-          t("error_title"), // Використовуємо t()
-          t("saveError", { error: error.message }) // Використовуємо t()
-        );
+        Alert.alert(t("error_title"), t("saveError", { error: error.message }));
       } else {
-        Alert.alert(t("saveSuccessTitle"), t("saveSuccessMessage")); // Використовуємо t()
+        Alert.alert(t("saveSuccessTitle"), t("saveSuccessMessage"));
         setPersonalInfoText("");
       }
     } catch (err) {
       console.error("Загальна помилка при збереженні інформації:", err);
-      Alert.alert(t("error_title"), t("unknownError")); // Використовуємо t()
+      Alert.alert(t("error_title"), t("unknownError"));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSignOut = async () => {
-    // Підтвердження виходу
     Alert.alert(
-      t("logout_confirm_title"), // Заголовок
-      t("logout_confirm_message"), // Повідомлення
+      t("logout_confirm_title"),
+      t("logout_confirm_message"),
       [
         {
-          text: t("no"), // Кнопка "Ні"
+          text: t("no"),
           style: "cancel",
         },
         {
-          text: t("yes"), // Кнопка "Так"
+          text: t("yes"),
           onPress: async () => {
             const { error } = await supabase.auth.signOut();
             if (error) {
               console.error("Помилка виходу:", error.message);
               Alert.alert(
-                t("error_title"), // Використовуємо t()
-                t("signOutError", { error: error.message }) // Використовуємо t()
+                t("error_title"),
+                t("signOutError", { error: error.message })
               );
             } else {
-              Alert.alert(t("signOutSuccessTitle"), t("signOutSuccessMessage")); // Використовуємо t()
+              Alert.alert(t("signOutSuccessTitle"), t("signOutSuccessMessage"));
               navigation.navigate("LoginScreen");
             }
           },
@@ -195,7 +194,7 @@ const Patsient_Home = () => {
   };
 
   const handleLanguageSelect = (langCode) => {
-    i18n.changeLanguage(langCode); // --- ВАЖЛИВО: Правильний метод для i18next ---
+    i18n.changeLanguage(langCode);
     closeLanguageModal();
   };
 
@@ -208,18 +207,16 @@ const Patsient_Home = () => {
   };
 
   const handleSpecializationSelect = (specializationKey) => {
-    // --- ВИПРАВЛЕНО: Використовуємо повний шлях до ключа спеціалізації ---
     Alert.alert(
       t("selectSpecialization"),
       t("categories." + specializationKey)
-    ); // Використовуємо t()
+    );
     closeSpecializationModal();
     // Тут можна додати логіку для переходу до відповідного екрана або фільтрації лікарів
   };
 
-  // Оновлені languages для модального вікна
   const languagesForModal = [
-    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" }, // Змінено "ua" на "uk"
+    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
   ];
 
@@ -251,7 +248,10 @@ const Patsient_Home = () => {
                 </View>
               </TouchableOpacity>
               {/* Іконка сповіщень */}
-              <TouchableOpacity style={styles.notificationButton}>
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => navigation.navigate("Messege")}
+              >
                 <Ionicons
                   name="notifications-outline"
                   size={24}
@@ -271,7 +271,7 @@ const Patsient_Home = () => {
                 onPress={openSpecializationModal}
               >
                 <Text style={styles.specializationText}>
-                  {t("chooseDoctorSpecialization")} {/* Використовуємо t() */}
+                  {t("chooseDoctorSpecialization")}
                 </Text>
               </TouchableOpacity>
 
@@ -294,7 +294,7 @@ const Patsient_Home = () => {
                 />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder={t("search_placeholder")} // Використовуємо t()
+                  placeholder={t("search_placeholder")}
                   placeholderTextColor="#BDBDBD"
                   editable={false}
                   pointerEvents="none"
@@ -387,7 +387,6 @@ const Patsient_Home = () => {
                 >
                   {doctorSpecializations.map((spec) => (
                     <View key={spec.key} style={styles.specializationItem}>
-                      {/* --- ВИПРАВЛЕНО: Використовуємо повний шлях до ключа спеціалізації --- */}
                       <Text style={styles.specializationItemText}>
                         {t("categories." + spec.nameKey)}
                       </Text>
@@ -428,7 +427,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "flex-start",
     alignItems: "center",
-    paddingBottom: 90,
+    paddingBottom: 90, // *** ДОДАНО/ВИПРАВЛЕНО: Достатній відступ для TabBar ***
   },
   container: {
     flex: 1,

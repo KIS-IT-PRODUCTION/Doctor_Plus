@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View,
-  Text,
+  Text, // <-- Упевніться, що Text імпортовано
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
@@ -17,12 +17,12 @@ const HomeScreen = () => {
 
   const handlePatientSelect = () => {
     console.log("Patient selected");
-    navigation.navigate("RegisterScreen"); // Змінено на 'Register'
+    navigation.navigate("RegisterScreen");
   };
 
   const handleDoctorSelect = () => {
     console.log("Doctor selected");
-    navigation.navigate("RegisterScreen"); // Вам потрібно буде створити цей екран
+    navigation.navigate("RegisterScreen");
   };
 
   const handlePrivacyPolicyToggle = () => {
@@ -31,7 +31,6 @@ const HomeScreen = () => {
 
   const handlePrivacyPolicyPress = () => {
     console.log("Privacy Policy Clicked");
-    // You might use Linking.openURL here to open a web page
   };
 
   return (
@@ -39,24 +38,20 @@ const HomeScreen = () => {
       <View style={styles.logoContainer}>
         <Icon width={190} height={190} />
       </View>
-
-      <Text style={styles.title}>Онлайн-консультації лікарів</Text>
+      <Text style={styles.title}>Online Doctor Consultations</Text>
       <Text style={styles.subtitle}>
-        Здоров'я - це найцінніший скарб, і ми тут, щоб допомогти вам його
-        зберегти.
+        Health is the most valuable treasure, and we are here to help you
+        preserve it.
       </Text>
-
-      <Text style={styles.chooseText}>Обери себе!</Text>
-
+      <Text style={styles.chooseText}>Choose your role!</Text>
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.button} onPress={handlePatientSelect}>
-          <Text style={styles.buttonText}>Пацієнт</Text>
+          <Text style={styles.buttonText}>Patient</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={handleDoctorSelect}>
-          <Text style={styles.buttonText}>Лікар</Text>
+          <Text style={styles.buttonText}>Doctor</Text>
         </TouchableOpacity>
       </View>
-
       <View style={styles.privacyPolicyContainer}>
         <TouchableOpacity onPress={handlePrivacyPolicyToggle}>
           {privacyPolicyAgreed ? (
@@ -67,8 +62,8 @@ const HomeScreen = () => {
         </TouchableOpacity>
         <TouchableOpacity onPress={handlePrivacyPolicyPress}>
           <Text style={styles.privacyPolicyText}>
-            <Text style={styles.privacyPolicyText2}>Я погоджуюсь з </Text>
-            Політикою конфіденційності
+            <Text>I agree with </Text>
+            <Text style={styles.privacyPolicyText2}>Privacy Policy</Text>
           </Text>
         </TouchableOpacity>
       </View>
@@ -80,15 +75,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: "center",
-    backgroundColor: "white", // Змінено колір фону на білий
+    backgroundColor: "white",
   },
   logoContainer: {
     marginTop: 60,
-
-    // backgroundColor: 'lightblue', // Для налагодження
   },
   title: {
-    fontSize: 24, // Трохи зменшено розмір шрифту
+    fontSize: 24,
     color: "#333",
     textAlign: "center",
     fontFamily: "Mont-SemiBold",
@@ -116,10 +109,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
-    backgroundColor: "#0EB3EB", // Колір кнопок як на зображенні
-    borderRadius: 555, // Заокруглені кути
+    backgroundColor: "#0EB3EB",
+    borderRadius: 555,
     alignItems: "center",
-    justifyContent: "center", // Додано для вертикального центрування
+    justifyContent: "center",
     marginBottom: 9,
     width: 258,
     height: 58,
@@ -139,13 +132,13 @@ const styles = StyleSheet.create({
   },
   privacyPolicyText: {
     fontSize: 10,
-    color: "#337AB7", // Колір посилання
+    color: "#337AB7",
     textDecorationLine: "underline",
     fontFamily: "Mont-SemiBold",
   },
   privacyPolicyText2: {
     fontSize: 10,
-    color: "black", // Колір посилання
+    color: "black",
     textDecorationLine: "underline",
     fontFamily: "Mont-Medium",
   },
