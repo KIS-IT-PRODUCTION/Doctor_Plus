@@ -165,9 +165,9 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   submitButton: {
-    backgroundColor: "#5CACEE", // Синій колір кнопки
+    backgroundColor: "#0EB3EB", // Синій колір кнопки
     paddingVertical: 15,
-    borderRadius: 8,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,

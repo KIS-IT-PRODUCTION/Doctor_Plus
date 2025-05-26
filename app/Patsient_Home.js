@@ -529,7 +529,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(14, 179, 235, 0.2)",
     borderRadius: 555,
     paddingHorizontal: 15,
-    marginBottom: 14,
     width: width * 0.9,
     height: 52,
     marginTop: 50,

@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop: 30,
+    paddingTop: 50,
   },
   scrollContent: {
     flexGrow: 1,
@@ -239,15 +239,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
-  // *** ЗАКОМЕНТОВАНО ТУТ: Стилі кнопки назад, якщо вона не використовується ***
-  // backButton: {
-  //   backgroundColor: 'rgba(14, 179, 235, 0.2)',
-  //   borderRadius: 25,
-  //   width: 48,
-  //   height: 48,
-  //   justifyContent: 'center',
-  //   alignItems: 'center',
-  // },
   headerTitle: {
     fontSize: 20,
     fontFamily: "Mont-Bold",

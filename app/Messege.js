@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
-    paddingTop: 30, // Згідно з вашим попереднім запитом, залишаю цей відступ
+    paddingTop: 50, 
   },
   container: {
     flex: 1,
@@ -166,11 +166,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: "Mont-Bold", // Залишаю ваші шрифти, як було в останньому коді
+    fontFamily: "Mont-Bold", 
     color: "#333",
-  },
-  logoContainer: {
-    // Стилі для контейнера вашого SVG, якщо він потрібен
   },
   messageList: {
     paddingVertical: 20,
@@ -187,7 +184,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 14,
-    fontWeight: "bold", // Якщо використовуєте 'Mont-Bold' або 'Mont-SemiBold', fontWeight може бути зайвим
+    fontWeight: "bold",
     color: "#666",
   },
   timestampText: {
@@ -209,46 +206,46 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontFamily: "Mont-SemiBold", // Залишаю ваші шрифти
+    fontFamily: "Mont-SemiBold", 
     marginBottom: 5,
     color: "#333",
   },
   cardText: {
     fontSize: 14,
-    fontFamily: "Mont-Regular", // Залишаю ваші шрифти
+    fontFamily: "Mont-Regular", 
     color: "#555",
     marginBottom: 10,
   },
   zoomLink: {
     fontSize: 14,
-    color: "#007AFF", // Синій колір для посилання
+    color: "#007AFF",
     textDecorationLine: "underline",
-    fontFamily: "Mont-Regular", // Залишаю ваші шрифти
+    fontFamily: "Mont-Regular", 
   },
   payButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.7)", // Синій колір кнопки
+    backgroundColor: "rgba(14, 179, 235, 0.7)",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
-    alignSelf: "flex-start", // Розмістити зліва
+    alignSelf: "flex-start", 
     marginTop: 10,
   },
   payButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontFamily: "Mont-SemiBold", // Залишаю ваші шрифти
+    fontFamily: "Mont-SemiBold", 
   },
   chooseDoctorButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.7)", // Синій колір кнопки
+    backgroundColor: "rgba(14, 179, 235, 0.7)",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
-    alignSelf: "flex-start", // Розмістити зліва
+    alignSelf: "flex-start", 
     marginTop: 10,
   },
   chooseDoctorButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontFamily: "Mont-SemiBold", // Залишаю ваші шрифти
+    fontFamily: "Mont-SemiBold", 
   },
 });

@@ -22,9 +22,7 @@ const TabBar = ({ activeTab, onTabPress }) => {
   const handlePress = (tabName, screenName) => {
     onTabPress(tabName);
 
-    // *** ВИПРАВЛЕНО ТУТ: Використання navigation.getState() для отримання поточного маршруту ***
     if (navigation.isFocused()) {
-      // Додаткова перевірка, що навігатор сфокусований
       const state = navigation.getState();
       const currentRouteName = state.routes[state.index].name;
 
@@ -35,16 +33,16 @@ const TabBar = ({ activeTab, onTabPress }) => {
   };
 
   return (
-    <View style={[styles.tabBarContainer, { bottom: 5 + insets.bottom }]}>
+    <View style={[styles.tabBarContainer, { bottom: 10 + insets.bottom }]}>
       <TouchableOpacity
         style={[
           styles.tabButton,
-          activeTab === "Home" && styles.activeTabButton, // Змінено на "Home"
+          activeTab === "Home" && styles.activeTabButton, 
         ]}
         onPress={() => handlePress("Home", "Patsient_Home")}
       >
         <Ionicons
-          name="home-outline" // *** ВИПРАВЛЕНО: Використовуємо коректне ім'я іконки ***
+          name="home-outline" 
           size={28}
           color={activeTab === "Home" ? "#0EB3EB" : "white"}
         />
@@ -54,19 +52,19 @@ const TabBar = ({ activeTab, onTabPress }) => {
             { color: activeTab === "Home" ? "#0EB3EB" : "white" },
           ]}
         >
-          {t("home")} {/* Використовуємо коректний ключ перекладу */}
+          {t("home")} 
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={[
           styles.tabButton,
-          activeTab === "Questions" && styles.activeTabButton, // Змінено на "Questions"
+          activeTab === "Questions" && styles.activeTabButton, 
         ]}
         onPress={() => handlePress("Questions", "Faq")}
       >
         <Ionicons
-          name="chatbubble-ellipses-outline" // *** ВИПРАВЛЕНО: Використовуємо коректне ім'я іконки ***
+          name="chatbubble-ellipses-outline"
           size={28}
           color={activeTab === "Questions" ? "#0EB3EB" : "white"}
         />
@@ -76,7 +74,7 @@ const TabBar = ({ activeTab, onTabPress }) => {
             { color: activeTab === "Questions" ? "#0EB3EB" : "white" },
           ]}
         >
-          {t("questions")} {/* Використовуємо коректний ключ перекладу */}
+          {t("questions")} 
         </Text>
       </TouchableOpacity>
 
@@ -120,7 +118,7 @@ const TabBar = ({ activeTab, onTabPress }) => {
             { color: activeTab === "Stars" ? "#0EB3EB" : "white" },
           ]}
         >
-          {t("favorites")}
+          {t("Review")}
         </Text>
       </TouchableOpacity>
     </View>

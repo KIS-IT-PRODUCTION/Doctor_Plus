@@ -76,10 +76,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     backgroundColor: "white",
+    paddingTop: 120,
   },
-  logoContainer: {
-    marginTop: 60,
-  },
+
   title: {
     fontSize: 24,
     color: "#333",
