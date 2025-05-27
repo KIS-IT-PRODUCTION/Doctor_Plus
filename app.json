@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "DOCTOR",
-    "slug": "DOCTOR",
+    "name": "Doctor Plus",
+    "slug": "Doctor Plus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

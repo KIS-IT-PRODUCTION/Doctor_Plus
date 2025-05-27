@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   specializationText: {
     fontSize: 18,
-    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Bold",
     color: "white",
   },
   doctorsImageContainer: {
@@ -551,12 +551,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(7, 90, 126, 0.31)",
   },
   languageModalContent: {
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
+    borderColor: "#0EB3EB",
+    borderWidth: 1,
     alignItems: "center",
     width: width * 0.8,
     shadowColor: "#000",
