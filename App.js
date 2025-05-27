@@ -5,14 +5,15 @@ import {
   View,
   ActivityIndicator,
   StyleSheet,
-  LogBox, // Додано LogBox
+  LogBox,
 } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
-import { AuthProvider, useAuth } from "./providers/AuthProvider";
+import { AuthProvider, useAuth } from "./providers/AuthProvider"; 
 import "./i18n";
+import ChooseSpecial from './app/ChooseSpecial';
 import LoginScreen from "./app/LoginScreen";
 import Patsient_Home from "./app/Patsient_Home";
 import RegisterScreen from "./app/RegisterScreen";
@@ -22,14 +23,14 @@ import Messege from "./app/Messege";
 import Faq from "./app/Faq";
 import Support from "./app/Support";
 import Review from "./app/Rewiew";
-import WriteReviewReview from "./app/WriteRewiew";
+import WriteReview from "./app/WriteRewiew";
+import Profile  from "./app/Profile";
 
 SplashScreen.preventAutoHideAsync();
 const Stack = createNativeStackNavigator();
 
 function InitialNavigator() {
-  const { session, loading } = useAuth();
-
+  const { session, loading } = useAuth(); 
   if (loading) {
     return (
       <View style={styles.centeredContainer}>
@@ -39,17 +40,15 @@ function InitialNavigator() {
     );
   }
 
-  const initialRouteName =
-    session && session.user ? "Patsient_Home" : "HomeScreen";
+  const initialRouteName = session && session.user ? "Patsient_Home" : "HomeScreen";
 
   return (
     <Stack.Navigator
       initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
-        // Оновлені властивості для вимкнення анімації
-        animation: "fade", // Використовуємо анімацію "fade"
-        animationDuration: 0, // Встановлюємо тривалість анімації на 0
+        animation: "fade",
+        animationDuration: 0,
       }}
     >
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
@@ -61,7 +60,9 @@ function InitialNavigator() {
       <Stack.Screen name="Faq" component={Faq} />
       <Stack.Screen name="Support" component={Support} />
       <Stack.Screen name="Review" component={Review} />
-      <Stack.Screen name="WriteReview" component={WriteReviewReview} />
+      <Stack.Screen name="ChooseSpecial" component={ChooseSpecial} />
+      <Stack.Screen name="WriteReview" component={WriteReview} />
+      <Stack.Screen name="Profile" component={Profile} />
     </Stack.Navigator>
   );
 }
@@ -81,7 +82,7 @@ export default function App() {
       } catch (e) {
         console.warn(e);
       } finally {
-        setAppIsReady(true);
+        setAppIsReady(true); 
       }
     }
 
@@ -95,14 +96,14 @@ export default function App() {
   }, [appIsReady]);
 
   if (!appIsReady) {
-    return null;
+    return null; 
   }
 
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <AuthProvider>
         <NavigationContainer>
-          <InitialNavigator />
+          <InitialNavigator /> 
         </NavigationContainer>
       </AuthProvider>
     </View>

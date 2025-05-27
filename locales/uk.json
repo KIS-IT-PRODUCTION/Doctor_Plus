@@ -65,16 +65,14 @@
     "emailRequired": "Email обов'язковий.",
     "passwordRequired": "Пароль обов'язковий."
   },
-  "profileScreen": {
-    "profileTitle": "Мій профіль",
-    "userName": "Ім'я користувача",
-    "email": "Email",
-    "phoneNumber": "Номер телефону",
-    "saveChanges": "Зберегти зміни",
-    "editProfile": "Редагувати профіль",
-    "changesSaved": "Зміни збережено!",
-    "updateError": "Помилка оновлення: {{error}}"
-  },
+  "profile": "Профіль",
+  "choose_consultation_time": "Обрати час консультації",
+  "more_about_doctor": "Більше інформації про лікаря",
+  "about_me": "Про себе",
+  "certificate_photo": "Фото сертифіката",
+  "work_experience": "Досвід роботи",
+  "work_location": "Місце роботи",
+  "place_of_work": "Місце роботи",
   "login_greeting": "Увійти",
   "login_subtitle": "Ласкаво просимо назад! Увійдіть, щоб продовжити.",
   "placeholder_email": "Введіть Вашу електронну пошту",
@@ -187,5 +185,22 @@
       "reviewTextPlaceholder": "Поділіться своїм досвідом...",
       "yourRatingLabel": "Ваша оцінка",
       "submitButton": "Надіслати"
-    }
+    },
+   "therapist": "Терапевт",
+  "sort": "Сортувати",
+  "rating": "Рейтинг",
+  "communication_language": "Мова спілкування",
+  "specialization": "Спеціалізація",
+  "achievements": "Досягнення",
+  "time_in_app": "Час в додатку",
+  "consultations_count": "Кількість консультацій",
+  "go_to": "Перейти",
+  "price": "Ціна",
+  "sort_by_rating_desc": "За рейтингом (від більшого до меншого)",
+  "sort_by_rating_asc": "За рейтингом (від меншого до більшого)",
+  "sort_by_experience_desc": "За досвідом (від більшого до меншого)",
+  "sort_by_experience_asc": "За досвідом (від меншого до більшого)",
+  "sort_by_price_asc": "За ціною (від меншої до більшої)",
+  "sort_by_price_desc": "За ціною (від більшої до меншої)",
+  "close": "Закрити"
 }

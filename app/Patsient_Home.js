@@ -278,6 +278,7 @@ const Patsient_Home = () => {
               {/* Зображення лікарів */}
               <View style={styles.doctorsImageContainer}>
                 <People style={styles.peopleImage} />
+                {/* <Image source={require("../assets/Main/people.jpg")} /> */}
               </View>
 
               {/* Поле пошуку */}
@@ -387,13 +388,12 @@ const Patsient_Home = () => {
                 >
                   {doctorSpecializations.map((spec) => (
                     <View key={spec.key} style={styles.specializationItem}>
-                      <Text style={styles.specializationItemText}>
+                      <Text style={styles.specializationItemText} onPress={() => navigation.navigate("ChooseSpecial")}>
                         {t("categories." + spec.nameKey)}
                       </Text>
                       <TouchableOpacity
                         style={styles.goToButton}
-                        onPress={() => handleSpecializationSelect(spec.nameKey)}
-                      >
+                         onPress={() => navigation.navigate("ChooseSpecial")} >
                         <Text style={styles.goToButtonText}>{t("goTo")}</Text>
                         <Ionicons
                           name="play"
@@ -544,14 +544,14 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
     borderWidth: 0,
     color: "#212121",
-    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Regular",
   },
 
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(7, 90, 126, 0.31)",
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
   },
   languageModalContent: {
     backgroundColor: "white",
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#ECECEC",
+    borderBottomColor: "rgba(14, 179, 235, 0.3)",
   },
   languageOptionText: {
     fontSize: 18,
@@ -592,6 +592,8 @@ const styles = StyleSheet.create({
   specializationModalContent: {
     backgroundColor: "white",
     borderRadius: 20,
+    borderColor: "#0EB3EB",
+    borderWidth: 1,
     padding: 20,
     width: width * 0.9,
     maxHeight: Dimensions.get("window").height * 0.75,

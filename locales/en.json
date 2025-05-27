@@ -65,16 +65,14 @@
     "emailRequired": "Email is required.",
     "passwordRequired": "Password is required."
   },
-  "profileScreen": {
-    "profileTitle": "My Profile",
-    "userName": "Username",
-    "email": "Email",
-    "phoneNumber": "Phone Number",
-    "saveChanges": "Save Changes",
-    "editProfile": "Edit Profile",
-    "changesSaved": "Changes saved!",
-    "updateError": "Update error: {{error}}"
-  },
+  "profile": "Profile",
+  "choose_consultation_time": "Choose consultation time",
+  "more_about_doctor": "More information about the doctor",
+  "about_me": "About me",
+  "certificate_photo": "Certificate Photo",
+  "work_experience": "Work experience",
+  "work_location": "Work location",
+  "place_of_work": "Place of work",
   "login_greeting": "Login",
   "login_subtitle": "Welcome back! Log in to continue.",
   "placeholder_email": "Enter your email",
@@ -187,5 +185,22 @@
       "reviewTextPlaceholder": "Share your experience...",
       "yourRatingLabel": "Your rating",
       "submitButton": "Submit"
-    }
+    },
+    "therapist": "Therapist",
+  "sort": "Sort",
+  "rating": "Rating",
+  "communication_language": "Communication language",
+  "specialization": "Specialization",
+  "achievements": "Achievements",
+  "time_in_app": "Time in app",
+  "consultations_count": "Number of consultations",
+  "go_to": "Go",
+  "price": "Price",
+  "sort_by_rating_desc": "By rating (descending)",
+  "sort_by_rating_asc": "By rating (ascending)",
+  "sort_by_experience_desc": "By experience (descending)",
+  "sort_by_experience_asc": "By experience (ascending)",
+  "sort_by_price_asc": "By price (ascending)",
+  "sort_by_price_desc": "By price (descending)",
+  "close": "Close"
 }
