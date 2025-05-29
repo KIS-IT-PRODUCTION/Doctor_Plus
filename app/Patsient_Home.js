@@ -1,5 +1,5 @@
 // Patsient_Home.js
-import React, { useState, useEffect, useCallback } from "react"; // Додано useCallback
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "../assets/icon.svg";
 import People from "../assets/Main/people.svg";
-import { useNavigation, useFocusEffect } from "@react-navigation/native"; // Додано useFocusEffect
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import TabBar from "../components/TopBar.js"; // *** ВИПРАВЛЕНО ТУТ: ЗМІНЕНО НА TabBar.js ***
@@ -69,7 +69,7 @@ const Patsient_Home = () => {
 
   const [personalInfoText, setPersonalInfoText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("Home"); // *** ДОДАНО: Стан для активної вкладки TabBar ***
+  const [activeTab, setActiveTab] = useState("Home");
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isSpecializationModalVisible, setSpecializationModalVisible] =
     useState(false);
@@ -78,23 +78,19 @@ const Patsient_Home = () => {
     i18n.language.toUpperCase()
   );
 
-  // *** ДОДАНО: useFocusEffect для оновлення activeTab при фокусуванні на цьому екрані ***
   useFocusEffect(
     useCallback(() => {
-      setActiveTab("Home"); // Встановлюємо "Home" як активну вкладку, коли цей екран фокусується
+      setActiveTab("Home");
     }, [])
   );
 
-  // Оновлюємо код мови на кнопці, коли змінюється мова i18n
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-  // Обробка розмірів екрана (залишаємо без змін, оскільки це не стосується i18n)
   useEffect(() => {
     const updateDimensions = () => {
       // Додано логіку оновлення розмірів, якщо потрібно
-      // setDimensions({ width: Dimensions.get("window").width, height: Dimensions.get("window").height });
     };
     updateDimensions();
     if (Platform.OS === "web") {
@@ -176,7 +172,7 @@ const Patsient_Home = () => {
               );
             } else {
               Alert.alert(t("signOutSuccessTitle"), t("signOutSuccessMessage"));
-              navigation.navigate("LoginScreen");
+              navigation.navigate("HomeScreen"); // Перехід на початковий екран
             }
           },
         },
@@ -247,6 +243,13 @@ const Patsient_Home = () => {
                   />
                 </View>
               </TouchableOpacity>
+              {/* Кнопка "Вийти" */}
+              <TouchableOpacity
+                style={styles.signOutButton} // Додаємо новий стиль
+                onPress={handleSignOut}
+              >
+                <Ionicons name="log-out-outline" size={24} color="white" />
+              </TouchableOpacity>
               {/* Іконка сповіщень */}
               <TouchableOpacity
                 style={styles.notificationButton}
@@ -307,7 +310,6 @@ const Patsient_Home = () => {
       </SafeAreaView>
 
       {/* TabBar внизу екрана */}
-      {/* Передаємо i18n до TabBar, якщо він також використовує переклади */}
       <TabBar activeTab={activeTab} onTabPress={setActiveTab} i18n={i18n} />
 
       {/* Модальне вікно для вибору мови */}
@@ -388,12 +390,16 @@ const Patsient_Home = () => {
                 >
                   {doctorSpecializations.map((spec) => (
                     <View key={spec.key} style={styles.specializationItem}>
-                      <Text style={styles.specializationItemText} onPress={() => navigation.navigate("ChooseSpecial")}>
+                      <Text
+                        style={styles.specializationItemText}
+                        onPress={() => navigation.navigate("ChooseSpecial")}
+                      >
                         {t("categories." + spec.nameKey)}
                       </Text>
                       <TouchableOpacity
                         style={styles.goToButton}
-                         onPress={() => navigation.navigate("ChooseSpecial")} >
+                        onPress={() => navigation.navigate("ChooseSpecial")}
+                      >
                         <Text style={styles.goToButtonText}>{t("goTo")}</Text>
                         <Ionicons
                           name="play"
@@ -427,7 +433,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "flex-start",
     alignItems: "center",
-    paddingBottom: 90, // *** ДОДАНО/ВИПРАВЛЕНО: Достатній відступ для TabBar ***
+    paddingBottom: 90,
   },
   container: {
     flex: 1,
@@ -458,9 +464,19 @@ const styles = StyleSheet.create({
   },
   languageText: {
     fontSize: 14,
-    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Bold",
     color: "white",
     marginHorizontal: 5,
+  },
+  // Новий стиль для кнопки "Вийти"
+  signOutButton: {
+    width: width * 0.12,
+    height: width * 0.12,
+    backgroundColor: "rgba(255, 0, 0, 0.6)", // Червоний колір для кнопки виходу
+    borderRadius: width * 0.06,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 10, // Додаємо відступ, щоб не зливався з кнопкою сповіщень
   },
   notificationButton: {
     width: width * 0.12,
@@ -572,7 +588,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 22,
-    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Bold",
     marginBottom: 20,
     color: "#0EB3EB",
   },
@@ -585,7 +601,7 @@ const styles = StyleSheet.create({
   },
   languageOptionText: {
     fontSize: 18,
-    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Regular",
     color: "#333333",
   },
 
@@ -617,7 +633,7 @@ const styles = StyleSheet.create({
   },
   specializationModalTitle: {
     fontSize: 22,
-    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Bold",
     color: "#0EB3EB",
     flex: 1,
     textAlign: "center",
@@ -631,7 +647,7 @@ const styles = StyleSheet.create({
   },
   modalCloseButtonText: {
     fontSize: 16,
-    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Regular",
     color: "#0EB3EB",
   },
   specializationScrollView: {
@@ -657,7 +673,7 @@ const styles = StyleSheet.create({
   },
   specializationItemText: {
     fontSize: 18,
-    fontFamily: "Mont-Regular", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Regular",
     color: "#333333",
     flex: 1,
     marginRight: 10,
@@ -674,7 +690,7 @@ const styles = StyleSheet.create({
   goToButtonText: {
     color: "white",
     fontSize: 14,
-    fontFamily: "Mont-Bold", // Переконайтеся, що цей шрифт завантажено
+    fontFamily: "Mont-Bold",
   },
 });
 

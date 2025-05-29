@@ -1,7 +1,9 @@
 {
   "doctor_profile_title": "Doctor's Questionnaire",
+  "selectLanguage": "Select Language",
   "fullname_placeholder_doc": "Last Name, First Name, Patronymic",
   "consultation_cost": "Consultation Cost",
+   "consultation_choose": "Choose Consultation Type",
   "consultation_language": "Consultation Language",
   "select_specialization": "Select Specialization",
   "upload_photo": "Upload Photo",
@@ -39,7 +41,6 @@
   "success_profile_saved": "Doctor profile saved successfully!",
   "error_profile_save_failed": "Failed to save profile.",
   "error_general_save_failed": "An general error occurred while saving the profile.",
-
   "search": "Search",
   "back": "Back",
   "categories": {
@@ -225,7 +226,6 @@
   "rating": "Rating",
   "communication_language": "Communication language",
   "specialization": "Specialization",
-  "achievements": "Achievements",
   "time_in_app": "Time in app",
   "consultations_count": "Number of consultations",
   "go_to": "Go",

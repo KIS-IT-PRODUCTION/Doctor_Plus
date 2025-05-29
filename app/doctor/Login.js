@@ -59,7 +59,9 @@ const Login = () => {
     }
 
     setIsLoggingIn(true); // Встановити стан входу в true
-
+    if (setIsLoggingIn == true) {
+      navigation.navigate("Anketa_Settings");
+    }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
