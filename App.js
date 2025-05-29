@@ -25,6 +25,9 @@ import Support from "./app/Support";
 import Review from "./app/Rewiew";
 import WriteReview from "./app/WriteRewiew";
 import Profile  from "./app/Profile";
+import Register from "./app/doctor/Register";
+import Login from "./app/doctor/Login";
+import Anketa_Settings from "./app/doctor/Anketa_Settings";
 
 SplashScreen.preventAutoHideAsync();
 const Stack = createNativeStackNavigator();
@@ -53,7 +56,10 @@ function InitialNavigator() {
     >
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
       <Stack.Screen name="LoginScreen" component={LoginScreen} />
+      <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
+      <Stack.Screen name="Register" component={Register} />
+      <Stack.Screen name="Anketa_Settings" component={Anketa_Settings} />
       <Stack.Screen name="Patsient_Home" component={Patsient_Home} />
       <Stack.Screen name="Search" component={Search} />
       <Stack.Screen name="Messege" component={Messege} />

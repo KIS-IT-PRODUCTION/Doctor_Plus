@@ -22,7 +22,7 @@ const HomeScreen = () => {
 
   const handleDoctorSelect = () => {
     console.log("Doctor selected");
-    navigation.navigate("RegisterScreen");
+    navigation.navigate("Register");
   };
 
   const handlePrivacyPolicyToggle = () => {

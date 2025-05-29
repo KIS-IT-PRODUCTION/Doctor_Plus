@@ -17,16 +17,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { supabase } from "../providers/supabaseClient";
-
-// --- ВАЖЛИВО: Використовуємо хук useTranslation з react-i18next ---
 import { useTranslation } from "react-i18next";
-
-// ВИДАЛЕНО:
-// - const translations = {...}; (більше не потрібно, переклади у .json файлах)
-// - import { getLocales } from "expo-localization";
-// - import { I18n } from "i18n-js";
-// - Ініціалізація i18n = new I18n(...) та getDeviceLanguage() (все це робиться глобально в i18n.js)
-// - import { Svg, Path } from "react-native-svg"; (не використовується)
 
 const countries = [
   { name: "Ukraine", code: "UA", emoji: "🇺🇦" },
