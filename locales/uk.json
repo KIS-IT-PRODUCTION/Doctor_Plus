@@ -236,8 +236,16 @@
   "sort_by_experience_asc": "За досвідом (зростання)",
   "sort_by_price_asc": "За ціною (зростання)",
   "sort_by_price_desc": "За ціною (спадання)",
-  "close": "Закрити",
   "doctor_home_title": "Панель лікаря",
   "doctor_welcome_message": "Ласкаво просимо, лікарю!",
-  "doctor_dashboard_info": "Це ваша головна панель. Тут ви можете керувати своїми записами, профілем та іншим."
+  "doctor_dashboard_info": "Це ваша головна панель. Тут ви можете керувати своїми записами, профілем та іншим.",
+  "select_consultation_language": "Обрати мову консультації",
+  "select_consultation_language_modal_title": "Оберіть мови консультацій",
+  "close": "Закрити",
+  "polish": "Польська",
+  "german": "Німецька",
+  "french": "Французька",
+  "spanish": "Іспанська",
+  "englishS": "Англійська",
+  "ukrainianS": "Українська"
 }

@@ -1,5 +1,5 @@
 // providers/AuthProvider.js
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, { createContext, useState, useEffect, useContext, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 
 const AuthContext = createContext();
@@ -9,77 +9,75 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
 
-  useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        if (session) {
-          console.log("Auth State Changed: User ID -", session.user.id); // <--- ДОДАТИ ЦЕЙ ЛОГ
-          const { data: doctorData, error: doctorError } = await supabase
-            .from("profile_doctor")
-            .select("id")
-            .eq("user_id", session.user.id)
-            .single();
+  // Функція для визначення ролі користувача
+  const fetchUserRole = useCallback(async (userSession) => {
+    if (!userSession || !userSession.user) {
+      console.log("No session or user. Clearing role.");
+      setUserRole(null);
+      return;
+    }
 
-          if (doctorError && doctorError.code !== "PGRST116") {
-            console.error("Error fetching doctor role:", doctorError.message);
-            setUserRole("patient");
-          } else if (doctorData) {
-            console.log("Doctor profile FOUND. Setting role to 'doctor'."); // <--- ДОДАТИ ЦЕЙ ЛОГ
-            setUserRole("doctor");
-          } else {
-            console.log("Doctor profile NOT found. Setting role to 'patient'."); // <--- ДОДАТИ ЦЕЙ ЛОГ
-            setUserRole("patient");
-          }
-        } else {
-          console.log("Auth State Changed: No session. Clearing role."); // <--- ДОДАТИ ЦЕЙ ЛОГ
-          setUserRole(null);
-        }
+    console.log("Checking user role for User ID -", userSession.user.id);
+    try {
+      const { data: doctorData, error: doctorError } = await supabase
+        .from("profile_doctor")
+        .select("id")
+        .eq("user_id", userSession.user.id)
+        .single();
+
+      if (doctorError && doctorError.code !== "PGRST116") { // PGRST116 означає "не знайдено"
+        console.error("Error fetching doctor role:", doctorError.message);
+        setUserRole("patient"); // Якщо є інша помилка, за замовчуванням пацієнт
+      } else if (doctorData) {
+        console.log("Doctor profile FOUND. Setting role to 'doctor'.");
+        setUserRole("doctor");
+      } else {
+        console.log("Doctor profile NOT found. Setting role to 'patient'.");
+        setUserRole("patient");
+      }
+    } catch (error) {
+      console.error("Unexpected error fetching user role:", error.message);
+      setUserRole("patient"); // У випадку непередбаченої помилки
+    }
+  }, []); // Пустий масив залежностей, оскільки функція не залежить від стейтів, що змінюються
+
+  useEffect(() => {
+    // 1. Встановлення слухача зміни стану автентифікації
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      async (_event, currentSession) => {
+        setSession(currentSession);
+        // Викликаємо функцію визначення ролі
+        await fetchUserRole(currentSession);
         setLoading(false);
       }
     );
 
-    // Initial check for session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // 2. Початкова перевірка сесії при завантаженні компонента
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
-      if (session) {
-        console.log("Initial Session: User ID -", session.user.id); // <--- ДОДАТИ ЦЕЙ ЛОГ
-        supabase
-          .from("profile_doctor")
-          .select("id")
-          .eq("user_id", session.user.id)
-          .single()
-          .then(({ data: doctorData, error: doctorError }) => {
-            if (doctorError && doctorError.code !== "PGRST116") {
-              console.error(
-                "Error fetching doctor role on initial load:",
-                doctorError.message
-              );
-              setUserRole("patient");
-            } else if (doctorData) {
-              console.log(
-                "Initial load: Doctor profile FOUND. Setting role to 'doctor'."
-              ); // <--- ДОДАТИ ЦЕЙ ЛОГ
-              setUserRole("doctor");
-            } else {
-              console.log(
-                "Initial load: Doctor profile NOT found. Setting role to 'patient'."
-              ); // <--- ДОДАТИ ЦЕЙ ЛОГ
-              setUserRole("patient");
-            }
-            setLoading(false);
-          });
-      } else {
-        console.log("Initial load: No session. Clearing role."); // <--- ДОДАТИ ЦЕЙ ЛОГ
-        setLoading(false);
-      }
+      // Викликаємо функцію визначення ролі
+      await fetchUserRole(session);
+      setLoading(false);
     });
 
-    return () => authListener.unsubscribe();
-  }, []);
+    // Функція очищення: відписуємося від слухача при демонтажі компонента
+    return () => {
+      if (authSubscription) {
+        authSubscription.unsubscribe(); // ВИПРАВЛЕНО: викликаємо unsubscribe на об'єкті subscription
+      }
+    };
+  }, [fetchUserRole]); // Залежність від fetchUserRole, оскільки вона викликається всередині
+
+  const value = {
+    session,
+    loading,
+    userRole,
+    // Додайте інші методи автентифікації, якщо вони потрібні
+    // наприклад, signIn, signOut, signUp
+  };
 
   return (
-    <AuthContext.Provider value={{ session, loading, userRole }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -88,4 +86,5 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   return useContext(AuthContext);
 };
-export default AuthProvider;
+
+export default AuthProvider; // Рекомендується використовувати export default для основного компонента

@@ -23,7 +23,6 @@ import { supabase } from "../../providers/supabaseClient"; // Шлях до ва
 import { useTranslation } from "react-i18next";
 import * as DocumentPicker from "expo-document-picker"; // Для завантаження файлів
 import * as ImagePicker from "expo-image-picker"; // Для завантаження фото
-
 // Список країн (ви можете перенести його в окремий файл, якщо він використовується в багатьох місцях)
 const countries = [
   { name: "Ukraine", code: "UA", emoji: "🇺🇦" },
@@ -86,6 +85,17 @@ const specializations = [
   { nameKey: "specialization_nutritionist", value: "Nutritionist" },
 ];
 
+// Список мов для модального вікна вибору мови консультацій
+const consultationLanguages = [
+  { nameKey: "english", code: "en", emoji: "🇬🇧" },
+  { nameKey: "ukrainian", code: "uk", emoji: "uk" },
+  { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
+  { nameKey: "german", code: "de", emoji: "🇩🇪" },
+  { nameKey: "french", code: "fr", emoji: "🇫🇷" },
+  { nameKey: "spanish", code: "es", emoji: "🇪🇸" },
+  // Додайте інші мови за потребою
+];
+
 // Generate consultation cost options (e.g., from $10 to $200 in $5 increments)
 const generateConsultationCostOptions = () => {
   const options = [];
@@ -104,7 +114,7 @@ const Anketa_Settings = () => {
   const [fullName, setFullName] = useState("");
   const [country, setCountry] = useState(null); // Для поля "Україна"
   const [consultationCost, setConsultationCost] = useState("");
-  // Changed to array for multiple languages
+  // Changed to array for multiple languages for consultation
   const [selectedConsultationLanguages, setSelectedConsultationLanguages] =
     useState([]);
   // Changed to array for multiple specializations
@@ -123,7 +133,10 @@ const Anketa_Settings = () => {
 
   // MODAL VISIBILITY STATES
   const [isCountryModalVisible, setIsCountryModalVisible] = useState(false);
-  const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
+  const [isGeneralLanguageModalVisible, setIsGeneralLanguageModalVisible] =
+    useState(false); // Для загальної мови інтерфейсу
+  const [isConsultationLanguageModalVisible, setIsConsultationLanguageModalVisible] =
+    useState(false); // Для мови консультацій
   const [isSpecializationModalVisible, setIsSpecializationModalVisible] =
     useState(false);
   const [isConsultationCostModalVisible, setIsConsultationCostModalVisible] =
@@ -175,12 +188,21 @@ const Anketa_Settings = () => {
     closeCountryModal();
   };
 
-  const openLanguageModal = () => {
-    setIsLanguageModalVisible(true);
+  // Handlers for general app language
+  const openGeneralLanguageModal = () => setIsGeneralLanguageModalVisible(true);
+  const closeGeneralLanguageModal = () => setIsGeneralLanguageModalVisible(false);
+  const handleGeneralLanguageSelect = (langCode) => {
+    i18n.changeLanguage(langCode);
+    closeGeneralLanguageModal();
+    // setDisplayedLanguageCode оновиться автоматично завдяки useEffect
   };
-  const closeLanguageModal = () => setIsLanguageModalVisible(false);
-  // Modified to handle multiple language selections
-  const toggleLanguageSelect = (langCode) => {
+
+  // Handlers for consultation languages (multiple selection)
+  const openConsultationLanguageModal = () => {
+    setIsConsultationLanguageModalVisible(true);
+  };
+  const closeConsultationLanguageModal = () => setIsConsultationLanguageModalVisible(false);
+  const toggleConsultationLanguageSelect = (langCode) => {
     setSelectedConsultationLanguages((prevSelected) => {
       if (prevSelected.includes(langCode)) {
         return prevSelected.filter((code) => code !== langCode);
@@ -240,8 +262,8 @@ const Anketa_Settings = () => {
       setUri(result.assets[0].uri);
       // TODO: Додати логіку завантаження на Supabase Storage тут
       // Alert.alert(
-      //   "Фото",
-      //   `Завантажено: ${result.assets[0].uri.split("/").pop()}`
+      //   "Фото",
+      //   `Завантажено: ${result.assets[0].uri.split("/").pop()}`
       // );
     }
   };
@@ -309,7 +331,7 @@ const Anketa_Settings = () => {
           : [i18n.language]; // Default to current if none selected
 
       const { error: doctorProfileError } = await supabase
-        .from("profile_doctor") // <--- Changed from 'doctors' to 'profile_doctor' based on previous discussion
+        .from("anketa_doctor") // <--- Changed from 'doctors' to 'anketa_doctor' based on previous discussion
         .upsert(
           [
             {
@@ -366,16 +388,12 @@ const Anketa_Settings = () => {
   const { width, height } = dimensions;
   const isLargeScreen = width > 768;
 
-  const languagesForModal = [
+  // Languages for general app language modal (can be different if you want different options)
+  const generalAppLanguages = [
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
     { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
   ];
-  const handleLanguageSelect = (langCode) => {
-    // --- ВАЖЛИВО: Використовуємо i18n.changeLanguage() для i18next ---
-    i18n.changeLanguage(langCode);
-    closeLanguageModal();
-    // setDisplayedLanguageCode оновиться автоматично завдяки useEffect
-  };
+
   return (
     <SafeAreaView
       style={{
@@ -398,10 +416,10 @@ const Anketa_Settings = () => {
             <Text style={styles.title(isLargeScreen)}>
               {t("doctor_profile_title")}
             </Text>
-            {/* Прапорець мови - на зображенні він вгорі праворуч, але не кнопка */}
+            {/* Прапорець мови - для зміни загальної мови інтерфейсу */}
             <TouchableOpacity
               style={styles.languageDisplayContainer}
-              onPress={openLanguageModal}
+              onPress={openGeneralLanguageModal} // Open general language modal
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ color: "white", fontSize: 14 }}>
@@ -448,27 +466,27 @@ const Anketa_Settings = () => {
             </Text>
           </TouchableOpacity>
 
-          {/* Мова консультацій */}
+          {/* Мова консультацій (Множинний вибір) */}
           <Text style={styles.inputLabel}>{t("consultation_language")}</Text>
           <TouchableOpacity
             style={styles.selectButton(width)}
-            onPress={openLanguageModal}
+            onPress={openConsultationLanguageModal} // Open consultation language modal
           >
             <Text style={styles.selectButtonTextExpanded}>
               {selectedConsultationLanguages.length > 0
                 ? selectedConsultationLanguages
                     .map(
                       (code) =>
-                        languagesForModal.find((lang) => lang.code === code)
+                        consultationLanguages.find((lang) => lang.code === code)
                           ?.emoji +
                         " " +
                         t(
-                          languagesForModal.find((lang) => lang.code === code)
+                          consultationLanguages.find((lang) => lang.code === code)
                             ?.nameKey
                         )
                     )
                     .join(", ")
-                : t("select_language")}
+                : t("select_consultation_language")} {/* Changed translation key */}
             </Text>
           </TouchableOpacity>
 
@@ -689,14 +707,14 @@ const Anketa_Settings = () => {
             </ScrollView>
           </Modal>
 
-          {/* Language Modal */}
+          {/* General App Language Modal */}
           <Modal
             animationType="fade"
             transparent={true}
-            visible={isLanguageModalVisible}
-            onRequestClose={closeLanguageModal}
+            visible={isGeneralLanguageModalVisible}
+            onRequestClose={closeGeneralLanguageModal}
           >
-            <TouchableWithoutFeedback onPress={closeLanguageModal}>
+            <TouchableWithoutFeedback onPress={closeGeneralLanguageModal}>
               <View style={styles.modalOverlay}>
                 <TouchableWithoutFeedback
                   onPress={() => {
@@ -705,11 +723,11 @@ const Anketa_Settings = () => {
                 >
                   <View style={styles.languageModalContent}>
                     <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
-                    {languagesForModal.map((item) => (
+                    {generalAppLanguages.map((item) => (
                       <TouchableOpacity
                         key={item.code}
                         style={styles.languageOption}
-                        onPress={() => handleLanguageSelect(item.code)}
+                        onPress={() => handleGeneralLanguageSelect(item.code)}
                       >
                         <Text style={styles.languageOptionText}>
                           {t(item.nameKey)}
@@ -720,6 +738,50 @@ const Anketa_Settings = () => {
                 </TouchableWithoutFeedback>
               </View>
             </TouchableWithoutFeedback>
+          </Modal>
+
+          {/* Consultation Language Modal (Multiple selection) */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={isConsultationLanguageModalVisible}
+            onRequestClose={closeConsultationLanguageModal}
+          >
+            <ScrollView contentContainerStyle={styles.centeredView}>
+              <View style={styles.modalView(width)}>
+                <Text style={styles.modalTitle}>
+                  {t("select_consultation_language_modal_title")} {/* New translation key */}
+                </Text>
+                {consultationLanguages.map((item) => (
+                  <TouchableOpacity
+                    key={item.code}
+                    style={[
+                      styles.countryItem, // Reusing style for consistency
+                      selectedConsultationLanguages.includes(item.code) &&
+                      styles.countryItemSelected,
+                    ]}
+                    onPress={() => toggleConsultationLanguageSelect(item.code)}
+                  >
+                    <Text style={styles.countryEmoji}>{item.emoji}</Text>
+                    <Text style={styles.countryName}>{t(item.nameKey)}</Text>
+                    {selectedConsultationLanguages.includes(item.code) && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color="#0EB3EB"
+                        style={styles.checkmarkIcon}
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))}
+                <Pressable
+                  style={[styles.button, styles.buttonClose]}
+                  onPress={closeConsultationLanguageModal}
+                >
+                  <Text style={styles.textStyle}>{t("close")}</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </Modal>
 
           {/* Specialization Modal */}
@@ -823,6 +885,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingTop: 40, // Додано відступ зверху
   },
   container: (width, height) => ({
     backgroundColor: "#fff",
@@ -851,21 +914,22 @@ const styles = StyleSheet.create({
   },
   languageDisplayText: {
     fontSize: 14,
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Розкоментовано
     color: "white",
   },
   title: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 30 : 26, // Трохи менше для анкети
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Розкоментовано
     color: "#212121",
     textAlign: "center",
     flex: 1, // Щоб заголовок займав доступне місце
+    paddingHorizontal: 10, // Додано відступи для кращого вигляду
   }),
   inputLabel: {
     fontSize: 14,
     alignSelf: "flex-start",
     color: "#2A2A2A",
-    fontFamily: "Mont-Medium",
+    fontFamily: "Mont-Medium", // Розкоментовано
     paddingHorizontal: 35,
     marginTop: 10, // Відступ над кожним полем
     marginBottom: 5,
@@ -885,14 +949,14 @@ const styles = StyleSheet.create({
   selectButtonTextExpanded: {
     color: "black",
     fontSize: 16,
-    fontFamily: "Mont-Medium",
+    fontFamily: "Mont-Medium", // Розкоментовано
     flexWrap: "wrap", // Дозволити перенос тексту
   },
   // Оригінальний selectButtonText, якщо він використовується для інших кнопок, де не потрібен wrap
   selectButtonText: {
     color: "black",
     fontSize: 16,
-    fontFamily: "Mont-Medium",
+    fontFamily: "Mont-Medium", // Розкоментовано
   },
   inputContainer: (width) => ({
     flexDirection: "row",
@@ -907,7 +971,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Розкоментовано
     paddingVertical: Platform.OS === "ios" ? 10 : 0, // Для кращого вигляду на iOS
   },
   // New style for upload section to accommodate image preview
@@ -932,7 +996,7 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontFamily: "Mont-Medium",
+    fontFamily: "Mont-Medium", // Розкоментовано
   },
   previewImage: {
     width: 60, // Smaller size for preview
@@ -958,7 +1022,7 @@ const styles = StyleSheet.create({
   },
   agreementText: {
     fontSize: 14,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Розкоментовано
     color: "#757575",
     marginLeft: 10,
     flexShrink: 1, // Дозволяє тексту переноситися
@@ -1011,6 +1075,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     width: width * 0.9,
+    maxHeight: Dimensions.get("window").height * 0.8, // Додано для прокручування
   }),
   modalTitle: {
     fontSize: 20,
@@ -1018,12 +1083,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   countryItem: {
-    // Використовується для елементів списку в модальних вікнах (країни, спеціалізації)
+    // Використовується для елементів списку в модальних вікнах (країни, спеціалізації, мови консультацій)
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     width: "100%",
     justifyContent: "space-between", // To push checkmark to the right
+    paddingHorizontal: 15, // Додано для відступів
   },
   countryEmoji: {
     fontSize: 24,
@@ -1031,6 +1097,7 @@ const styles = StyleSheet.create({
   },
   countryName: {
     fontSize: 18,
+    flex: 1, // Дозволяє тексту займати доступний простір
   },
   countryItemSelected: {
     backgroundColor: "rgba(14, 179, 235, 0.1)", // Light blue background for selected
@@ -1041,9 +1108,10 @@ const styles = StyleSheet.create({
     padding: 10,
     elevation: 2,
     marginTop: 15,
+    width: "100%",
   },
   buttonClose: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#0EB3EB", // Змінено на колір кнопки збереження
   },
   textStyle: {
     color: "white",
@@ -1070,6 +1138,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    maxHeight: Dimensions.get("window").height * 0.6, // Обмежено висоту для прокручування
   },
   languageOption: {
     paddingVertical: 15,
@@ -1080,7 +1149,7 @@ const styles = StyleSheet.create({
   },
   languageOptionText: {
     fontSize: 18,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Розкоментовано
     color: "#333333",
   },
   checkmarkIcon: {
@@ -1116,7 +1185,7 @@ const styles = StyleSheet.create({
   },
   pickerOptionText: {
     fontSize: 18,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Розкоментовано
     color: "#333333",
   },
   pickerOptionSelected: {

@@ -236,5 +236,13 @@
   "sort_by_experience_asc": "By experience (ascending)",
   "sort_by_price_asc": "By price (ascending)",
   "sort_by_price_desc": "By price (descending)",
-  "close": "Close"
+  "select_consultation_language": "Select consultation language",
+  "select_consultation_language_modal_title": "Select Consultation Languages",
+  "close": "Close",
+  "polish": "Polish",
+  "german": "German",
+  "french": "French",
+  "spanish": "Spanish",
+  "englishS": "English",
+  "ukrainianS": "Ukrainian"
 }
