@@ -12,91 +12,57 @@ import {
   Dimensions,
   Platform,
   TouchableWithoutFeedback,
-  Switch, // Для перемикача "Я погоджуюсь"
+  Switch,
   Image,
   StatusBar,
-  SafeAreaView, // Import Image component for previews
+  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../../providers/supabaseClient"; // Шлях до вашого supabaseClient
+import { supabase } from "../../providers/supabaseClient";
 import { useTranslation } from "react-i18next";
-import * as DocumentPicker from "expo-document-picker"; // Для завантаження файлів
-import * as ImagePicker from "expo-image-picker"; // Для завантаження фото
-// Список країн (ви можете перенести його в окремий файл, якщо він використовується в багатьох місцях)
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
+
+// Список країн
 const countries = [
-  { name: "Ukraine", code: "UA", emoji: "🇺🇦" },
+  { name: "Україна", code: "UA", emoji: "🇺🇦" },
   { name: "United Kingdom", code: "GB", emoji: "🇬🇧" },
   { name: "United States", code: "US", emoji: "🇺🇸" },
   { name: "Canada", code: "CA", emoji: "🇨🇦" },
   { name: "Germany", code: "DE", emoji: "🇩🇪" },
   { name: "France", code: "FR", emoji: "🇫🇷" },
   { name: "Poland", code: "PL", emoji: "🇵🇱" },
-  { name: "Italy", code: "IT", emoji: "🇮🇹" },
-  { name: "Spain", code: "ES", emoji: "🇪🇸" },
-  { name: "Japan", code: "JP", emoji: "🇯🇵" },
-  { name: "China", code: "CN", emoji: "🇨🇳" },
-  { name: "India", code: "IN", emoji: "🇮🇳" },
-  { name: "Australia", code: "AU", emoji: "🇦🇺" },
-  { name: "Brazil", code: "BR", emoji: "🇧🇷" },
-  { name: "Turkey", code: "TR", emoji: "🇹🇷" },
-  { name: "Sweden", code: "SE", emoji: "🇸🇪" },
-  { name: "Switzerland", code: "CH", emoji: "🇨🇭" },
-  { name: "Netherlands", code: "NL", emoji: "🇳🇱" },
-  { name: "Norway", code: "NO", emoji: "🇳🇴" },
-  { name: "Denmark", code: "DK", emoji: "🇩🇰" },
-  { name: "Finland", code: "FI", emoji: "🇫🇮" },
-  { name: "South Africa", code: "ZA", emoji: "🇿🇦" },
-  { name: "Mexico", code: "MX", emoji: "🇲🇽" },
-  { name: "South Korea", code: "KR", emoji: "🇰🇷" },
-  { name: "Argentina", code: "AR", emoji: "🇦🇷" },
-  { name: "Ireland", code: "IE", emoji: "🇮🇪" },
-  { name: "New Zealand", code: "NZ", emoji: "🇳🇿" },
-  { name: "Singapore", code: "SG", emoji: "🇸🇬" },
-  { name: "Israel", code: "IL", emoji: "🇮🇱" },
-  { name: "Malaysia", code: "MY", emoji: "🇲🇾" },
-  { name: "Thailand", code: "TH", emoji: "🇹🇭" },
-  { name: "Vietnam", code: "VN", emoji: "🇻🇳" },
-  { name: "Indonesia", code: "ID", emoji: "🇮🇩" },
-  { name: "Egypt", code: "EG", emoji: "🇪🇬" },
-  { name: "Nigeria", code: "NG", emoji: "🇳🇬" },
-  { name: "Saudi Arabia", code: "SA", emoji: "🇸🇦" },
-  { name: "United Arab Emirates", code: "AE", emoji: "🇦🇪" },
-  { name: "Kuwait", code: "KW", emoji: "🇰🇼" },
-  { name: "Qatar", code: "QA", emoji: "🇶🇦" },
 ];
 
-// Список спеціалізацій для модального вікна
-const specializations = [
-  { nameKey: "specialization_therapist", value: "Therapist" },
-  { nameKey: "specialization_cardiologist", value: "Cardiologist" },
-  { nameKey: "specialization_surgeon", value: "Surgeon" },
-  { nameKey: "specialization_pediatrician", value: "Pediatrician" },
-  { nameKey: "specialization_dermatologist", value: "Dermatologist" },
-  { nameKey: "specialization_neurologist", value: "Neurologist" },
-  { nameKey: "specialization_gastroenterologist", value: "Gastroenterologist" },
-  { nameKey: "specialization_ophthalmologist", value: "Ophthalmologist" },
-  { nameKey: "specialization_lor", value: "LOR" },
-  { nameKey: "specialization_gynecologist", value: "Gynecologist" },
-  { nameKey: "specialization_urologist", value: "Urologist" },
-  { nameKey: "specialization_endocrinologist", value: "Endocrinologist" },
-  { nameKey: "specialization_psychologist", value: "Psychologist" },
-  { nameKey: "specialization_psychiatrist", value: "Psychiatrist" },
-  { nameKey: "specialization_nutritionist", value: "Nutritionist" },
-];
-
-// Список мов для модального вікна вибору мови консультацій
+// Languages for consultation
 const consultationLanguages = [
   { nameKey: "english", code: "en", emoji: "🇬🇧" },
-  { nameKey: "ukrainian", code: "uk", emoji: "uk" },
+  { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
   { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
   { nameKey: "german", code: "de", emoji: "🇩🇪" },
-  { nameKey: "french", code: "fr", emoji: "🇫🇷" },
-  { nameKey: "spanish", code: "es", emoji: "🇪🇸" },
-  // Додайте інші мови за потребою
 ];
 
-// Generate consultation cost options (e.g., from $10 to $200 in $5 increments)
+// Specializations
+const specializations = [
+  { nameKey: "general_practitioner", value: "general_practitioner" },
+  { nameKey: "pediatrician", value: "pediatrician" },
+  { nameKey: "cardiologist", value: "cardiologist" },
+  { nameKey: "dermatologist", value: "dermatologist" },
+  { nameKey: "neurologist", value: "neurologist" },
+  { nameKey: "surgeon", value: "surgeon" },
+  { nameKey: "psychiatrist", value: "psychiatrist" },
+  { nameKey: "dentist", value: "dentist" },
+  { nameKey: "ophthalmologist", value: "ophthalmologist" },
+  { nameKey: "ent_specialist", value: "ent_specialist" },
+  { nameKey: "gastroenterologist", value: "gastroenterologist" },
+  { nameKey: "endocrinologist", value: "endocrinologist" },
+  { nameKey: "oncologist", value: "oncologist" },
+  { nameKey: "allergist", value: "allergist" },
+  { nameKey: "physiotherapist", value: "physiotherapist" },
+];
+
+// Generate consultation cost options
 const generateConsultationCostOptions = () => {
   const options = [];
   for (let i = 10; i <= 200; i += 5) {
@@ -112,39 +78,41 @@ const Anketa_Settings = () => {
 
   // STATES FOR PROFILE DATA
   const [fullName, setFullName] = useState("");
-  const [country, setCountry] = useState(null); // Для поля "Україна"
+  const [country, setCountry] = useState(null);
   const [consultationCost, setConsultationCost] = useState("");
-  // Changed to array for multiple languages for consultation
   const [selectedConsultationLanguages, setSelectedConsultationLanguages] =
     useState([]);
-  // Changed to array for multiple specializations
   const [selectedSpecializations, setSelectedSpecializations] = useState([]);
   const [photoUri, setPhotoUri] = useState(null);
+  // ЗМІНА: Тимчасово встановлюємо null для цих полів, щоб вони не завантажувались
   const [diplomaUri, setDiplomaUri] = useState(null);
   const [certificateUri, setCertificateUri] = useState(null);
   const [experienceText, setExperienceText] = useState("");
   const [workLocation, setWorkLocation] = useState("");
   const [achievements, setAchievements] = useState("");
   const [aboutMe, setAboutMe] = useState("");
-  const [consultationCostRange, setConsultationCostRange] = useState(""); // Від і до
+  const [consultationCostRange, setConsultationCostRange] = useState("");
   const [searchTags, setSearchTags] = useState("");
   const [bankDetails, setBankDetails] = useState("");
-  const [agreedToTerms, setAgreedToTerms] = useState(false); // Для чекбоксу "Я погоджуюсь"
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // MODAL VISIBILITY STATES
   const [isCountryModalVisible, setIsCountryModalVisible] = useState(false);
   const [isGeneralLanguageModalVisible, setIsGeneralLanguageModalVisible] =
-    useState(false); // Для загальної мови інтерфейсу
-  const [isConsultationLanguageModalVisible, setIsConsultationLanguageModalVisible] =
-    useState(false); // Для мови консультацій
+    useState(false);
+  const [
+    isConsultationLanguageModalVisible,
+    setIsConsultationLanguageModalVisible,
+  ] = useState(false);
   const [isSpecializationModalVisible, setIsSpecializationModalVisible] =
     useState(false);
   const [isConsultationCostModalVisible, setIsConsultationCostModalVisible] =
-    useState(false); // New state for cost picker
+    useState(false);
 
   // UI RELATED STATES
   const [profileSaveError, setProfileSaveError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
@@ -180,6 +148,92 @@ const Anketa_Settings = () => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
+  // --- FETCH USER PROFILE DATA ---
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setIsLoadingProfile(true);
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          console.error("User not authenticated:", userError?.message);
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("anketa_doctor")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+
+        if (error && error.code !== "PGRST116") {
+          // PGRST116 means "No rows found"
+          console.error("Error fetching profile:", error.message);
+          Alert.alert(t("error_title"), t("error_fetching_profile"));
+          return;
+        }
+
+        if (data) {
+          setFullName(data.full_name || "");
+          const userCountry = countries.find((c) => c.name === data.country);
+          setCountry(userCountry || null);
+          setConsultationCost(data.consultation_cost?.toString() || "");
+
+          try {
+            setSelectedConsultationLanguages(
+              JSON.parse(data.communication_languages || "[]")
+            );
+          } catch (e) {
+            console.error("Помилка парсингу communication_languages:", e);
+            setSelectedConsultationLanguages([]);
+          }
+
+          try {
+            const storedSpecializationsFromDb = JSON.parse(
+              data.specialization || "[]"
+            );
+            const storedSpecializations = storedSpecializationsFromDb
+              .map((value) =>
+                specializations.find((spec) => spec.value === value)
+              )
+              .filter(Boolean);
+            setSelectedSpecializations(storedSpecializations);
+          } catch (e) {
+            console.error("Помилка парсингу specialization:", e);
+            setSelectedSpecializations([]);
+          }
+
+          // Встановлюємо photoUri з publicUrl, якщо він є
+          setPhotoUri(data.avatar_url || null);
+          // Не зчитуємо diploma_url та certificate_photo_url, щоб вони не відображались,
+          // якщо ми поки зосередились на аватарі.
+          setDiplomaUri(null); // Просто скидаємо
+          setCertificateUri(null); // Просто скидаємо
+
+          setExperienceText(data.work_experience || "");
+          setWorkLocation(data.work_location || "");
+          setAchievements(data.achievements || "");
+          setAboutMe(data.about_me || "");
+          setConsultationCostRange(data.consultation_cost_range || "");
+          setSearchTags(data.search_tags || "");
+          setBankDetails(data.bank_details || "");
+          setAgreedToTerms(data.agreed_to_terms || false);
+        }
+      } catch (err) {
+        console.error("Загальна помилка під час завантаження профілю:", err);
+        Alert.alert(t("error_title"), t("error_general_fetch_failed"));
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
   // --- MODAL HANDLERS ---
   const openCountryModal = () => setIsCountryModalVisible(true);
   const closeCountryModal = () => setIsCountryModalVisible(false);
@@ -188,20 +242,19 @@ const Anketa_Settings = () => {
     closeCountryModal();
   };
 
-  // Handlers for general app language
   const openGeneralLanguageModal = () => setIsGeneralLanguageModalVisible(true);
-  const closeGeneralLanguageModal = () => setIsGeneralLanguageModalVisible(false);
+  const closeGeneralLanguageModal = () =>
+    setIsGeneralLanguageModalVisible(false);
   const handleGeneralLanguageSelect = (langCode) => {
     i18n.changeLanguage(langCode);
     closeGeneralLanguageModal();
-    // setDisplayedLanguageCode оновиться автоматично завдяки useEffect
   };
 
-  // Handlers for consultation languages (multiple selection)
   const openConsultationLanguageModal = () => {
     setIsConsultationLanguageModalVisible(true);
   };
-  const closeConsultationLanguageModal = () => setIsConsultationLanguageModalVisible(false);
+  const closeConsultationLanguageModal = () =>
+    setIsConsultationLanguageModalVisible(false);
   const toggleConsultationLanguageSelect = (langCode) => {
     setSelectedConsultationLanguages((prevSelected) => {
       if (prevSelected.includes(langCode)) {
@@ -214,7 +267,6 @@ const Anketa_Settings = () => {
 
   const openSpecializationModal = () => setIsSpecializationModalVisible(true);
   const closeSpecializationModal = () => setIsSpecializationModalVisible(false);
-  // Modified to handle multiple specialization selections
   const toggleSpecializationSelect = (spec) => {
     setSelectedSpecializations((prevSelected) => {
       const isSelected = prevSelected.some(
@@ -230,7 +282,6 @@ const Anketa_Settings = () => {
     });
   };
 
-  // Consultation Cost Picker handlers
   const openConsultationCostModal = () =>
     setIsConsultationCostModalVisible(true);
   const closeConsultationCostModal = () =>
@@ -241,8 +292,100 @@ const Anketa_Settings = () => {
   };
 
   // --- FILE UPLOAD HANDLERS ---
-  const pickImage = async (setUri) => {
+  const uploadFile = async (uri, bucketName, userId, fileNamePrefix) => {
+    console.log("Starting upload for URI:", uri);
+    console.log("Bucket:", bucketName);
+    console.log("User ID (in uploadFile):", userId);
+
+    // Перевірка на userId
+    if (!userId) {
+      console.error("User ID is missing or null in uploadFile. Cannot upload.");
+      Alert.alert(
+        "Помилка завантаження",
+        "Ідентифікатор користувача відсутній."
+      );
+      return null;
+    }
+
+    // ЗМІНА: Додано перевірку на дійсність URI
+    if (!uri || uri.length === 0) {
+      console.error("URI is empty or null in uploadFile. Cannot upload.");
+      Alert.alert("Помилка завантаження", "URI файлу відсутній.");
+      return null;
+    }
+
+    try {
+      const response = await fetch(uri);
+      console.log("Fetch response status:", response.status);
+      if (!response.ok) {
+        throw new Error(
+          `Fetch failed with status ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const blob = await response.blob();
+      console.log("Blob type:", blob.type);
+      console.log("Blob size:", blob.size);
+
+      if (blob.size === 0) {
+        console.warn("WARNING: Uploading an empty blob!");
+        Alert.alert(
+          "Помилка завантаження",
+          "Вибраний файл порожній або не вдалося прочитати його вміст."
+        );
+        return null;
+      }
+
+      const fileExtension = blob.type.split("/")[1] || "jpg";
+      // ВИПРАВЛЕНО: Використання правильного синтаксису темплейтного рядка
+      const filePath = `${userId}/${fileNamePrefix}_${Date.now()}.${fileExtension}`;
+      console.log("Attempting to upload to path (key):", filePath);
+
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, blob, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (error) {
+        console.error("Supabase upload error:", error);
+        // Додано детальніший лог помилки, яка прийшла від Supabase
+        Alert.alert(
+          "Помилка завантаження",
+          `Не вдалося завантажити файл: ${error.message}`
+        );
+        throw error; // Прокидаємо помилку далі для обробки
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+
+      if (publicUrlData) {
+        console.log("Public URL:", publicUrlData.publicUrl);
+        return publicUrlData.publicUrl;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error in uploadFile (catch block):", error); // Детальніший лог
+      // Alert вже був викликаний вище, якщо це Supabase upload error
+      if (!error.message.includes("Failed to upload file")) {
+        // Запобігаємо дублюванню Alert
+        Alert.alert(
+          "Upload Error",
+          `Невідома помилка завантаження: ${error.message}`
+        );
+      }
+      return null;
+    }
+  };
+
+  const pickImage = async (setUriState) => {
+    console.log("Attempting to pick image...");
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log("Media library permission status:", status);
+
     if (status !== "granted") {
       Alert.alert(
         "Permission required",
@@ -251,37 +394,75 @@ const Anketa_Settings = () => {
       return;
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+    console.log("Permissions granted. Launching image library...");
+    try {
+      // ЗМІНА: Додано try...catch блок
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.useMediaLibraryPermissions.Images, // ЗМІНА: Використання ImagePicker.MediaType
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
 
-    if (!result.canceled) {
-      setUri(result.assets[0].uri);
-      // TODO: Додати логіку завантаження на Supabase Storage тут
-      // Alert.alert(
-      //   "Фото",
-      //   `Завантажено: ${result.assets[0].uri.split("/").pop()}`
-      // );
+      console.log("ImagePicker result:", result);
+
+      if (!result.canceled) {
+        console.log(
+          "ImagePicker not canceled. Selected URI:",
+          result.assets[0].uri
+        );
+        // ЗМІНА: Якщо це веб-платформа, використовуємо URL.createObjectURL для попереднього перегляду
+        if (Platform.OS === "web") {
+          const response = await fetch(result.assets[0].uri);
+          const blob = await response.blob();
+          setUriState(URL.createObjectURL(blob));
+        } else {
+          setUriState(result.assets[0].uri);
+        }
+      } else {
+        console.log("ImagePicker canceled by user.");
+        setUriState(null); // ЗМІНА: Очищаємо photoUri, якщо користувач скасував
+      }
+    } catch (error) {
+      // ЗМІНА: Обробка помилок
+      console.error("Error launching ImagePicker:", error);
+      Alert.alert("Помилка", `Не вдалося відкрити галерею: ${error.message}`);
+      setUriState(null); // Очищаємо photoUri у разі помилки
     }
   };
 
-  const pickDocument = async (setUri) => {
-    let result = await DocumentPicker.getDocumentAsync({
-      type: "*/*", // Дозволити всі типи файлів
-      copyToCacheDirectory: true,
-    });
+  const pickDocument = async (setUriState) => {
+    try {
+      // ЗМІНА: Додано try...catch блок
+      let result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+      });
 
-    if (result.type === "success") {
-      setUri(result.uri);
-      // TODO: Додати логіку завантаження на Supabase Storage тут
-      // Alert.alert("Документ", `Завантажено: ${result.name}`);
-    } else if (result.type === "cancel") {
-      console.log("Документ не вибрано");
-    } else if (result.type === "error") {
-      Alert.alert("Помилка", "Не вдалося вибрати документ.");
+      if (!result.canceled && result.type === "success") {
+        // ЗМІНА: Якщо це веб-платформа, використовуємо URL.createObjectURL для попереднього перегляду
+        if (Platform.OS === "web") {
+          const response = await fetch(result.assets[0].uri);
+          const blob = await response.blob();
+          setUriState(URL.createObjectURL(blob));
+        } else {
+          setUriState(result.assets[0].uri);
+        }
+      } else if (result.type === "cancel") {
+        console.log("Документ не вибрано");
+        setUriState(null); // ЗМІНА: Очищаємо URI, якщо користувач скасував
+      } else {
+        Alert.alert("Помилка", "Не вдалося вибрати документ.");
+        setUriState(null); // Очищаємо URI у разі помилки
+      }
+    } catch (error) {
+      // ЗМІНА: Обробка помилок
+      console.error("Error launching DocumentPicker:", error);
+      Alert.alert(
+        "Помилка",
+        `Не вдалося відкрити вибір файлів: ${error.message}`
+      );
+      setUriState(null); // Очищаємо URI у разі помилки
     }
   };
 
@@ -289,12 +470,10 @@ const Anketa_Settings = () => {
   const handleSaveProfile = async () => {
     setProfileSaveError("");
 
-    // Basic validation
     if (!fullName.trim()) {
       setProfileSaveError("Будь ласка, введіть повне ім'я.");
       return;
     }
-    // Updated validation for multiple specializations
     if (selectedSpecializations.length === 0) {
       setProfileSaveError("Будь ласка, виберіть хоча б одну спеціалізацію.");
       return;
@@ -307,62 +486,93 @@ const Anketa_Settings = () => {
     setIsSavingProfile(true);
 
     try {
-      // Отримання поточної сесії/користувача
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (userError || !user || !user.id) {
+        // Додана перевірка user.id
+        console.error(
+          "User not authenticated or user ID is missing:",
+          userError?.message || "User ID not found."
+        );
         setProfileSaveError(
-          "Користувач не автентифікований. Будь ласка, увійдіть."
+          "Користувач не автентифікований або ID користувача відсутній. Будь ласка, увійдіть."
         );
         setIsSavingProfile(false);
         return;
       }
 
-      // Prepare data for Supabase
-      const specializationsToSave = selectedSpecializations.map(
-        (spec) => spec.value
+      console.log("Authenticated User ID in handleSaveProfile:", user.id); // Для діагностики
+
+      let avatarUrl = photoUri;
+      // Завантажуємо аватар, якщо це локальний URI
+      if (photoUri && !photoUri.startsWith("http")) {
+        // Перевірка, чи photoUri дійсно є локальним файлом, а не просто null
+        if (photoUri.length > 0) {
+          // Проста перевірка на непустий рядок
+          avatarUrl = await uploadFile(photoUri, "avatars", user.id, "profile");
+        } else {
+          console.log("photoUri is empty, skipping upload.");
+          avatarUrl = null; // Немає URI, тому аватар буде null
+        }
+      }
+
+      // ЗМІНА: Для тимчасового ігнорування дипломів та сертифікатів
+      // ми їх не завантажуємо і встановлюємо в null, щоб не мати помилок з bucket 'documents'
+      let diplomaUrl = null;
+      let certUrl = null;
+      // Примітка: якщо ви згодом захочете завантажувати ці файли,
+      // вам потрібно буде розкоментувати відповідний код та створити bucket 'documents'
+      // let diplomaUrl = diplomaUri;
+      // if (diplomaUri && !diplomaUri.startsWith('http')) {
+      //   diplomaUrl = await uploadFile(diplomaUri, 'documents', user.id, 'diploma');
+      // }
+      // let certUrl = certificateUri;
+      // if (certificateUri && !certificateUri.startsWith('http')) {
+      //   certUrl = await uploadFile(certificateUri, 'documents', user.id, 'certificate');
+      // }
+
+      const specializationsToSave = JSON.stringify(
+        selectedSpecializations.map((spec) => spec.value)
       );
-      const languagesToSave =
+      const languagesToSave = JSON.stringify(
         selectedConsultationLanguages.length > 0
           ? selectedConsultationLanguages
-          : [i18n.language]; // Default to current if none selected
+          : [i18n.language]
+      );
 
       const { error: doctorProfileError } = await supabase
-        .from("anketa_doctor") // <--- Changed from 'doctors' to 'anketa_doctor' based on previous discussion
+        .from("anketa_doctor")
         .upsert(
           [
             {
-              // id: user.id, // <--- Removed this line as 'id' is auto-generated by DB (Primary Key)
-              user_id: user.id, // <--- Correctly assigning user.id to user_id column
+              user_id: user.id,
               full_name: fullName.trim(),
-              email: user.email, // Email беремо з об'єкта користувача Supabase
-              phone: "", // Якщо у вас немає поля вводу для телефону на цьому екрані, воно може бути пустим або null
+              email: user.email, // Забезпечуємо, що email користувача зберігається
+              phone: "",
               country: country?.name || null,
-              // Saved as an array
               communication_languages: languagesToSave,
-              // Saved as an array
               specialization: specializationsToSave,
-              experience_years: null, // Потрібно окреме поле вводу для років досвіду
-              education: null, // Потрібно окреме поле вводу
+              experience_years: null,
+              education: null,
               achievements: achievements.trim() || null,
               about_me: aboutMe.trim() || null,
-              consultation_cost: consultationCost.trim() || null, // Ціна за консультацію
-              consultation_cost_range: consultationCostRange.trim() || null, // Діапазон цін
+              consultation_cost: consultationCost.trim() || null,
+              consultation_cost_range: consultationCostRange.trim() || null,
               search_tags: searchTags.trim() || null,
               bank_details: bankDetails.trim() || null,
-
-              avatar_url: photoUri, // Тимчасово URI, в реальності URL після завантаження
-              certificate_photo_url: certificateUri, // Тимчасово URI, в реальності URL після завантаження
+              avatar_url: avatarUrl, // Зберігаємо публічну URL аватару
+              diploma_url: diplomaUrl, // ЗМІНА: Встановлюємо null для збереження
+              certificate_photo_url: certUrl, // ЗМІНА: Встановлюємо null для збереження
               work_experience: experienceText.trim() || null,
               work_location: workLocation.trim() || null,
-
-              is_verified: false, // Зазвичай встановлюється адміністратором
+              is_verified: false,
+              agreed_to_terms: agreedToTerms,
             },
           ],
-          { onConflict: "user_id" } // <--- Changed 'id' to 'user_id' for onConflict
+          { onConflict: "user_id" }
         );
 
       if (doctorProfileError) {
@@ -375,8 +585,7 @@ const Anketa_Settings = () => {
       }
 
       Alert.alert(t("success_title"), t("success_profile_saved"));
-      // Опціонально: перехід на інший екран або очищення форми
-      navigation.navigate("HomeScreen"); // Redirect to HomeScreen after successful save
+      navigation.navigate("HomeScreen");
     } catch (err) {
       console.error("Загальна помилка при збереженні профілю:", err);
       setProfileSaveError(t("error_general_save_failed"));
@@ -388,11 +597,28 @@ const Anketa_Settings = () => {
   const { width, height } = dimensions;
   const isLargeScreen = width > 768;
 
-  // Languages for general app language modal (can be different if you want different options)
   const generalAppLanguages = [
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
     { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
   ];
+
+  // ЗМІНА: useEffect для очищення URL.createObjectURL для веб-платформи
+  useEffect(() => {
+    if (Platform.OS === "web" && photoUri && photoUri.startsWith("blob:")) {
+      return () => {
+        URL.revokeObjectURL(photoUri);
+      };
+    }
+  }, [photoUri]);
+  // Такий же useEffect можна додати для diplomaUri та certificateUri, якщо вони будуть використовуватися на веб
+
+  if (isLoadingProfile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>{t("loading_profile")}</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -409,17 +635,16 @@ const Anketa_Settings = () => {
           <View style={styles.headerContainer}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.navigate("HomeScreen")} // Go to HomeScreen
+              onPress={() => navigation.navigate("HomeScreen")}
             >
               <Ionicons name="arrow-back" size={24} color="#212121" />
             </TouchableOpacity>
             <Text style={styles.title(isLargeScreen)}>
               {t("doctor_profile_title")}
             </Text>
-            {/* Прапорець мови - для зміни загальної мови інтерфейсу */}
             <TouchableOpacity
               style={styles.languageDisplayContainer}
-              onPress={openGeneralLanguageModal} // Open general language modal
+              onPress={openGeneralLanguageModal}
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ color: "white", fontSize: 14 }}>
@@ -470,7 +695,7 @@ const Anketa_Settings = () => {
           <Text style={styles.inputLabel}>{t("consultation_language")}</Text>
           <TouchableOpacity
             style={styles.selectButton(width)}
-            onPress={openConsultationLanguageModal} // Open consultation language modal
+            onPress={openConsultationLanguageModal}
           >
             <Text style={styles.selectButtonTextExpanded}>
               {selectedConsultationLanguages.length > 0
@@ -481,12 +706,13 @@ const Anketa_Settings = () => {
                           ?.emoji +
                         " " +
                         t(
-                          consultationLanguages.find((lang) => lang.code === code)
-                            ?.nameKey
+                          consultationLanguages.find(
+                            (lang) => lang.code === code
+                          )?.nameKey
                         )
                     )
                     .join(", ")
-                : t("select_consultation_language")} {/* Changed translation key */}
+                : t("select_consultation_language")}
             </Text>
           </TouchableOpacity>
 
@@ -514,37 +740,39 @@ const Anketa_Settings = () => {
             >
               <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
             </TouchableOpacity>
+            {/* Перевіряємо, чи photoUri існує і є дійсним для відображення */}
             {photoUri && (
               <Image source={{ uri: photoUri }} style={styles.previewImage} />
             )}
           </View>
 
-          {/* Diploma Upload */}
+          {/* Diploma Upload (ЗМІНА: Поки не завантажуємо) */}
           <Text style={styles.inputLabel}>{t("upload_diploma")}</Text>
           <View style={styles.uploadContainer}>
             <TouchableOpacity
               style={styles.uploadButton(width)}
-              onPress={() => pickImage(setDiplomaUri)}
+              onPress={() => pickDocument(setDiplomaUri)}
             >
               <Text style={styles.uploadButtonText}>{t("upload_diploma")}</Text>
             </TouchableOpacity>
+            {/* Відображаємо, якщо є локальний URI, але не завантажуємо його */}
             {diplomaUri && (
-              // For documents, you might want a generic document icon or a small image for file types
               <Image source={{ uri: diplomaUri }} style={styles.previewImage} />
             )}
           </View>
 
-          {/* Certificate Upload */}
+          {/* Certificate Upload (ЗМІНА: Поки не завантажуємо) */}
           <Text style={styles.inputLabel}>{t("upload_certificate")}</Text>
           <View style={styles.uploadContainer}>
             <TouchableOpacity
               style={styles.uploadButton(width)}
-              onPress={() => pickImage(setCertificateUri)}
+              onPress={() => pickDocument(setCertificateUri)}
             >
               <Text style={styles.uploadButtonText}>
                 {t("upload_certificate")}
               </Text>
             </TouchableOpacity>
+            {/* Відображаємо, якщо є локальний URI, але не завантажуємо його */}
             {certificateUri && (
               <Image
                 source={{ uri: certificateUri }}
@@ -561,7 +789,7 @@ const Anketa_Settings = () => {
               placeholder={t("work_experience")}
               value={experienceText}
               onChangeText={setExperienceText}
-              multiline={true} // Дозволити багаторядковий текст
+              multiline={true}
             />
           </View>
 
@@ -597,7 +825,7 @@ const Anketa_Settings = () => {
               value={aboutMe}
               onChangeText={setAboutMe}
               multiline={true}
-              numberOfLines={4} // Для багаторядкового вводу
+              numberOfLines={4}
             />
           </View>
 
@@ -607,7 +835,7 @@ const Anketa_Settings = () => {
             <TextInput
               style={styles.input}
               placeholder="Від 00.00 до 00.00"
-              keyboardType="default" // Може бути text, якщо потрібні символи валюти
+              keyboardType="default"
               value={consultationCostRange}
               onChangeText={setConsultationCostRange}
             />
@@ -750,15 +978,15 @@ const Anketa_Settings = () => {
             <ScrollView contentContainerStyle={styles.centeredView}>
               <View style={styles.modalView(width)}>
                 <Text style={styles.modalTitle}>
-                  {t("select_consultation_language_modal_title")} {/* New translation key */}
+                  {t("select_consultation_language_modal_title")}
                 </Text>
                 {consultationLanguages.map((item) => (
                   <TouchableOpacity
                     key={item.code}
                     style={[
-                      styles.countryItem, // Reusing style for consistency
+                      styles.countryItem,
                       selectedConsultationLanguages.includes(item.code) &&
-                      styles.countryItemSelected,
+                        styles.countryItemSelected,
                     ]}
                     onPress={() => toggleConsultationLanguageSelect(item.code)}
                   >
@@ -800,7 +1028,7 @@ const Anketa_Settings = () => {
                   <TouchableOpacity
                     key={item.value}
                     style={[
-                      styles.countryItem, // Reusing style as it looks similar
+                      styles.countryItem,
                       selectedSpecializations.some(
                         (selectedSpec) => selectedSpec.value === item.value
                       ) && styles.countryItemSelected,
