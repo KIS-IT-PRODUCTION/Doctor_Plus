@@ -23,8 +23,9 @@ import { supabase } from "../../providers/supabaseClient";
 import { useTranslation } from "react-i18next";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import { decode } from "base64-arraybuffer"; // Цей імпорт потрібен для перетворення base64 в ArrayBuffer
 
-// Список країн
 const countries = [
   { name: "Україна", code: "UA", emoji: "🇺🇦" },
   { name: "United Kingdom", code: "GB", emoji: "🇬🇧" },
@@ -37,10 +38,10 @@ const countries = [
 
 // Languages for consultation
 const consultationLanguages = [
-  { nameKey: "english", code: "en", emoji: "🇬🇧" },
-  { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
-  { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
-  { nameKey: "german", code: "de", emoji: "🇩🇪" },
+  { nameKey: "english", code: "en", emoji: "" },
+  { nameKey: "ukrainian", code: "uk", emoji: "" },
+  { nameKey: "polish", code: "pl", emoji: "" },
+  { nameKey: "german", code: "de", emoji: "" },
 ];
 
 // Specializations
@@ -62,7 +63,6 @@ const specializations = [
   { nameKey: "physiotherapist", value: "physiotherapist" },
 ];
 
-// Generate consultation cost options
 const generateConsultationCostOptions = () => {
   const options = [];
   for (let i = 10; i <= 200; i += 5) {
@@ -84,7 +84,6 @@ const Anketa_Settings = () => {
     useState([]);
   const [selectedSpecializations, setSelectedSpecializations] = useState([]);
   const [photoUri, setPhotoUri] = useState(null);
-  // ЗМІНА: Тимчасово встановлюємо null для цих полів, щоб вони не завантажувались
   const [diplomaUri, setDiplomaUri] = useState(null);
   const [certificateUri, setCertificateUri] = useState(null);
   const [experienceText, setExperienceText] = useState("");
@@ -209,10 +208,9 @@ const Anketa_Settings = () => {
 
           // Встановлюємо photoUri з publicUrl, якщо він є
           setPhotoUri(data.avatar_url || null);
-          // Не зчитуємо diploma_url та certificate_photo_url, щоб вони не відображались,
-          // якщо ми поки зосередились на аватарі.
-          setDiplomaUri(null); // Просто скидаємо
-          setCertificateUri(null); // Просто скидаємо
+          // Тепер зчитуємо diploma_url та certificate_photo_url, якщо вони існують
+          setDiplomaUri(data.diploma_url || null);
+          setCertificateUri(data.certificate_photo_url || null);
 
           setExperienceText(data.work_experience || "");
           setWorkLocation(data.work_location || "");
@@ -291,13 +289,11 @@ const Anketa_Settings = () => {
     closeConsultationCostModal();
   };
 
-  // --- FILE UPLOAD HANDLERS ---
   const uploadFile = async (uri, bucketName, userId, fileNamePrefix) => {
     console.log("Starting upload for URI:", uri);
     console.log("Bucket:", bucketName);
     console.log("User ID (in uploadFile):", userId);
 
-    // Перевірка на userId
     if (!userId) {
       console.error("User ID is missing or null in uploadFile. Cannot upload.");
       Alert.alert(
@@ -307,28 +303,27 @@ const Anketa_Settings = () => {
       return null;
     }
 
-    // ЗМІНА: Додано перевірку на дійсність URI
     if (!uri || uri.length === 0) {
       console.error("URI is empty or null in uploadFile. Cannot upload.");
       Alert.alert("Помилка завантаження", "URI файлу відсутній.");
       return null;
     }
 
+    let fileExtension = "bin"; // Дефолтне розширення
+    let mimeType = "application/octet-stream"; // Дефолтний MIME тип
+    let fileBuffer; // Буде ArrayBuffer
+
     try {
-      const response = await fetch(uri);
-      console.log("Fetch response status:", response.status);
-      if (!response.ok) {
-        throw new Error(
-          `Fetch failed with status ${response.status}: ${response.statusText}`
-        );
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      console.log("File Info:", fileInfo);
+
+      if (!fileInfo.exists) {
+        console.error("ERROR: File does not exist at URI:", uri);
+        Alert.alert("Помилка завантаження", "Вибраний файл не існує.");
+        return null;
       }
-
-      const blob = await response.blob();
-      console.log("Blob type:", blob.type);
-      console.log("Blob size:", blob.size);
-
-      if (blob.size === 0) {
-        console.warn("WARNING: Uploading an empty blob!");
+      if (fileInfo.size === 0) {
+        console.warn("WARNING: File selected has 0 bytes:", uri);
         Alert.alert(
           "Помилка завантаження",
           "Вибраний файл порожній або не вдалося прочитати його вміст."
@@ -336,47 +331,88 @@ const Anketa_Settings = () => {
         return null;
       }
 
-      const fileExtension = blob.type.split("/")[1] || "jpg";
-      // ВИПРАВЛЕНО: Використання правильного синтаксису темплейтного рядка
+      // Визначення mimeType та fileExtension
+      if (fileInfo.mimeType) {
+        mimeType = fileInfo.mimeType;
+      } else {
+        const uriParts = uri.split(".");
+        if (uriParts.length > 1) {
+          const ext = uriParts[uriParts.length - 1].toLowerCase();
+          if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
+          else if (ext === "png") mimeType = "image/png";
+          else if (ext === "pdf") mimeType = "application/pdf";
+          else if (ext === "doc") mimeType = "application/msword";
+          else if (ext === "docx")
+            mimeType =
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+          // Додаємо інші формати зображень, якщо необхідно
+          else if (ext === "gif") mimeType = "image/gif";
+          else if (ext === "bmp") mimeType = "image/bmp";
+          else if (ext === "webp") mimeType = "image/webp";
+        }
+      }
+
+      const uriParts = uri.split(".");
+      if (uriParts.length > 1) {
+        fileExtension = uriParts[uriParts.length - 1];
+      } else if (mimeType) {
+        const mimeTypeParts = mimeType.split("/");
+        if (mimeTypeParts.length > 1) {
+          fileExtension = mimeTypeParts[1];
+        }
+      }
+
+      // Читаємо файл у base64 для завантаження
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      fileBuffer = decode(base64); // Перетворюємо base64 в ArrayBuffer
+
+      console.log("File data type for upload:", typeof fileBuffer);
+      console.log("Determined MIME type for upload:", mimeType);
+
       const filePath = `${userId}/${fileNamePrefix}_${Date.now()}.${fileExtension}`;
       console.log("Attempting to upload to path (key):", filePath);
 
       const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(filePath, blob, {
+        .upload(filePath, fileBuffer, {
+          contentType: mimeType,
           cacheControl: "3600",
           upsert: true,
         });
 
       if (error) {
         console.error("Supabase upload error:", error);
-        // Додано детальніший лог помилки, яка прийшла від Supabase
         Alert.alert(
-          "Помилка завантаження",
+          "Помилка завантаження Supabase",
           `Не вдалося завантажити файл: ${error.message}`
         );
-        throw error; // Прокидаємо помилку далі для обробки
+        throw error;
       }
 
       const { data: publicUrlData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(filePath);
 
-      if (publicUrlData) {
+      if (publicUrlData && publicUrlData.publicUrl) {
         console.log("Public URL:", publicUrlData.publicUrl);
         return publicUrlData.publicUrl;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error in uploadFile (catch block):", error); // Детальніший лог
-      // Alert вже був викликаний вище, якщо це Supabase upload error
-      if (!error.message.includes("Failed to upload file")) {
-        // Запобігаємо дублюванню Alert
+      } else {
+        console.warn("Could not get public URL for file:", filePath);
         Alert.alert(
-          "Upload Error",
-          `Невідома помилка завантаження: ${error.message}`
+          "Помилка URL",
+          "Не вдалося отримати публічну URL-адресу для файлу."
         );
+        return null;
       }
+    } catch (error) {
+      console.error("Error in uploadFile (catch block):", error);
+      Alert.alert(
+        "Помилка завантаження",
+        `Невідома помилка завантаження: ${error.message}`
+      );
       return null;
     }
   };
@@ -388,17 +424,16 @@ const Anketa_Settings = () => {
 
     if (status !== "granted") {
       Alert.alert(
-        "Permission required",
-        "Please grant media library permissions to upload photos."
+        "Потрібен дозвіл",
+        "Будь ласка, надайте дозволи до бібліотеки медіа для завантаження фотографій."
       );
       return;
     }
 
     console.log("Permissions granted. Launching image library...");
     try {
-      // ЗМІНА: Додано try...catch блок
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.useMediaLibraryPermissions.Images, // ЗМІНА: Використання ImagePicker.MediaType
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
@@ -406,63 +441,85 @@ const Anketa_Settings = () => {
 
       console.log("ImagePicker result:", result);
 
-      if (!result.canceled) {
-        console.log(
-          "ImagePicker not canceled. Selected URI:",
-          result.assets[0].uri
-        );
-        // ЗМІНА: Якщо це веб-платформа, використовуємо URL.createObjectURL для попереднього перегляду
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedUri = result.assets[0].uri;
+        console.log("ImagePicker not canceled. Selected URI:", selectedUri);
+
         if (Platform.OS === "web") {
-          const response = await fetch(result.assets[0].uri);
-          const blob = await response.blob();
-          setUriState(URL.createObjectURL(blob));
+          let uriToSet;
+          if (
+            typeof selectedUri === "string" &&
+            selectedUri.startsWith("blob:")
+          ) {
+            uriToSet = selectedUri;
+          } else {
+            const response = await fetch(selectedUri);
+            const blob = await response.blob();
+            uriToSet = URL.createObjectURL(blob);
+          }
+          setUriState(uriToSet);
         } else {
-          setUriState(result.assets[0].uri);
+          setUriState(selectedUri);
         }
       } else {
-        console.log("ImagePicker canceled by user.");
-        setUriState(null); // ЗМІНА: Очищаємо photoUri, якщо користувач скасував
+        console.log("ImagePicker canceled by user or no asset selected.");
+        setUriState(null);
       }
     } catch (error) {
-      // ЗМІНА: Обробка помилок
       console.error("Error launching ImagePicker:", error);
       Alert.alert("Помилка", `Не вдалося відкрити галерею: ${error.message}`);
-      setUriState(null); // Очищаємо photoUri у разі помилки
+      setUriState(null);
     }
   };
 
   const pickDocument = async (setUriState) => {
     try {
-      // ЗМІНА: Додано try...catch блок
       let result = await DocumentPicker.getDocumentAsync({
         type: "*/*",
         copyToCacheDirectory: true,
       });
 
-      if (!result.canceled && result.type === "success") {
-        // ЗМІНА: Якщо це веб-платформа, використовуємо URL.createObjectURL для попереднього перегляду
+      if (
+        !result.canceled &&
+        result.type === "success" &&
+        result.assets &&
+        result.assets.length > 0
+      ) {
+        const selectedUri = result.assets[0].uri;
+        console.log("DocumentPicker result:", result);
+        console.log("Selected Document URI:", selectedUri);
+
         if (Platform.OS === "web") {
-          const response = await fetch(result.assets[0].uri);
-          const blob = await response.blob();
-          setUriState(URL.createObjectURL(blob));
+          let uriToSet;
+          if (
+            typeof selectedUri === "string" &&
+            selectedUri.startsWith("blob:")
+          ) {
+            uriToSet = selectedUri;
+          } else {
+            const response = await fetch(selectedUri);
+            const blob = await response.blob();
+            uriToSet = URL.createObjectURL(blob);
+          }
+          setUriState(uriToSet);
         } else {
-          setUriState(result.assets[0].uri);
+          setUriState(selectedUri);
         }
       } else if (result.type === "cancel") {
         console.log("Документ не вибрано");
-        setUriState(null); // ЗМІНА: Очищаємо URI, якщо користувач скасував
+        setUriState(null);
       } else {
+        console.error("Помилка вибору документа:", result);
         Alert.alert("Помилка", "Не вдалося вибрати документ.");
-        setUriState(null); // Очищаємо URI у разі помилки
+        setUriState(null);
       }
     } catch (error) {
-      // ЗМІНА: Обробка помилок
       console.error("Error launching DocumentPicker:", error);
       Alert.alert(
         "Помилка",
         `Не вдалося відкрити вибір файлів: ${error.message}`
       );
-      setUriState(null); // Очищаємо URI у разі помилки
+      setUriState(null);
     }
   };
 
@@ -492,7 +549,6 @@ const Anketa_Settings = () => {
       } = await supabase.auth.getUser();
 
       if (userError || !user || !user.id) {
-        // Додана перевірка user.id
         console.error(
           "User not authenticated or user ID is missing:",
           userError?.message || "User ID not found."
@@ -504,35 +560,68 @@ const Anketa_Settings = () => {
         return;
       }
 
-      console.log("Authenticated User ID in handleSaveProfile:", user.id); // Для діагностики
+      console.log("Authenticated User ID in handleSaveProfile:", user.id);
 
       let avatarUrl = photoUri;
-      // Завантажуємо аватар, якщо це локальний URI
-      if (photoUri && !photoUri.startsWith("http")) {
-        // Перевірка, чи photoUri дійсно є локальним файлом, а не просто null
-        if (photoUri.length > 0) {
-          // Проста перевірка на непустий рядок
-          avatarUrl = await uploadFile(photoUri, "avatars", user.id, "profile");
-        } else {
-          console.log("photoUri is empty, skipping upload.");
-          avatarUrl = null; // Немає URI, тому аватар буде null
+      if (
+        photoUri &&
+        !photoUri.startsWith("http") &&
+        !photoUri.startsWith("https")
+      ) {
+        console.log("Uploading photo from local URI:", photoUri);
+        avatarUrl = await uploadFile(photoUri, "avatars", user.id, "profile");
+        if (!avatarUrl) {
+          setProfileSaveError("Не вдалося завантажити фото профілю.");
+          setIsSavingProfile(false);
+          return;
         }
+      } else if (photoUri === null) {
+        avatarUrl = null;
       }
 
-      // ЗМІНА: Для тимчасового ігнорування дипломів та сертифікатів
-      // ми їх не завантажуємо і встановлюємо в null, щоб не мати помилок з bucket 'documents'
-      let diplomaUrl = null;
-      let certUrl = null;
-      // Примітка: якщо ви згодом захочете завантажувати ці файли,
-      // вам потрібно буде розкоментувати відповідний код та створити bucket 'documents'
-      // let diplomaUrl = diplomaUri;
-      // if (diplomaUri && !diplomaUri.startsWith('http')) {
-      //   diplomaUrl = await uploadFile(diplomaUri, 'documents', user.id, 'diploma');
-      // }
-      // let certUrl = certificateUri;
-      // if (certificateUri && !certificateUri.startsWith('http')) {
-      //   certUrl = await uploadFile(certificateUri, 'documents', user.id, 'certificate');
-      // }
+      let diplomaUrl = diplomaUri;
+      if (
+        diplomaUri &&
+        !diplomaUri.startsWith("http") &&
+        !diplomaUri.startsWith("https")
+      ) {
+        console.log("Uploading diploma from local URI:", diplomaUri);
+        diplomaUrl = await uploadFile(
+          diplomaUri,
+          "avatars", // ЗМІНА: Завантажуємо в бакет "avatars"
+          user.id,
+          "diploma"
+        );
+        if (!diplomaUrl) {
+          setProfileSaveError("Не вдалося завантажити диплом.");
+          setIsSavingProfile(false);
+          return;
+        }
+      } else if (diplomaUri === null) {
+        diplomaUrl = null;
+      }
+
+      let certUrl = certificateUri;
+      if (
+        certificateUri &&
+        !certificateUri.startsWith("http") &&
+        !certificateUri.startsWith("https")
+      ) {
+        console.log("Uploading certificate from local URI:", certificateUri);
+        certUrl = await uploadFile(
+          certificateUri,
+          "avatars", // ЗМІНА: Завантажуємо в бакет "avatars"
+          user.id,
+          "certificate"
+        );
+        if (!certUrl) {
+          setProfileSaveError("Не вдалося завантажити сертифікат.");
+          setIsSavingProfile(false);
+          return;
+        }
+      } else if (certificateUri === null) {
+        certUrl = null;
+      }
 
       const specializationsToSave = JSON.stringify(
         selectedSpecializations.map((spec) => spec.value)
@@ -550,7 +639,7 @@ const Anketa_Settings = () => {
             {
               user_id: user.id,
               full_name: fullName.trim(),
-              email: user.email, // Забезпечуємо, що email користувача зберігається
+              email: user.email,
               phone: "",
               country: country?.name || null,
               communication_languages: languagesToSave,
@@ -563,9 +652,9 @@ const Anketa_Settings = () => {
               consultation_cost_range: consultationCostRange.trim() || null,
               search_tags: searchTags.trim() || null,
               bank_details: bankDetails.trim() || null,
-              avatar_url: avatarUrl, // Зберігаємо публічну URL аватару
-              diploma_url: diplomaUrl, // ЗМІНА: Встановлюємо null для збереження
-              certificate_photo_url: certUrl, // ЗМІНА: Встановлюємо null для збереження
+              avatar_url: avatarUrl,
+              diploma_url: diplomaUrl,
+              certificate_photo_url: certUrl,
               work_experience: experienceText.trim() || null,
               work_location: workLocation.trim() || null,
               is_verified: false,
@@ -598,27 +687,19 @@ const Anketa_Settings = () => {
   const isLargeScreen = width > 768;
 
   const generalAppLanguages = [
-    { nameKey: "english", code: "en", emoji: "🇬🇧" },
-    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
+    { nameKey: "english", code: "en", emoji: "" },
+    { nameKey: "ukrainian", code: "uk", emoji: "" },
   ];
 
-  // ЗМІНА: useEffect для очищення URL.createObjectURL для веб-платформи
   useEffect(() => {
-    if (Platform.OS === "web" && photoUri && photoUri.startsWith("blob:")) {
-      return () => {
-        URL.revokeObjectURL(photoUri);
-      };
-    }
-  }, [photoUri]);
-  // Такий же useEffect можна додати для diplomaUri та certificateUri, якщо вони будуть використовуватися на веб
-
-  if (isLoadingProfile) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>{t("loading_profile")}</Text>
-      </View>
+    const cleanupUris = [photoUri, diplomaUri, certificateUri].filter(
+      (uri) => Platform.OS === "web" && uri && uri.startsWith("blob:")
     );
-  }
+
+    return () => {
+      cleanupUris.forEach((uri) => URL.revokeObjectURL(uri));
+    };
+  }, [photoUri, diplomaUri, certificateUri]);
 
   return (
     <SafeAreaView
@@ -647,10 +728,28 @@ const Anketa_Settings = () => {
               onPress={openGeneralLanguageModal}
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text style={{ color: "white", fontSize: 14 }}>
+                <Text style={styles.languageDisplayText}>
                   {displayedLanguageCode}
                 </Text>
               </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Photo Upload - Moved to the top and styled as a circle */}
+          <Text style={styles.inputLabel}>{t("upload_photo")}</Text>
+          <View style={styles.avatarUploadContainer}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.profileAvatar} />
+            ) : (
+              <View style={styles.profileAvatarPlaceholder}>
+                <Ionicons name="person" size={60} color="#ccc" />
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.uploadButton(width)}
+              onPress={() => pickImage(setPhotoUri)}
+            >
+              <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -731,48 +830,31 @@ const Anketa_Settings = () => {
             </Text>
           </TouchableOpacity>
 
-          {/* Photo Upload */}
-          <Text style={styles.inputLabel}>{t("upload_photo")}</Text>
-          <View style={styles.uploadContainer}>
-            <TouchableOpacity
-              style={styles.uploadButton(width)}
-              onPress={() => pickImage(setPhotoUri)}
-            >
-              <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
-            </TouchableOpacity>
-            {/* Перевіряємо, чи photoUri існує і є дійсним для відображення */}
-            {photoUri && (
-              <Image source={{ uri: photoUri }} style={styles.previewImage} />
-            )}
-          </View>
-
-          {/* Diploma Upload (ЗМІНА: Поки не завантажуємо) */}
+          {/* Diploma Upload */}
           <Text style={styles.inputLabel}>{t("upload_diploma")}</Text>
           <View style={styles.uploadContainer}>
             <TouchableOpacity
               style={styles.uploadButton(width)}
-              onPress={() => pickDocument(setDiplomaUri)}
+              onPress={() => pickImage(setDiplomaUri)}
             >
               <Text style={styles.uploadButtonText}>{t("upload_diploma")}</Text>
             </TouchableOpacity>
-            {/* Відображаємо, якщо є локальний URI, але не завантажуємо його */}
             {diplomaUri && (
               <Image source={{ uri: diplomaUri }} style={styles.previewImage} />
             )}
           </View>
 
-          {/* Certificate Upload (ЗМІНА: Поки не завантажуємо) */}
+          {/* Certificate Upload */}
           <Text style={styles.inputLabel}>{t("upload_certificate")}</Text>
           <View style={styles.uploadContainer}>
             <TouchableOpacity
               style={styles.uploadButton(width)}
-              onPress={() => pickDocument(setCertificateUri)}
+              onPress={() => pickImage(setCertificateUri)}
             >
               <Text style={styles.uploadButtonText}>
                 {t("upload_certificate")}
               </Text>
             </TouchableOpacity>
-            {/* Відображаємо, якщо є локальний URI, але не завантажуємо його */}
             {certificateUri && (
               <Image
                 source={{ uri: certificateUri }}
@@ -846,63 +928,53 @@ const Anketa_Settings = () => {
           <View style={styles.inputContainer(width)}>
             <TextInput
               style={styles.input}
-              placeholder={t("search_tags")}
+              placeholder={t("search_tags_placeholder")}
               value={searchTags}
               onChangeText={setSearchTags}
-              multiline={true}
             />
           </View>
 
-          {/* Реквізити */}
+          {/* Банківські реквізити */}
           <Text style={styles.inputLabel}>{t("bank_details")}</Text>
           <View style={styles.inputContainer(width)}>
             <TextInput
               style={styles.input}
-              placeholder={t("bank_details")}
+              placeholder={t("bank_details_placeholder")}
               value={bankDetails}
               onChangeText={setBankDetails}
               multiline={true}
+              numberOfLines={3}
             />
           </View>
 
-          {/* Checkbox "Я погоджуюсь" */}
+          {/* Згода з умовами */}
           <View style={styles.agreementContainer}>
             <Switch
-              trackColor={{ false: "#767577", true: "#81b0ff" }}
-              thumbColor={agreedToTerms ? "#0EB3EB" : "#f4f3f4"}
-              ios_backgroundColor="#3e3e3e"
+              trackColor={{
+                false: "#767577",
+                true: "rgb(3, 88, 101)",
+              }}
+              thumbColor={agreedToTerms ? "rgba(14, 179, 235, 1)" : "#f4f3f4"}
               onValueChange={setAgreedToTerms}
               value={agreedToTerms}
             />
-            <Text style={styles.agreementText}>
-              {t("i_agree_with")}{" "}
-              <Text
-                style={styles.agreementLink}
-                onPress={() =>
-                  Alert.alert("Угода", "Перехід до договору співпраці")
-                }
-              >
-                {t("cooperation_agreement")}
-              </Text>
-            </Text>
+            <Text style={styles.agreementText}>{t("agree_to_terms")}</Text>
           </View>
 
           {profileSaveError ? (
             <Text style={styles.errorText}>{profileSaveError}</Text>
           ) : null}
 
-          {/* Кнопка Зберегти */}
           <TouchableOpacity
             style={styles.saveProfileButton(width)}
             onPress={handleSaveProfile}
             disabled={isSavingProfile}
           >
             <Text style={styles.saveProfileButtonText}>
-              {isSavingProfile ? "Збереження..." : t("save_profile")}
+              {isSavingProfile ? t("saving") : t("save_profile")}
             </Text>
           </TouchableOpacity>
 
-          {/* Modals */}
           {/* Country Modal */}
           <Modal
             animationType="slide"
@@ -910,106 +982,134 @@ const Anketa_Settings = () => {
             visible={isCountryModalVisible}
             onRequestClose={closeCountryModal}
           >
-            <ScrollView contentContainerStyle={styles.centeredView}>
-              <View style={styles.modalView(width)}>
-                <Text style={styles.modalTitle}>
-                  {t("select_country_modal_title")}
-                </Text>
-                {countries.map((item) => (
-                  <TouchableOpacity
-                    key={item.code}
-                    style={styles.countryItem}
-                    onPress={() => selectCountry(item)}
+            <Pressable style={styles.centeredView} onPress={closeCountryModal}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalView(width), styles.modalBorder]}>
+                  {/* ЗМІНА: Додано modalBorder */}
+                  <Text style={styles.modalTitle}>
+                    {t("select_country_modal_title")}
+                  </Text>
+                  <ScrollView style={styles.modalScrollView}>
+                    {countries.map((item) => (
+                      <TouchableOpacity
+                        key={item.code}
+                        style={styles.countryItem}
+                        onPress={() => selectCountry(item)}
+                      >
+                        <Text style={styles.countryEmoji}>{item.emoji}</Text>
+                        <Text style={styles.countryName}>{item.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <Pressable
+                    style={[styles.button, styles.buttonClose]}
+                    onPress={closeCountryModal}
                   >
-                    <Text style={styles.countryEmoji}>{item.emoji}</Text>
-                    <Text style={styles.countryName}>{item.name}</Text>
-                  </TouchableOpacity>
-                ))}
-                <Pressable
-                  style={[styles.button, styles.buttonClose]}
-                  onPress={closeCountryModal}
-                >
-                  <Text style={styles.textStyle}>{t("cancel")}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+                    <Text style={styles.textStyle}>{t("close")}</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </Pressable>
           </Modal>
 
-          {/* General App Language Modal */}
+          {/* General Language Modal */}
           <Modal
-            animationType="fade"
+            animationType="slide"
             transparent={true}
             visible={isGeneralLanguageModalVisible}
             onRequestClose={closeGeneralLanguageModal}
           >
-            <TouchableWithoutFeedback onPress={closeGeneralLanguageModal}>
-              <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback
-                  onPress={() => {
-                    /* Залишаємо порожнім, щоб не закривати модалку при натисканні всередині */
-                  }}
-                >
-                  <View style={styles.languageModalContent}>
-                    <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
-                    {generalAppLanguages.map((item) => (
+            <Pressable
+              style={styles.centeredView}
+              onPress={closeGeneralLanguageModal}
+            >
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalView(width), styles.modalBorder]}>
+                  {/* ЗМІНА: Додано modalBorder */}
+                  <Text style={styles.modalTitle}>{t("select_language")}</Text>
+                  <ScrollView style={styles.modalScrollView}>
+                    {generalAppLanguages.map((lang) => (
                       <TouchableOpacity
-                        key={item.code}
+                        key={lang.code}
                         style={styles.languageOption}
-                        onPress={() => handleGeneralLanguageSelect(item.code)}
+                        onPress={() => handleGeneralLanguageSelect(lang.code)}
                       >
                         <Text style={styles.languageOptionText}>
-                          {t(item.nameKey)}
+                          {lang.emoji} {t(lang.nameKey)}
                         </Text>
                       </TouchableOpacity>
                     ))}
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
+                  </ScrollView>
+                  <Pressable
+                    style={[styles.button, styles.buttonClose]}
+                    onPress={closeGeneralLanguageModal}
+                  >
+                    <Text style={styles.textStyle}>{t("close")}</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </Pressable>
           </Modal>
 
-          {/* Consultation Language Modal (Multiple selection) */}
+          {/* Consultation Language Modal */}
           <Modal
             animationType="slide"
             transparent={true}
             visible={isConsultationLanguageModalVisible}
             onRequestClose={closeConsultationLanguageModal}
           >
-            <ScrollView contentContainerStyle={styles.centeredView}>
-              <View style={styles.modalView(width)}>
-                <Text style={styles.modalTitle}>
-                  {t("select_consultation_language_modal_title")}
-                </Text>
-                {consultationLanguages.map((item) => (
-                  <TouchableOpacity
-                    key={item.code}
-                    style={[
-                      styles.countryItem,
-                      selectedConsultationLanguages.includes(item.code) &&
-                        styles.countryItemSelected,
-                    ]}
-                    onPress={() => toggleConsultationLanguageSelect(item.code)}
+            <Pressable
+              style={styles.centeredView}
+              onPress={closeConsultationLanguageModal}
+            >
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalView(width), styles.modalBorder]}>
+                  {/* ЗМІНА: Додано modalBorder */}
+                  <Text style={styles.modalTitle}>
+                    {t("select_consultation_language")}
+                  </Text>
+                  <ScrollView style={styles.modalScrollView}>
+                    {consultationLanguages.map((lang) => (
+                      <TouchableOpacity
+                        key={lang.code}
+                        style={[
+                          styles.countryItem,
+                          selectedConsultationLanguages.includes(lang.code) &&
+                            styles.countryItemSelected,
+                        ]}
+                        onPress={() =>
+                          toggleConsultationLanguageSelect(lang.code)
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.countryName,
+                            selectedConsultationLanguages.includes(lang.code) &&
+                              styles.countryItemTextSelected,
+                          ]}
+                        >
+                          {lang.emoji} {t(lang.nameKey)}
+                        </Text>
+                        {selectedConsultationLanguages.includes(lang.code) && (
+                          <Ionicons
+                            name="checkmark"
+                            size={20}
+                            color="#0EB3EB"
+                            style={styles.checkmarkIcon}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <Pressable
+                    style={[styles.button, styles.buttonClose]}
+                    onPress={closeConsultationLanguageModal}
                   >
-                    <Text style={styles.countryEmoji}>{item.emoji}</Text>
-                    <Text style={styles.countryName}>{t(item.nameKey)}</Text>
-                    {selectedConsultationLanguages.includes(item.code) && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color="#0EB3EB"
-                        style={styles.checkmarkIcon}
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                <Pressable
-                  style={[styles.button, styles.buttonClose]}
-                  onPress={closeConsultationLanguageModal}
-                >
-                  <Text style={styles.textStyle}>{t("close")}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+                    <Text style={styles.textStyle}>{t("close")}</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </Pressable>
           </Modal>
 
           {/* Specialization Modal */}
@@ -1019,88 +1119,109 @@ const Anketa_Settings = () => {
             visible={isSpecializationModalVisible}
             onRequestClose={closeSpecializationModal}
           >
-            <ScrollView contentContainerStyle={styles.centeredView}>
-              <View style={styles.modalView(width)}>
-                <Text style={styles.modalTitle}>
-                  {t("select_specialization_modal_title")}
-                </Text>
-                {specializations.map((item) => (
-                  <TouchableOpacity
-                    key={item.value}
-                    style={[
-                      styles.countryItem,
-                      selectedSpecializations.some(
-                        (selectedSpec) => selectedSpec.value === item.value
-                      ) && styles.countryItemSelected,
-                    ]}
-                    onPress={() => toggleSpecializationSelect(item)}
+            <Pressable
+              style={styles.centeredView}
+              onPress={closeSpecializationModal}
+            >
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalView(width), styles.modalBorder]}>
+                  {/* ЗМІНА: Додано modalBorder */}
+                  <Text style={styles.modalTitle}>
+                    {t("select_specialization_modal_title")}
+                  </Text>
+                  <ScrollView style={styles.modalScrollView}>
+                    {specializations.map((spec) => (
+                      <TouchableOpacity
+                        key={spec.value}
+                        style={[
+                          styles.countryItem,
+                          selectedSpecializations.some(
+                            (selectedSpec) => selectedSpec.value === spec.value
+                          ) && styles.countryItemSelected,
+                        ]}
+                        onPress={() => toggleSpecializationSelect(spec)}
+                      >
+                        <Text
+                          style={[
+                            styles.countryName,
+                            selectedSpecializations.some(
+                              (selectedSpec) =>
+                                selectedSpec.value === spec.value
+                            ) && styles.countryItemTextSelected,
+                          ]}
+                        >
+                          {t(spec.nameKey)}
+                        </Text>
+                        {selectedSpecializations.some(
+                          (s) => s.value === spec.value
+                        ) && (
+                          <Ionicons
+                            name="checkmark"
+                            size={20}
+                            color="#0EB3EB"
+                            style={styles.checkmarkIcon}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <Pressable
+                    style={[styles.button, styles.buttonClose]}
+                    onPress={closeSpecializationModal}
                   >
-                    <Text style={styles.countryName}>{t(item.nameKey)}</Text>
-                    {selectedSpecializations.some(
-                      (selectedSpec) => selectedSpec.value === item.value
-                    ) && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color="#0EB3EB"
-                        style={styles.checkmarkIcon}
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                <Pressable
-                  style={[styles.button, styles.buttonClose]}
-                  onPress={closeSpecializationModal}
-                >
-                  <Text style={styles.textStyle}>{t("close")}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+                    <Text style={styles.textStyle}>{t("close")}</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </Pressable>
           </Modal>
 
-          {/* Consultation Cost Modal (Picker View) */}
+          {/* Consultation Cost Modal */}
           <Modal
-            animationType="fade"
+            animationType="slide"
             transparent={true}
             visible={isConsultationCostModalVisible}
             onRequestClose={closeConsultationCostModal}
           >
-            <TouchableWithoutFeedback onPress={closeConsultationCostModal}>
-              <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback
-                  onPress={() => {
-                    /* no-op */
-                  }}
+            <Pressable
+              style={styles.centeredView}
+              onPress={closeConsultationCostModal}
+            >
+              <TouchableWithoutFeedback>
+                <View
+                  style={[
+                    styles.consultationCostModalContent,
+                    styles.modalBorder,
+                  ]}
                 >
-                  <View style={styles.consultationCostModalContent}>
-                    <Text style={styles.modalTitle}>
-                      {t("select_consultation_cost")}
-                    </Text>
-                    <ScrollView style={styles.pickerScrollView}>
-                      {consultationCostOptions.map((cost) => (
-                        <TouchableOpacity
-                          key={cost}
-                          style={[
-                            styles.pickerOption,
-                            consultationCost === cost.toString() &&
-                              styles.pickerOptionSelected,
-                          ]}
-                          onPress={() => selectConsultationCost(cost)}
-                        >
-                          <Text style={styles.pickerOptionText}>${cost}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                    <Pressable
-                      style={[styles.button, styles.buttonClose]}
-                      onPress={closeConsultationCostModal}
-                    >
-                      <Text style={styles.textStyle}>{t("cancel")}</Text>
-                    </Pressable>
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
+                  {/* ЗМІНА: Додано modalBorder */}
+                  <Text style={styles.modalTitle}>
+                    {t("select_consultation_cost")}
+                  </Text>
+                  <ScrollView style={styles.pickerScrollView}>
+                    {consultationCostOptions.map((cost) => (
+                      <TouchableOpacity
+                        key={cost}
+                        style={[
+                          styles.pickerOption,
+                          consultationCost === cost.toString() &&
+                            styles.pickerOptionSelected,
+                        ]}
+                        onPress={() => selectConsultationCost(cost)}
+                      >
+                        <Text style={styles.pickerOptionText}>${cost}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <Pressable
+                    style={[styles.button, styles.buttonClose]}
+                    onPress={closeConsultationCostModal}
+                  >
+                    <Text style={styles.textStyle}>{t("close")}</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </Pressable>
           </Modal>
         </View>
       </ScrollView>
@@ -1204,11 +1325,19 @@ const styles = StyleSheet.create({
   },
   // New style for upload section to accommodate image preview
   uploadContainer: {
+    // For diploma and certificate
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between", // Space between button and image
     width: "90%",
     marginBottom: 10,
+  },
+  avatarUploadContainer: {
+    // Specific for avatar
+    flexDirection: "column",
+    alignItems: "center",
+    marginBottom: 20,
+    width: "100%",
   },
   uploadButton: (width) => ({
     backgroundColor: "#0EB3EB",
@@ -1227,11 +1356,34 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Medium", // Розкоментовано
   },
   previewImage: {
+    // For diploma and certificate previews
     width: 60, // Smaller size for preview
     height: 60,
     borderRadius: 10, // Rounded corners for aesthetics
     marginLeft: 10, // Space between button and image
     resizeMode: "cover", // Ensure image covers the area
+  },
+  profileAvatar: {
+    // Specific style for the circular avatar
+    width: 120,
+    height: 120,
+    borderRadius: 60, // Makes it a circle
+    marginBottom: 15,
+    borderWidth: 3,
+    borderColor: "#0EB3EB",
+    resizeMode: "cover",
+  },
+  profileAvatarPlaceholder: {
+    // Placeholder for when no avatar is selected
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 15,
+    borderWidth: 3,
+    borderColor: "#0EB3EB",
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
   },
   uploadedFileName: {
     fontSize: 12,
@@ -1305,10 +1457,18 @@ const styles = StyleSheet.create({
     width: width * 0.9,
     maxHeight: Dimensions.get("window").height * 0.8, // Додано для прокручування
   }),
+  modalBorder: {
+    // НОВИЙ СТИЛЬ: для рамки модальних вікон
+    borderColor: "#0EB3EB",
+    borderWidth: 1,
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 15,
+  },
+  modalScrollView: {
+    width: "100%", // Займає всю ширину модального вікна
   },
   countryItem: {
     // Використовується для елементів списку в модальних вікнах (країни, спеціалізації, мови консультацій)
@@ -1330,6 +1490,11 @@ const styles = StyleSheet.create({
   countryItemSelected: {
     backgroundColor: "rgba(14, 179, 235, 0.1)", // Light blue background for selected
     borderRadius: 10,
+  },
+  countryItemTextSelected: {
+    // Додано для стилю тексту вибраних елементів
+    fontWeight: "bold",
+    color: "#0EB3EB",
   },
   button: {
     borderRadius: 20,
