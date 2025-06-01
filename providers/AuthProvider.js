@@ -1,5 +1,11 @@
 // providers/AuthProvider.js
-import React, { createContext, useState, useEffect, useContext, useCallback } from "react";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
 import { supabase } from "./supabaseClient";
 
 const AuthContext = createContext();
@@ -25,7 +31,8 @@ export const AuthProvider = ({ children }) => {
         .eq("user_id", userSession.user.id)
         .single();
 
-      if (doctorError && doctorError.code !== "PGRST116") { // PGRST116 означає "не знайдено"
+      if (doctorError && doctorError.code !== "PGRST116") {
+        // PGRST116 означає "не знайдено"
         console.error("Error fetching doctor role:", doctorError.message);
         setUserRole("patient"); // Якщо є інша помилка, за замовчуванням пацієнт
       } else if (doctorData) {
@@ -43,14 +50,14 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // 1. Встановлення слухача зміни стану автентифікації
-    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-      async (_event, currentSession) => {
-        setSession(currentSession);
-        // Викликаємо функцію визначення ролі
-        await fetchUserRole(currentSession);
-        setLoading(false);
-      }
-    );
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      setSession(currentSession);
+      // Викликаємо функцію визначення ролі
+      await fetchUserRole(currentSession);
+      setLoading(false);
+    });
 
     // 2. Початкова перевірка сесії при завантаженні компонента
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -76,11 +83,7 @@ export const AuthProvider = ({ children }) => {
     // наприклад, signIn, signOut, signUp
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

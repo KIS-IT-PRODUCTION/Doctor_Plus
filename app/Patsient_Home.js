@@ -21,7 +21,7 @@ import People from "../assets/Main/people.svg";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
-import TabBar from "../components/TopBar.js"; // *** ВИПРАВЛЕНО ТУТ: ЗМІНЕНО НА TabBar.js ***
+import TabBar from "../components/TopBar.js";
 
 // --- ВАЖЛИВО: ВИКОРИСТОВУЄМО ХУК useTranslation З react-i18next ---
 import { useTranslation } from "react-i18next";
@@ -30,7 +30,6 @@ const { width } = Dimensions.get("window");
 const containerWidth = width * 0.9;
 
 // Список спеціалізацій лікарів (ключі повинні відповідати ключам у файлах перекладів)
-// Цей список можна також винести у окремий файл або навіть завантажувати динамічно.
 const doctorSpecializations = [
   { key: "traumatologist", nameKey: "traumatologist" },
   { key: "pediatrician", nameKey: "pediatrician" },
@@ -243,13 +242,6 @@ const Patsient_Home = () => {
                   />
                 </View>
               </TouchableOpacity>
-              {/* Кнопка "Вийти" */}
-              <TouchableOpacity
-                style={styles.signOutButton} // Додаємо новий стиль
-                onPress={handleSignOut}
-              >
-                <Ionicons name="log-out-outline" size={24} color="white" />
-              </TouchableOpacity>
               {/* Іконка сповіщень */}
               <TouchableOpacity
                 style={styles.notificationButton}
@@ -267,7 +259,17 @@ const Patsient_Home = () => {
             </View>
 
             {/* Main Content Section */}
+            {/* Додаємо flex: 1 до mainContent, якщо він не був заданий, щоб дозволити абсолютному позиціонуванню працювати відносно його меж */}
             <View style={styles.mainContent}>
+              {/* Кнопка "Вийти" тепер тут, позиціонована абсолютно */}
+              <TouchableOpacity
+                style={styles.signOutButtonAboveSearch} // Новий стиль для позиціонування
+                onPress={handleSignOut}
+              >
+                <Ionicons name="log-out-outline" size={24} color="white" />
+                <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
+              </TouchableOpacity>
+
               {/* Кнопка вибору спеціалізації лікаря */}
               <TouchableOpacity
                 style={styles.specializationButton}
@@ -281,7 +283,6 @@ const Patsient_Home = () => {
               {/* Зображення лікарів */}
               <View style={styles.doctorsImageContainer}>
                 <People style={styles.peopleImage} />
-                {/* <Image source={require("../assets/Main/people.jpg")} /> */}
               </View>
 
               {/* Поле пошуку */}
@@ -433,7 +434,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "flex-start",
     alignItems: "center",
-    paddingBottom: 90,
+    paddingBottom: 90, // Повернуто до початкового значення, оскільки кнопка тепер не внизу
   },
   container: {
     flex: 1,
@@ -468,16 +469,6 @@ const styles = StyleSheet.create({
     color: "white",
     marginHorizontal: 5,
   },
-  // Новий стиль для кнопки "Вийти"
-  signOutButton: {
-    width: width * 0.12,
-    height: width * 0.12,
-    backgroundColor: "rgba(255, 0, 0, 0.6)", // Червоний колір для кнопки виходу
-    borderRadius: width * 0.06,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 10, // Додаємо відступ, щоб не зливався з кнопкою сповіщень
-  },
   notificationButton: {
     width: width * 0.12,
     height: width * 0.12,
@@ -509,6 +500,7 @@ const styles = StyleSheet.create({
     width: containerWidth,
     paddingTop: 20,
     paddingBottom: 20,
+    position: "relative", // Важливо: встановлюємо relative, щоб absolute позиціонування працювало відносно mainContent
   },
   specializationButton: {
     marginTop: 30,
@@ -547,7 +539,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     width: width * 0.9,
     height: 52,
-    marginTop: 50,
+    marginTop: 80, // Збільшено відступ, щоб дати місце кнопці "Вийти"
   },
   searchIcon: {
     marginRight: 10,
@@ -561,6 +553,35 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     color: "#212121",
     fontFamily: "Mont-Regular",
+  },
+
+  // НОВИЙ СТИЛЬ: Кнопка "Вийти" над полем пошуку справа
+  signOutButtonAboveSearch: {
+    position: "absolute",
+    top: 105, // Відступ зверху від початку mainContent (або adjust as needed)
+    right: 0, // Притиснуто до правого краю mainContent (який є containerWidth)
+    backgroundColor: "rgba(255, 0, 0, 0.7)", // Червоний колір для кнопки виходу
+    borderRadius: 30,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 100,
+  },
+  signOutButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontFamily: "Mont-Bold",
+    marginLeft: 8,
   },
 
   modalOverlay: {
