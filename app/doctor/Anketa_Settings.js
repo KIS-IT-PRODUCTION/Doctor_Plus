@@ -472,57 +472,7 @@ const Anketa_Settings = () => {
     }
   };
 
-  const pickDocument = async (setUriState) => {
-    try {
-      let result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-      });
-
-      if (
-        !result.canceled &&
-        result.type === "success" &&
-        result.assets &&
-        result.assets.length > 0
-      ) {
-        const selectedUri = result.assets[0].uri;
-        console.log("DocumentPicker result:", result);
-        console.log("Selected Document URI:", selectedUri);
-
-        if (Platform.OS === "web") {
-          let uriToSet;
-          if (
-            typeof selectedUri === "string" &&
-            selectedUri.startsWith("blob:")
-          ) {
-            uriToSet = selectedUri;
-          } else {
-            const response = await fetch(selectedUri);
-            const blob = await response.blob();
-            uriToSet = URL.createObjectURL(blob);
-          }
-          setUriState(uriToSet);
-        } else {
-          setUriState(selectedUri);
-        }
-      } else if (result.type === "cancel") {
-        console.log("Документ не вибрано");
-        setUriState(null);
-      } else {
-        console.error("Помилка вибору документа:", result);
-        Alert.alert("Помилка", "Не вдалося вибрати документ.");
-        setUriState(null);
-      }
-    } catch (error) {
-      console.error("Error launching DocumentPicker:", error);
-      Alert.alert(
-        "Помилка",
-        `Не вдалося відкрити вибір файлів: ${error.message}`
-      );
-      setUriState(null);
-    }
-  };
-
+  
   // --- SAVE PROFILE HANDLER ---
   const handleSaveProfile = async () => {
     setProfileSaveError("");
@@ -674,7 +624,7 @@ const Anketa_Settings = () => {
       }
 
       Alert.alert(t("success_title"), t("success_profile_saved"));
-      navigation.navigate("HomeScreen");
+      navigation.navigate("Profile_doctor");
     } catch (err) {
       console.error("Загальна помилка при збереженні профілю:", err);
       setProfileSaveError(t("error_general_save_failed"));
