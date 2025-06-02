@@ -233,5 +233,18 @@
   "sort_by_experience_desc": "За досвідом (спадання)",
   "sort_by_experience_asc": "За досвідом (зростання)",
   "sort_by_price_asc": "За ціною (зростання)",
-  "sort_by_price_desc": "За ціною (спадання)"
+  "sort_by_price_desc": "За ціною (спадання)",
+  "doctor_id_missing": "Ідентифікатор лікаря відсутній. Неможливо завантажити профіль.",
+  "error_fetching_doctor_data": "Помилка завантаження даних лікаря",
+  "unexpected_error": "Сталася несподівана помилка",
+  "loading_profile_data": "Завантаження даних профілю...",
+  "retry": "Повторити",
+  "doctor_not_found": "Профіль лікаря не знайдено.",
+  "back_to_home": "На головну",
+  "profile_doctor": "Профіль лікаря",
+  "not_specified": "Не вказано",
+  "profile_doctor_settings": "Налаштування профілю лікаря",
+  "no_certificate_photo": "Фото сертифіката відсутнє",
+  "diploma_photo": "Фото диплома",
+  "no_diploma_photo": "Фото диплома відсутнє"
 }

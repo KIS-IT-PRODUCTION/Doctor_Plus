@@ -233,5 +233,18 @@
   "sort_by_experience_desc": "By experience (descending)",
   "sort_by_experience_asc": "By experience (ascending)",
   "sort_by_price_asc": "By price (ascending)",
-  "sort_by_price_desc": "By price (descending)"
+  "sort_by_price_desc": "By price (descending)",
+   "doctor_id_missing": "Doctor ID is missing. Cannot load profile.",
+  "error_fetching_doctor_data": "Error fetching doctor data",
+  "unexpected_error": "An unexpected error occurred",
+  "loading_profile_data": "Loading profile data...",
+  "retry": "Retry",
+  "doctor_not_found": "Doctor profile not found.",
+  "back_to_home": "Back to Home",
+  "profile_doctor": "Doctor Profile",  
+  "not_specified": "Not specified",
+  "profile_doctor_settings": "Doctor Profile Settings",
+  "diploma_photo": "Diploma Photo",
+  "no_diploma_photo": "No diploma photo available"
 }
+

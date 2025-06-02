@@ -472,7 +472,6 @@ const Anketa_Settings = () => {
     }
   };
 
-  
   // --- SAVE PROFILE HANDLER ---
   const handleSaveProfile = async () => {
     setProfileSaveError("");
@@ -650,7 +649,35 @@ const Anketa_Settings = () => {
       cleanupUris.forEach((uri) => URL.revokeObjectURL(uri));
     };
   }, [photoUri, diplomaUri, certificateUri]);
-
+  const handleSignOut = async () => {
+    Alert.alert(
+      t("logout_confirm_title"),
+      t("logout_confirm_message"),
+      [
+        {
+          text: t("no"),
+          style: "cancel",
+        },
+        {
+          text: t("yes"),
+          onPress: async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+              console.error("Помилка виходу:", error.message);
+              Alert.alert(
+                t("error_title"),
+                t("signOutError", { error: error.message })
+              );
+            } else {
+              Alert.alert(t("signOutSuccessTitle"), t("signOutSuccessMessage"));
+              navigation.navigate("HomeScreen"); // Перехід на початковий екран
+            }
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
   return (
     <SafeAreaView
       style={{
@@ -666,7 +693,7 @@ const Anketa_Settings = () => {
           <View style={styles.headerContainer}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.navigate("HomeScreen")}
+              onPress={() => navigation.navigate("Profile_doctor")}
             >
               <Ionicons name="arrow-back" size={24} color="#212121" />
             </TouchableOpacity>
@@ -695,6 +722,7 @@ const Anketa_Settings = () => {
                 <Ionicons name="person" size={60} color="#ccc" />
               </View>
             )}
+
             <TouchableOpacity
               style={styles.uploadButton(width)}
               onPress={() => pickImage(setPhotoUri)}
@@ -702,7 +730,13 @@ const Anketa_Settings = () => {
               <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
             </TouchableOpacity>
           </View>
-
+          <TouchableOpacity
+            style={styles.signOutButtonAboveSearch} // Новий стиль для позиціонування
+            onPress={handleSignOut}
+          >
+            <Ionicons name="log-out-outline" size={24} color="white" />
+            <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
+          </TouchableOpacity>
           {/* Country (Україна) */}
           <Text style={styles.inputLabel}>{t("country")}</Text>
           <TouchableOpacity
@@ -896,7 +930,6 @@ const Anketa_Settings = () => {
               numberOfLines={3}
             />
           </View>
-
           {/* Згода з умовами */}
           <View style={styles.agreementContainer}>
             <Switch
@@ -1184,7 +1217,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 40, // Додано відступ зверху
   },
   container: (width, height) => ({
     backgroundColor: "#fff",
@@ -1534,6 +1566,30 @@ const styles = StyleSheet.create({
   pickerOptionSelected: {
     backgroundColor: "rgba(14, 179, 235, 0.1)", // Light blue background for selected
     borderRadius: 10,
+  },
+  signOutButtonAboveSearch: {
+    backgroundColor: "rgba(255, 0, 0, 0.7)", // Червоний колір для кнопки виходу
+    borderRadius: 30,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 100,
+  },
+  signOutButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontFamily: "Mont-Bold",
+    marginLeft: 8,
   },
 });
 

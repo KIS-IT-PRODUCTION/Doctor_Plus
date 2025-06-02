@@ -13,6 +13,7 @@ import {
   Platform,
   Modal,
   TouchableWithoutFeedback,
+  ActivityIndicator, // Додано ActivityIndicator для завантаження спеціалізацій
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,7 +31,9 @@ const { width } = Dimensions.get("window");
 const containerWidth = width * 0.9;
 
 // Список спеціалізацій лікарів (ключі повинні відповідати ключам у файлах перекладів)
-const doctorSpecializations = [
+// Цей список буде використаний як fallback або для мапінгу до ключів перекладу
+// (Якщо спеціалізація в БД "терапевт", а в перекладах "categories.therapist")
+const allDoctorSpecializations = [
   { key: "traumatologist", nameKey: "traumatologist" },
   { key: "pediatrician", nameKey: "pediatrician" },
   { key: "gynecologist", nameKey: "gynecologist" },
@@ -72,10 +75,14 @@ const Patsient_Home = () => {
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isSpecializationModalVisible, setSpecializationModalVisible] =
     useState(false);
-
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
   );
+
+  // Нові стани для завантаження та зберігання доступних спеціалізацій
+  const [availableSpecializations, setAvailableSpecializations] = useState([]);
+  const [loadingSpecializations, setLoadingSpecializations] = useState(true);
+  const [specializationsError, setSpecializationsError] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -108,6 +115,65 @@ const Patsient_Home = () => {
       };
     }
   }, []);
+
+  // Ефект для завантаження унікальних спеціалізацій лікарів
+  useEffect(() => {
+    const fetchAvailableSpecializations = async () => {
+      setLoadingSpecializations(true);
+      setSpecializationsError(null);
+      try {
+        const { data, error } = await supabase
+          .from("anketa_doctor")
+          .select("specialization"); // Отримуємо лише колонку 'specialization'
+
+        if (error) {
+          console.error("Error fetching doctor specializations:", error);
+          setSpecializationsError(
+            t("error_fetching_specializations") + ": " + error.message
+          );
+          setAvailableSpecializations([]); // Очистити список при помилці
+          return;
+        }
+
+        const uniqueSpecs = new Set();
+        data.forEach((doctor) => {
+          if (doctor.specialization) {
+            try {
+              const specializationsArray = JSON.parse(doctor.specialization);
+              specializationsArray.forEach((spec) => {
+                // Перевіряємо, чи існує така спеціалізація у нашому фіксованому списку
+                // Це дозволяє перекладати її за ключем nameKey
+                const matchingSpec = allDoctorSpecializations.find(
+                  (s) => s.key === spec
+                );
+                if (matchingSpec) {
+                  uniqueSpecs.add(matchingSpec);
+                }
+              });
+            } catch (e) {
+              console.warn(
+                "Error parsing specialization JSON for doctor:",
+                doctor.user_id,
+                e
+              );
+            }
+          }
+        });
+        // Перетворюємо Set назад у масив для рендерингу
+        setAvailableSpecializations(Array.from(uniqueSpecs));
+      } catch (err) {
+        console.error("Unexpected error fetching specializations:", err);
+        setSpecializationsError(
+          t("unexpected_error_fetching_specializations") + ": " + err.message
+        );
+        setAvailableSpecializations([]);
+      } finally {
+        setLoadingSpecializations(false);
+      }
+    };
+
+    fetchAvailableSpecializations();
+  }, [t]); // Залежність від 't' для оновлення при зміні мови
 
   const handleSaveInfo = async () => {
     if (!personalInfoText.trim()) {
@@ -202,12 +268,9 @@ const Patsient_Home = () => {
   };
 
   const handleSpecializationSelect = (specializationKey) => {
-    Alert.alert(
-      t("selectSpecialization"),
-      t("categories." + specializationKey)
-    );
     closeSpecializationModal();
-    // Тут можна додати логіку для переходу до відповідного екрана або фільтрації лікарів
+    // Передаємо ключ спеціалізації на наступний екран
+    navigation.navigate("ChooseSpecial", { specialization: specializationKey });
   };
 
   const languagesForModal = [
@@ -259,7 +322,6 @@ const Patsient_Home = () => {
             </View>
 
             {/* Main Content Section */}
-            {/* Додаємо flex: 1 до mainContent, якщо він не був заданий, щоб дозволити абсолютному позиціонуванню працювати відносно його меж */}
             <View style={styles.mainContent}>
               {/* Кнопка "Вийти" тепер тут, позиціонована абсолютно */}
               <TouchableOpacity
@@ -385,33 +447,58 @@ const Patsient_Home = () => {
                     />
                   </TouchableOpacity>
                 </View>
-                <ScrollView
-                  style={styles.specializationScrollView}
-                  contentContainerStyle={styles.specializationScrollViewContent}
-                >
-                  {doctorSpecializations.map((spec) => (
-                    <View key={spec.key} style={styles.specializationItem}>
-                      <Text
-                        style={styles.specializationItemText}
-                        onPress={() => navigation.navigate("ChooseSpecial")}
-                      >
-                        {t("categories." + spec.nameKey)}
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.goToButton}
-                        onPress={() => navigation.navigate("ChooseSpecial")}
-                      >
-                        <Text style={styles.goToButtonText}>{t("goTo")}</Text>
-                        <Ionicons
-                          name="play"
-                          size={14}
-                          color="white"
-                          style={{ marginLeft: 5 }}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
+                {loadingSpecializations ? (
+                  <View style={styles.loadingSpecializationsContainer}>
+                    <ActivityIndicator size="large" color="#0EB3EB" />
+                    <Text style={styles.loadingSpecializationsText}>
+                      {t("loading_specializations")}
+                    </Text>
+                  </View>
+                ) : specializationsError ? (
+                  <View style={styles.errorSpecializationsContainer}>
+                    <Text style={styles.errorSpecializationsText}>
+                      {specializationsError}
+                    </Text>
+                    {/* Можна додати кнопку "Спробувати ще раз" */}
+                  </View>
+                ) : availableSpecializations.length > 0 ? (
+                  <ScrollView
+                    style={styles.specializationScrollView}
+                    contentContainerStyle={
+                      styles.specializationScrollViewContent
+                    }
+                  >
+                    {availableSpecializations.map((spec) => (
+                      <View key={spec.key} style={styles.specializationItem}>
+                        <Text
+                          style={styles.specializationItemText}
+                          // Тепер передаємо specialization.key на екран ChooseSpecial
+                          onPress={() => handleSpecializationSelect(spec.key)}
+                        >
+                          {t("categories." + spec.nameKey)}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.goToButton}
+                          onPress={() => handleSpecializationSelect(spec.key)}
+                        >
+                          <Text style={styles.goToButtonText}>{t("goTo")}</Text>
+                          <Ionicons
+                            name="play"
+                            size={14}
+                            color="white"
+                            style={{ marginLeft: 5 }}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <View style={styles.noSpecializationsContainer}>
+                    <Text style={styles.noSpecializationsText}>
+                      {t("no_specializations_found")}
+                    </Text>
+                  </View>
+                )}
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -712,6 +799,45 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontFamily: "Mont-Bold",
+  },
+  // Стилі для індикатора завантаження та повідомлень про помилки
+  loadingSpecializationsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingSpecializationsText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontFamily: "Mont-Regular",
+    color: "#000000",
+  },
+  errorSpecializationsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#ffebee",
+    borderRadius: 10,
+  },
+  errorSpecializationsText: {
+    fontSize: 16,
+    fontFamily: "Mont-Regular",
+    color: "#000000",
+    textAlign: "center",
+  },
+  noSpecializationsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  noSpecializationsText: {
+    fontSize: 16,
+    fontFamily: "Mont-Regular",
+    color: "#777777",
+    textAlign: "center",
   },
 });
 
