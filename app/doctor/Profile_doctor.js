@@ -109,7 +109,7 @@ const Profile_doctor = ({ route }) => {
         const { data, error: fetchError } = await supabase
           .from("anketa_doctor")
           .select("*, diploma_url, certificate_photo_url, consultation_cost")
-          .eq("user_id", doctorId)
+          .eq("user_id", doctorId || null)
           .single();
 
         if (fetchError) {
@@ -151,10 +151,6 @@ const Profile_doctor = ({ route }) => {
   const languagesForModal = [
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
     { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
-    { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
-    { nameKey: "german", code: "de", emoji: "🇩🇪" },
-    { nameKey: "french", code: "fr", emoji: "🇫🇷" },
-    { nameKey: "spanish", code: "es", emoji: "🇪🇸" },
   ];
 
   if (loading) {
