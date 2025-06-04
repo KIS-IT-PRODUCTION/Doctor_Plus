@@ -182,29 +182,40 @@ const Anketa_Settings = () => {
           setCountry(userCountry || null);
           setConsultationCost(data.consultation_cost?.toString() || "");
 
-          try {
-            setSelectedConsultationLanguages(
-              JSON.parse(data.communication_languages || "[]")
-            );
-          } catch (e) {
-            console.error("Помилка парсингу communication_languages:", e);
-            setSelectedConsultationLanguages([]);
+          // ОНОВЛЕНО: Безпечне зчитування communication_languages
+          let fetchedCommunicationLanguages = [];
+          if (data.communication_languages) {
+            if (Array.isArray(data.communication_languages)) {
+              fetchedCommunicationLanguages = data.communication_languages;
+            } else {
+              try {
+                fetchedCommunicationLanguages = JSON.parse(data.communication_languages);
+              } catch (e) {
+                console.warn("Warning: Invalid communication_languages format on fetch:", data.communication_languages, e);
+              }
+            }
           }
+          setSelectedConsultationLanguages(fetchedCommunicationLanguages);
 
-          try {
-            const storedSpecializationsFromDb = JSON.parse(
-              data.specialization || "[]"
-            );
-            const storedSpecializations = storedSpecializationsFromDb
-              .map((value) =>
-                specializations.find((spec) => spec.value === value)
-              )
-              .filter(Boolean);
-            setSelectedSpecializations(storedSpecializations);
-          } catch (e) {
-            console.error("Помилка парсингу specialization:", e);
-            setSelectedSpecializations([]);
+
+          // ОНОВЛЕНО: Безпечне зчитування specialization
+          let fetchedSpecializations = [];
+          if (data.specialization) {
+            if (Array.isArray(data.specialization)) {
+              fetchedSpecializations = data.specialization;
+            } else {
+              try {
+                fetchedSpecializations = JSON.parse(data.specialization);
+              } catch (e) {
+                console.warn("Warning: Invalid specialization format on fetch:", data.specialization, e);
+              }
+            }
           }
+          const mappedSpecializations = fetchedSpecializations
+            .map((value) => specializations.find((spec) => spec.value === value))
+            .filter(Boolean);
+          setSelectedSpecializations(mappedSpecializations);
+
 
           // Встановлюємо photoUri з publicUrl, якщо він є
           setPhotoUri(data.avatar_url || null);
@@ -372,7 +383,7 @@ const Anketa_Settings = () => {
       console.log("File data type for upload:", typeof fileBuffer);
       console.log("Determined MIME type for upload:", mimeType);
 
-      const filePath = `${userId}/${fileNamePrefix}_${Date.now()}.${fileExtension}`;
+      const filePath = `<span class="math-inline">\{userId\}/</span>{fileNamePrefix}_${Date.now()}.${fileExtension}`;
       console.log("Attempting to upload to path (key):", filePath);
 
       const { data, error } = await supabase.storage
@@ -572,14 +583,12 @@ const Anketa_Settings = () => {
         certUrl = null;
       }
 
-      const specializationsToSave = JSON.stringify(
-        selectedSpecializations.map((spec) => spec.value)
-      );
-      const languagesToSave = JSON.stringify(
-        selectedConsultationLanguages.length > 0
+      // --- КЛЮЧОВІ ЗМІНИ ТУТ: ПЕРЕДАЄМО ПРЯМО JAVASCRIPT-МАСИВИ ---
+      const specializationsToSave = selectedSpecializations.map((spec) => spec.value);
+      const languagesToSave = selectedConsultationLanguages.length > 0
           ? selectedConsultationLanguages
-          : [i18n.language]
-      );
+          : [i18n.language];
+      // --- КІНЕЦЬ КЛЮЧОВИХ ЗМІН ---
 
       const { error: doctorProfileError } = await supabase
         .from("anketa_doctor")
@@ -591,8 +600,8 @@ const Anketa_Settings = () => {
               email: user.email,
               phone: "",
               country: country?.name || null,
-              communication_languages: languagesToSave,
-              specialization: specializationsToSave,
+              communication_languages: languagesToSave, // Тепер це JavaScript-масив
+              specialization: specializationsToSave,     // Тепер це JavaScript-масив
               experience_years: null,
               education: null,
               achievements: achievements.trim() || null,

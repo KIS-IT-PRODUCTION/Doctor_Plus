@@ -6,21 +6,28 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  ActivityIndicator, // Імпортуємо ActivityIndicator для індикатора завантаження
-  Modal, // Імпортуємо Modal для модального вікна
-  Pressable, // Імпортуємо Pressable для фону модального вікна
-  TouchableWithoutFeedback, // Імпортуємо TouchableWithoutFeedback для закриття модального вікна при натисканні поза ним
-  Dimensions, // Для отримання розмірів екрану
+  ActivityIndicator, // Переконаємось, що ActivityIndicator імпортований
+  Modal,
+  Pressable,
+  TouchableWithoutFeedback,
+  Dimensions,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg"; // Переконайтеся, що шлях до SVG іконки правильний
-import { useTranslation } from "react-i18next"; // Імпорт для перекладів
-import { supabase } from "../../providers/supabaseClient"; // Ваш клієнт Supabase
+import Icon from "../../assets/icon.svg";
+import { useTranslation } from "react-i18next";
+import { supabase } from "../../providers/supabaseClient";
 
 // Reusable component for displaying values in a styled box
 const ValueBox = ({ children }) => {
-  if (!children || (typeof children === "string" && children.trim() === "")) {
+  // Перевірка на null, undefined, порожній рядок або масив
+  const isEmpty =
+    !children ||
+    (typeof children === "string" && children.trim() === "") ||
+    (Array.isArray(children) && children.length === 0);
+
+  if (isEmpty) {
     return (
       <Text style={[styles.value, styles.noValueText]}>Not specified</Text>
     );
@@ -39,7 +46,7 @@ const ValueBox = ({ children }) => {
 // Функція для відображення прапорів мов
 const LanguageFlags = ({ languages }) => {
   const getFlag = (code) => {
-    switch (code) {
+    switch (String(code).toUpperCase()) { // Перетворення на рядок і до верхнього регістру
       case "UK":
         return "🇺🇦";
       case "DE":
@@ -52,8 +59,14 @@ const LanguageFlags = ({ languages }) => {
         return "🇫🇷";
       case "ES":
         return "🇪🇸";
+      default:
+        return "❓"; // Якщо код невідомий
     }
   };
+
+  if (!languages || languages.length === 0) {
+    return null; // Не рендерити нічого, якщо мов немає
+  }
 
   return (
     <View style={styles.flagsContainer}>
@@ -73,7 +86,8 @@ const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
 
-  const doctorId = route.params?.doctorId;
+  // Забезпечте, що doctorId є числовим або рядковим і не undefined
+  const doctorId = route.params?.doctorId ? String(route.params.doctorId) : null;
 
   const [doctor, setDoctor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -82,55 +96,70 @@ const Profile_doctor = ({ route }) => {
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
   );
+
   // СТАНІ ДЛЯ ЗАВАНТАЖЕННЯ ЗОБРАЖЕНЬ
   const [loadingAvatar, setLoadingAvatar] = useState(true);
   const [loadingCertificate, setLoadingCertificate] = useState(true);
   const [loadingDiploma, setLoadingDiploma] = useState(true);
 
+  // Стан для відстеження помилок завантаження зображень
+  const [avatarError, setAvatarError] = useState(false);
+  const [certificateError, setCertificateError] = useState(false);
+  const [diplomaError, setDiplomaError] = useState(false);
+
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-  useEffect(() => {
-    const fetchDoctorData = async () => {
-      setLoading(true);
-      setError(null);
+  const fetchDoctorData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setDoctor(null); // Скидаємо дані лікаря при новому запиті
 
-      if (!doctorId) {
-        console.warn(
-          "Profile_doctor: doctorId is undefined, cannot fetch data."
-        );
-        setError(t("doctor_id_missing"));
-        setLoading(false);
-        return;
-      }
+    if (!doctorId) {
+      console.warn("Profile_doctor: doctorId is undefined/null, cannot fetch data.");
+      setError(t("doctor_id_missing"));
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const { data, error: fetchError } = await supabase
-          .from("anketa_doctor")
-          .select("*, diploma_url, certificate_photo_url, consultation_cost")
-          .eq("user_id", doctorId || null)
-          .single();
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("anketa_doctor")
+        .select("*, diploma_url, certificate_photo_url, consultation_cost")
+        .eq("user_id", doctorId) // Передача doctorId без || null
+        .single();
 
-        if (fetchError) {
-          console.error("Error fetching doctor data:", fetchError);
-          setError(t("error_fetching_doctor_data") + ": " + fetchError.message);
+      if (fetchError) {
+        console.error("Error fetching doctor data from Supabase:", fetchError);
+        // Покращена обробка помилок Supabase
+        if (fetchError.code === "PGRST116") { // No rows found
+             setError(t("doctor_not_found"));
         } else {
-          setDoctor(data);
-          setLoadingAvatar(true);
-          setLoadingCertificate(true);
-          setLoadingDiploma(true);
+             setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
         }
-      } catch (err) {
-        console.error("Unexpected error fetching doctor data:", err);
-        setError(t("unexpected_error") + ": " + err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
 
+      } else {
+        setDoctor(data);
+        // Скидаємо стани завантаження та помилок зображень при успішному завантаженні даних
+        setLoadingAvatar(true);
+        setLoadingCertificate(true);
+        setLoadingDiploma(true);
+        setAvatarError(false);
+        setCertificateError(false);
+        setDiplomaError(false);
+      }
+    } catch (err) {
+      console.error("Unexpected error during data fetch:", err);
+      setError(`${t("unexpected_error")}: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [doctorId, t]); // Додаємо t до залежностей useCallback
+
+  useEffect(() => {
     fetchDoctorData();
-  }, [doctorId, t]);
+  }, [fetchDoctorData]); // Залежність від useCallback
 
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
@@ -145,13 +174,64 @@ const Profile_doctor = ({ route }) => {
   };
 
   const handleChooseConsultationTime = () => {
-    navigation.navigate("ConsultationTime", { doctorId: doctorId });
+    if (doctorId) {
+      navigation.navigate("ConsultationTime", { doctorId: doctorId });
+    } else {
+      Alert.alert(t("error"), t("doctor_id_missing_for_consultation"));
+    }
   };
 
   const languagesForModal = [
-    { nameKey: "english", code: "en", emoji: "🇬🇧" },
-    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
+    { nameKey: "english", code: "en", emoji: "" },
+    { nameKey: "ukrainian", code: "uk", emoji: "" },
+    // { nameKey: "german", code: "de", emoji: "🇩🇪" },
+    // { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
+    // { nameKey: "french", code: "fr", emoji: "🇫🇷" },
+    // { nameKey: "spanish", code: "es", emoji: "🇪🇸" },
   ];
+
+  // Функції для безпечного парсингу JSON
+  const getParsedArray = useCallback((value) => {
+    if (!value) return [];
+
+    // Ключова зміна: спочатку перевіряємо, чи value вже є масивом
+    if (Array.isArray(value)) {
+      return value; // Якщо це вже масив, повертаємо його як є
+    }
+
+    // Якщо це не масив, намагаємося розпарсити, припускаючи, що це JSON-рядок
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.warn("Warning: Invalid JSON format for array (expected array or parsable JSON string):", value, e);
+      return [];
+    }
+  }, []);
+
+  const getLanguages = useCallback((languagesData) => {
+    return getParsedArray(languagesData).map((lang) => String(lang).toUpperCase());
+  }, [getParsedArray]);
+
+  // ОНОВЛЕНО: Функція для отримання спеціалізацій
+  const getSpecializations = useCallback((specializationData) => {
+    const parsedSpecs = getParsedArray(specializationData);
+    // Якщо specializations - це масив значень (наприклад, ["oncologist", "pediatrician"]),
+    // то ми перекладаємо кожен елемент.
+    // Якщо specializations - це масив об'єктів (з nameKey і value),
+    // то ми беремо nameKey для перекладу.
+    if (parsedSpecs.length > 0) {
+      if (typeof parsedSpecs[0] === 'string') {
+        // Якщо це масив рядків, перекладаємо кожен рядок
+        return parsedSpecs.map(specValue => t(specValue)).join(", ");
+      } else if (typeof parsedSpecs[0] === 'object' && parsedSpecs[0].nameKey) {
+        // Якщо це масив об'єктів з nameKey, перекладаємо nameKey
+        return parsedSpecs.map(specObj => t(specObj.nameKey)).join(", ");
+      }
+    }
+    return t("not_specified");
+  }, [getParsedArray, t]);
+
 
   if (loading) {
     return (
@@ -162,23 +242,28 @@ const Profile_doctor = ({ route }) => {
     );
   }
 
+  // Якщо error встановлено, показуємо помилку
   if (error) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
-          onPress={() => {
-            setLoading(true);
-            setError(null);
-          }}
+          onPress={() => fetchDoctorData()} // Викликаємо useCallback функцію
         >
           <Text style={styles.retryButtonText}>{t("retry")}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backToHomeButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  // Після завантаження, якщо doctor все ще null (наприклад, жодного запису не знайдено)
   if (!doctor) {
     return (
       <View style={styles.container}>
@@ -193,25 +278,19 @@ const Profile_doctor = ({ route }) => {
     );
   }
 
-  const getLanguages = (languagesString) => {
-    try {
-      const languagesArray = JSON.parse(languagesString || "[]");
-      return languagesArray.map((lang) => lang.toUpperCase());
-    } catch (e) {
-      console.error("Error parsing languages:", e);
-      return [];
-    }
-  };
-
-  const getSpecializations = (specializationString) => {
-    try {
-      const specializationsArray = JSON.parse(specializationString || "[]");
-      return specializationsArray.join(", ");
-    } catch (e) {
-      console.error("Error parsing specializations:", e);
-      return "";
-    }
-  };
+  const {
+    full_name,
+    avatar_url,
+    communication_languages,
+    specialization,
+    work_experience,
+    work_location,
+    consultation_cost,
+    about_me,
+    achievements,
+    certificate_photo_url,
+    diploma_url,
+  } = doctor;
 
   return (
     <View style={styles.container}>
@@ -235,9 +314,8 @@ const Profile_doctor = ({ route }) => {
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
-        {/* Основна інформація про лікаря */}
         <View style={styles.doctorMainInfo}>
-          {doctor.avatar_url ? (
+          {avatar_url && !avatarError ? (
             // Контейнер для аватару та його індикатора
             <View style={styles.avatarContainer}>
               {loadingAvatar && (
@@ -248,17 +326,17 @@ const Profile_doctor = ({ route }) => {
                 />
               )}
               <Image
-                source={{ uri: doctor.avatar_url }}
+                source={{ uri: avatar_url }}
                 style={styles.avatar}
                 onLoad={() => setLoadingAvatar(false)}
                 onError={() => {
                   setLoadingAvatar(false);
-                  console.error("Error loading avatar image");
+                  setAvatarError(true); // Встановлюємо помилку завантаження
+                  console.error("Error loading avatar image:", avatar_url);
                 }}
               />
             </View>
           ) : (
-            // Якщо немає аватару, показуємо заглушку
             <Image
               source={{
                 uri: "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo",
@@ -268,7 +346,7 @@ const Profile_doctor = ({ route }) => {
           )}
 
           <View style={styles.doctorDetails}>
-            <Text style={styles.doctorName}>{doctor.full_name}</Text>
+            <Text style={styles.doctorName}>{full_name || t("not_specified")}</Text>
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("rating")}:</Text>
@@ -278,47 +356,37 @@ const Profile_doctor = ({ route }) => {
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("communication_language")}:</Text>
               <ValueBox>
-                <LanguageFlags
-                  languages={getLanguages(doctor.communication_languages)}
-                />
+                <LanguageFlags languages={getLanguages(communication_languages)} />
               </ValueBox>
             </View>
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("specialization")}:</Text>
-              <ValueBox>{getSpecializations(doctor.specialization)}</ValueBox>
+              <ValueBox>{getSpecializations(specialization)}</ValueBox>
             </View>
-
-            {/* Досягнення прибрано з основної картки */}
-            {/* <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("achievements")}:</Text>
-              <ValueBox>{doctor.achievements || t("not_specified")}</ValueBox>
-            </View> */}
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("work_experience")}:</Text>
               <ValueBox>
-                {doctor.work_experience || t("not_specified")}
+                {work_experience || t("not_specified")}
               </ValueBox>
             </View>
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("work_location")}:</Text>
-              <ValueBox>{doctor.work_location || t("not_specified")}</ValueBox>
+              <ValueBox>{work_location || t("not_specified")}</ValueBox>
             </View>
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("consultation_cost")}:</Text>
               <ValueBox>
-                {doctor.consultation_cost
-                  ? `${doctor.consultation_cost}$`
-                  : t("not_specified")}
+                {/* ЗМІНА: Коректне відображення вартості консультації */}
+                {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
               </ValueBox>
             </View>
           </View>
         </View>
 
-        {/* Кнопки дій */}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={handleChooseConsultationTime}
@@ -339,32 +407,29 @@ const Profile_doctor = ({ route }) => {
 
         <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
 
-        {/* Секція "Про себе" */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("about_me")}</Text>
           <Text style={styles.sectionContent}>
-            {doctor.about_me || t("not_specified")}
+            {about_me || t("not_specified")}
           </Text>
         </View>
-        {/* Секція "Досягнення" - залишилася тут */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("achievements")}</Text>
           <Text style={styles.sectionContent}>
-            {doctor.achievements || t("not_specified")}
+            {achievements || t("not_specified")}
           </Text>
         </View>
 
-        {/* Секція "Місце роботи" */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("place_of_work")}</Text>
           <Text style={styles.sectionContent}>
-            {doctor.work_location || t("not_specified")}
+            {work_location || t("not_specified")}
           </Text>
         </View>
-        {/* Секція "Фото сертифіката" */}
+
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
-          {doctor.certificate_photo_url ? (
+          {certificate_photo_url && !certificateError ? (
             <View style={styles.imageWrapper}>
               {loadingCertificate && (
                 <ActivityIndicator
@@ -374,12 +439,13 @@ const Profile_doctor = ({ route }) => {
                 />
               )}
               <Image
-                source={{ uri: doctor.certificate_photo_url }}
+                source={{ uri: certificate_photo_url }}
                 style={styles.certificateImage}
                 onLoad={() => setLoadingCertificate(false)}
                 onError={() => {
                   setLoadingCertificate(false);
-                  console.error("Error loading certificate image");
+                  setCertificateError(true);
+                  console.error("Error loading certificate image:", certificate_photo_url);
                 }}
               />
             </View>
@@ -388,10 +454,9 @@ const Profile_doctor = ({ route }) => {
           )}
         </View>
 
-        {/* Секція: "Фото диплома" */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
-          {doctor.diploma_url ? (
+          {diploma_url && !diplomaError ? (
             <View style={styles.imageWrapper}>
               {loadingDiploma && (
                 <ActivityIndicator
@@ -401,12 +466,13 @@ const Profile_doctor = ({ route }) => {
                 />
               )}
               <Image
-                source={{ uri: doctor.diploma_url }}
+                source={{ uri: diploma_url }}
                 style={styles.certificateImage}
                 onLoad={() => setLoadingDiploma(false)}
                 onError={() => {
                   setLoadingDiploma(false);
-                  console.error("Error loading diploma image");
+                  setDiplomaError(true);
+                  console.error("Error loading diploma image:", diploma_url);
                 }}
               />
             </View>
@@ -416,7 +482,6 @@ const Profile_doctor = ({ route }) => {
         </View>
       </ScrollView>
 
-      {/* Модальне вікно для вибору мови */}
       <Modal
         animationType="fade"
         transparent={true}

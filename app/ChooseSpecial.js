@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react"; // useRoute НЕ імпортуємо з React
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Easing,
   ActivityIndicator, // Import ActivityIndicator for loading
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native"; // Ось звідки імпортуємо useRoute
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../assets/icon.svg";
 
@@ -34,9 +34,8 @@ const LanguageFlags = ({ languages }) => {
       case "ES":
         return "🇪🇸"; // Added Spain flag
     }
-    if (code === "PL") {
-      return `🏳️‍🌈`; // Default flag for unrecognized codes
-    }
+    // За замовчуванням, якщо мова не розпізнана, повертаємо порожній рядок або інший знак
+    return "";
   };
 
   return (
@@ -98,13 +97,6 @@ const DoctorCard = ({ doctor }) => {
           {doctor.specialization || t("not_specified")}
         </Text>
       </View>
-      {/* Досягнення прибрано з картки */}
-      {/* <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>{t("achievements")}: </Text>
-        <Text style={styles.detailValue}>
-          {doctor.achievements || t("not_specified")}
-        </Text>
-      </View> */}
       <View style={styles.detailsRow}>
         <Text style={styles.detailLabel}>{t("time_in_app")}: </Text>
         <Text style={styles.detailValue}>
@@ -135,10 +127,17 @@ const DoctorCard = ({ doctor }) => {
 
 const ChooseSpecial = () => {
   const navigation = useNavigation();
+  const route = useRoute(); // Правильний імпорт useRoute
+  // Деструктуруємо params, додаємо || {} для безпеки, якщо params немає.
+  // specialization буде ключем, який ми передали з Patsient_Home.js
+  const { specialization } = route.params || {};
+
   const { t } = useTranslation();
   const [isSortModalVisible, setSortModalVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(300)).current;
+
+  console.log("Вибрана спеціалізація:", specialization); // Для дебагу
 
   // State to store fetched doctors
   const [doctors, setDoctors] = useState([]);
@@ -146,43 +145,90 @@ const ChooseSpecial = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchDoctors = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data, error } = await supabase
-          .from("anketa_doctor") // Assuming your table is named 'anketa_doctor'
-          .select("*, consultation_cost"); // Select all columns, including consultation_cost
+  const fetchDoctors = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let query = supabase.from("anketa_doctor").select("*, consultation_cost");
 
-        if (error) {
-          console.error("Error fetching doctors:", error);
-          setError(t("error_fetching_doctors") + ": " + error.message);
-        } else {
-          // Parse JSON strings for languages and specialization
-          const parsedDoctors = data.map((doctor) => ({
+      // Якщо спеціалізація передана, додаємо фільтр
+      if (specialization) {
+        // Змінено з .contains на .cs (contains, або @>) для JSONB типів
+        // `specialization` - це рядок (наприклад, "dentist").
+        // Ми обгортаємо його в JSON.stringify, щоб він був коректним JSON-масивом для фільтрації.
+        // Це скаже Supabase шукати записи, де JSON-масив 'specialization'
+        // містить елемент, який точно відповідає JSON-рядку, який ми передаємо.
+        query = query.filter('specialization', 'cs', `["${specialization}"]`);
+        // АБО, якщо вам потрібен старий оператор @>, то так:
+        // query = query.contains('specialization', `["${specialization}"]`); // Це також може спрацювати, але синтаксис `cs` більш явний для JSONB
+      }
+
+      const { data, error } = await query; // Виконуємо запит
+
+      if (error) {
+        console.error("Помилка отримання лікарів:", error);
+        setError(t("error_fetching_doctors") + ": " + error.message);
+      } else {
+      const parsedDoctors = data.map((doctor) => {
+          let parsedCommunicationLanguages = [];
+          if (doctor.communication_languages) {
+            // Перевіряємо, чи вже масив, інакше намагаємося парсити
+            if (Array.isArray(doctor.communication_languages)) {
+              parsedCommunicationLanguages = doctor.communication_languages;
+            } else {
+              try {
+                parsedCommunicationLanguages = JSON.parse(doctor.communication_languages);
+              } catch (e) {
+                console.warn(
+                  "Warning: Invalid communication_languages format for doctor:",
+                  doctor.user_id,
+                  doctor.communication_languages,
+                  e
+                );
+              }
+            }
+          }
+
+          let joinedSpecializations = "";
+          if (doctor.specialization) {
+            // Перевіряємо, чи вже масив, інакше намагаємося парсити
+            if (Array.isArray(doctor.specialization)) {
+              joinedSpecializations = doctor.specialization.join(", ");
+            } else {
+              try {
+                joinedSpecializations = JSON.parse(doctor.specialization).join(", ");
+              } catch (e) {
+                console.warn(
+                  "Warning: Invalid specialization format for doctor:",
+                  doctor.user_id,
+                  doctor.specialization,
+                  e
+                );
+              }
+            }
+          }
+
+          return {
             ...doctor,
-            communication_languages: doctor.communication_languages
-              ? JSON.parse(doctor.communication_languages)
-              : [],
-            specialization: doctor.specialization
-              ? JSON.parse(doctor.specialization).join(", ")
-              : "", // Join array into a string
+            communication_languages: parsedCommunicationLanguages,
+            specialization: joinedSpecializations,
             avatar_url:
               doctor.avatar_url ||
-              "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo", // Default avatar
-          }));
-          setDoctors(parsedDoctors);
-        }
-      } catch (e) {
-        console.error("Unexpected error:", e);
-        setError(t("unexpected_error") + ": " + e.message);
-      } finally {
-        setLoading(false);
+              "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo",
+          };
+        });
+        setDoctors(parsedDoctors);
       }
-    };
+    } catch (e) {
+      console.error("Неочікувана помилка:", e);
+      setError(t("unexpected_error") + ": " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchDoctors();
-  }, [t]); // Add t to dependencies for re-fetching if language changes
+  fetchDoctors();
+}, [t, specialization]); // Додаємо specialization до залежностей useEffect
 
   const sortOptions = [
     { label: t("sort_by_rating_desc"), value: "rating_desc" },
@@ -234,8 +280,7 @@ const ChooseSpecial = () => {
 
   const handleSortOptionSelect = (option) => {
     console.log("Обрано опцію сортування:", option.label);
-    // Here you would implement your sorting logic
-    // For now, it just closes the modal
+    // Тут буде логіка сортування, якщо потрібно
     closeSortModal();
   };
 
@@ -268,9 +313,10 @@ const ChooseSpecial = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        {/* This header title might be specific to the specialty selected.
-            Consider passing it as a route param or deriving it. */}
-        <Text style={styles.headerTitle}>{t("therapist")}</Text>
+        {/* Заголовок може відображати вибрану спеціалізацію */}
+        <Text style={styles.headerTitle}>
+          {specialization ? t(`categories.${specialization}`) : t("doctors")}
+        </Text>
         <View style={styles.rightIcon}>
           <Icon width={50} height={50} />
         </View>
@@ -283,7 +329,6 @@ const ChooseSpecial = () => {
       <ScrollView style={styles.scrollViewContent}>
         {doctors.length > 0 ? (
           doctors.map((doctor) => (
-            // Use doctor.user_id as the key, assuming it's unique
             <DoctorCard key={doctor.user_id} doctor={doctor} />
           ))
         ) : (

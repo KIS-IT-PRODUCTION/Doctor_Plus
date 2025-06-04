@@ -31,7 +31,7 @@ import Register from "./app/doctor/Register";
 import Login from "./app/doctor/Login";
 import Anketa_Settings from "./app/doctor/Anketa_Settings";
 import Profile_doctor from "./app/doctor/Profile_doctor";
-import ConsultationTime from "./app/ConsultationTime";
+import ConsultationTime from "./app/doctor/ConsultationTime";
 
 // Запобігаємо автоматичному прихованню Splash Screen, доки програма не буде готова
 SplashScreen.preventAutoHideAsync();

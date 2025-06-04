@@ -117,6 +117,7 @@ const Patsient_Home = () => {
   }, []);
 
   // Ефект для завантаження унікальних спеціалізацій лікарів
+  // Цей код вже коректно завантажує спеціалізації, які існують у вашій БД
   useEffect(() => {
     const fetchAvailableSpecializations = async () => {
       setLoadingSpecializations(true);
@@ -136,27 +137,38 @@ const Patsient_Home = () => {
         }
 
         const uniqueSpecs = new Set();
-        data.forEach((doctor) => {
+      data.forEach((doctor) => {
           if (doctor.specialization) {
-            try {
-              const specializationsArray = JSON.parse(doctor.specialization);
-              specializationsArray.forEach((spec) => {
-                // Перевіряємо, чи існує така спеціалізація у нашому фіксованому списку
-                // Це дозволяє перекладати її за ключем nameKey
-                const matchingSpec = allDoctorSpecializations.find(
-                  (s) => s.key === spec
-                );
-                if (matchingSpec) {
-                  uniqueSpecs.add(matchingSpec);
-                }
-              });
-            } catch (e) {
-              console.warn(
-                "Error parsing specialization JSON for doctor:",
-                doctor.user_id,
-                e
+            // Перевіряємо, чи specialization вже є масивом (як має бути після виправлення БД)
+            // Якщо ні, спробуємо розпарсити (для сумісності зі старими, неправильними даними, якщо вони ще десь є)
+            const currentSpecializations = Array.isArray(doctor.specialization)
+              ? doctor.specialization
+              : // Якщо це не масив, але щось є, спробуємо розпарсити
+                // (це може бути JSON-рядок зі старих даних, або null, або інший тип)
+                // Якщо парсинг невдалий, створимо порожній масив
+                (() => {
+                  try {
+                    return JSON.parse(doctor.specialization);
+                  } catch (e) {
+                    console.warn(
+                      "Warning: Invalid specialization format for doctor (expected array or parsable JSON string):",
+                      doctor.user_id,
+                      doctor.specialization,
+                      e
+                    );
+                    return [];
+                  }
+                })();
+
+            currentSpecializations.forEach((spec) => {
+              // Перевіряємо, чи існує така спеціалізація у нашому фіксованому списку
+              const matchingSpec = allDoctorSpecializations.find(
+                (s) => s.key === spec
               );
-            }
+              if (matchingSpec) {
+                uniqueSpecs.add(matchingSpec);
+              }
+            });
           }
         });
         // Перетворюємо Set назад у масив для рендерингу
@@ -267,6 +279,7 @@ const Patsient_Home = () => {
     setSpecializationModalVisible(false);
   };
 
+  // ЦЯ ФУНКЦІЯ ВЖЕ ПЕРЕДАЄ ВИБРАНУ СПЕЦІАЛІЗАЦІЮ НА ЕКРАН "ChooseSpecial"
   const handleSpecializationSelect = (specializationKey) => {
     closeSpecializationModal();
     // Передаємо ключ спеціалізації на наступний екран
@@ -329,7 +342,6 @@ const Patsient_Home = () => {
                 onPress={handleSignOut}
               >
                 <Ionicons name="log-out-outline" size={24} color="white" />
-                <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
               </TouchableOpacity>
 
               {/* Кнопка вибору спеціалізації лікаря */}
@@ -473,12 +485,14 @@ const Patsient_Home = () => {
                         <Text
                           style={styles.specializationItemText}
                           // Тепер передаємо specialization.key на екран ChooseSpecial
+                          // ЦЕ ВЖЕ ПРАВИЛЬНО ПЕРЕДАЄ ДАНІ!
                           onPress={() => handleSpecializationSelect(spec.key)}
                         >
                           {t("categories." + spec.nameKey)}
                         </Text>
                         <TouchableOpacity
                           style={styles.goToButton}
+                          // ЦЕ ВЖЕ ПРАВИЛЬНО ПЕРЕДАЄ ДАНІ!
                           onPress={() => handleSpecializationSelect(spec.key)}
                         >
                           <Text style={styles.goToButtonText}>{t("goTo")}</Text>
@@ -645,7 +659,7 @@ const styles = StyleSheet.create({
   // НОВИЙ СТИЛЬ: Кнопка "Вийти" над полем пошуку справа
   signOutButtonAboveSearch: {
     position: "absolute",
-    top: 105, // Відступ зверху від початку mainContent (або adjust as needed)
+    bottom: 75, // Відступ зверху від початку mainContent (або adjust as needed)
     right: 0, // Притиснуто до правого краю mainContent (який є containerWidth)
     backgroundColor: "rgba(255, 0, 0, 0.7)", // Червоний колір для кнопки виходу
     borderRadius: 30,
@@ -827,13 +841,7 @@ const styles = StyleSheet.create({
     color: "#000000",
     textAlign: "center",
   },
-  noSpecializationsContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  noSpecializationsText: {
+   noSpecializationsText: {
     fontSize: 16,
     fontFamily: "Mont-Regular",
     color: "#777777",
