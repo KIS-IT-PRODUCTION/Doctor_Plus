@@ -6,17 +6,16 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Animated, // Для анімацій
-  LayoutAnimation, // Для плавної анімації розгортання/згортання
+  Animated,
+  LayoutAnimation,
   Platform,
   UIManager,
-  // Dimensions, // Dimensions не потрібен тут, оскільки використовується в TabBar.js
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../assets/icon.svg"; // Переконайтеся, що шлях до SVG правильний
-import { useNavigation, useFocusEffect } from "@react-navigation/native"; // Додано useFocusEffect
+import Icon from "../assets/icon.svg";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
-import TabBar from "../components/TopBar.js"; // *** ВИПРАВЛЕНО ТУТ: ЗМІНЕНО НА TabBar.js ***
+import TabBar from "../components/TopBar.js"; // Переконайтеся, що шлях правильний
 
 // Для анімації LayoutAnimation на Android
 if (
@@ -26,21 +25,17 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Компонент одного запитання з відповіддю
-const AccordionItem = ({ title, content }) => {
-  const [expanded, setExpanded] = useState(false);
-  const rotateAnimation = new Animated.Value(expanded ? 1 : 0);
+// Компонент одного запитання з відповіддю (AccordionItem)
+const AccordionItem = ({ title, content, isExpanded, onToggleExpand }) => {
+  // `isExpanded` і `onToggleExpand` тепер передаються з батьківського компонента
+  const rotateAnimation = new Animated.Value(isExpanded ? 1 : 0);
 
-  const toggleExpand = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded(!expanded);
-
-    Animated.timing(rotateAnimation, {
-      toValue: expanded ? 0 : 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
+  // Анімація обертання стрілки
+  Animated.timing(rotateAnimation, {
+    toValue: isExpanded ? 1 : 0,
+    duration: 300,
+    useNativeDriver: true,
+  }).start();
 
   const arrowTransform = rotateAnimation.interpolate({
     inputRange: [0, 1],
@@ -49,13 +44,13 @@ const AccordionItem = ({ title, content }) => {
 
   return (
     <View style={styles.accordionCard}>
-      <TouchableOpacity onPress={toggleExpand} style={styles.accordionHeader}>
+      <TouchableOpacity onPress={onToggleExpand} style={styles.accordionHeader}>
         <Text style={styles.accordionTitle}>{title}</Text>
         <Animated.View style={{ transform: [{ rotate: arrowTransform }] }}>
           <Ionicons name="chevron-down-outline" size={20} color="#000" />
         </Animated.View>
       </TouchableOpacity>
-      {expanded && (
+      {isExpanded && ( // Залежить від isExpanded
         <View style={styles.accordionContent}>
           <Text style={styles.accordionText}>{content}</Text>
         </View>
@@ -67,33 +62,35 @@ const AccordionItem = ({ title, content }) => {
 export default function Faq() {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  // Встановлюємо "Questions" як активну вкладку для Faq.
-  // Цей початковий стан буде встановлений при першому рендерингу компонента.
   const [activeTab, setActiveTab] = useState("Questions");
+  // Стан для відстеження, який AccordionItem розгорнуто (за його ID)
+  const [expandedItemId, setExpandedItemId] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
+      // При фокусі на екрані "Questions" встановлюємо його як активну вкладку
       setActiveTab("Questions");
     }, [])
   );
 
+  // Дані для FAQ. Кожен об'єкт має унікальний `id`.
+  // Забезпечуємо, що немає дублюючих питань, а також відповідності ключам перекладів.
   const faqData = [
-    { title: t("faq_screen.q1_title"), content: t("faq_screen.q1_answer") },
-    { title: t("faq_screen.q2_title"), content: t("faq_screen.q2_answer") },
-    { title: t("faq_screen.q3_title"), content: t("faq_screen.q3_answer") },
-    { title: t("faq_screen.q4_title"), content: t("faq_screen.q4_answer") },
-    { title: t("faq_screen.q5_title"), content: t("faq_screen.q5_answer") },
-    { title: t("faq_screen.q6_title"), content: t("faq_screen.q6_answer") },
-    { title: t("faq_screen.q7_title"), content: t("faq_screen.q7_answer") },
-    { title: t("faq_screen.q8_title"), content: t("faq_screen.q8_answer") },
-    { title: t("faq_screen.q9_title"), content: t("faq_screen.q9_answer") },
-    { title: t("faq_screen.q4_title"), content: t("faq_screen.q4_answer") },
-    { title: t("faq_screen.q1_title"), content: t("faq_screen.q1_answer") },
-    { title: t("faq_screen.q7_title"), content: t("faq_screen.q7_answer") },
-    { title: t("faq_screen.q8_title"), content: t("faq_screen.q8_answer") },
-    { title: t("faq_screen.q1_title"), content: t("faq_screen.q1_answer") },
-    { title: t("faq_screen.q4_title"), content: t("faq_screen.q4_answer") },
+    { id: "q1", title: t("faq_screen.q1_title"), content: t("faq_screen.q1_answer") },
+    { id: "q2", title: t("faq_screen.q2_title"), content: t("faq_screen.q2_answer") },
+    { id: "q3", title: t("faq_screen.q3_title"), content: t("faq_screen.q3_answer") },
+    { id: "q4", title: t("faq_screen.q4_title"), content: t("faq_screen.q4_answer") },
+    { id: "q5", title: t("faq_screen.q5_title"), content: t("faq_screen.q5_answer") },
+    { id: "q6", title: t("faq_screen.q6_title"), content: t("faq_screen.q6_answer") },
+    { id: "q7", title: t("faq_screen.q7_title"), content: t("faq_screen.q7_answer") },
+    { id: "q8", title: t("faq_screen.q8_title"), content: t("faq_screen.q8_answer") },
+    { id: "q9", title: t("faq_screen.q9_title"), content: t("faq_screen.q9_answer") },
   ];
+
+  const handleToggleExpand = useCallback((id) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedItemId((prevId) => (prevId === id ? null : id));
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -106,11 +103,13 @@ export default function Faq() {
       </View>
 
       <ScrollView contentContainerStyle={styles.faqList}>
-        {faqData.map((item, index) => (
+        {faqData.map((item) => (
           <AccordionItem
-            key={index}
+            key={item.id} // Використовуємо унікальний id як key
             title={item.title}
             content={item.content}
+            isExpanded={expandedItemId === item.id} // Передаємо стан розгортання
+            onToggleExpand={() => handleToggleExpand(item.id)} // Передаємо функцію для зміни стану
           />
         ))}
       </ScrollView>
@@ -125,10 +124,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
-    paddingTop: 50,
-  },
-  container: {
-    flex: 1,
+    paddingTop: 50, // Відступ зверху для вмісту
   },
   header: {
     flexDirection: "row",
@@ -160,7 +156,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 2.22,
     elevation: 3,
-    overflow: "hidden",
+    overflow: "hidden", // Важливо для коректного відображення згортання
   },
   accordionHeader: {
     flexDirection: "row",
@@ -169,7 +165,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   accordionTitle: {
-    flex: 1,
+    flex: 1, // Дозволяє заголовку займати доступний простір
     fontSize: 16,
     fontFamily: "Mont-SemiBold",
     color: "#333",

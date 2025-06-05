@@ -12,6 +12,7 @@ import {
   Dimensions,
   Platform,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -38,7 +39,7 @@ const countries = [
   { name: "Sweden", code: "SE", emoji: "🇸🇪" },
   { name: "Switzerland", code: "CH", emoji: "🇨🇭" },
   { name: "Netherlands", code: "NL", emoji: "🇳🇱" },
-  { name: "Norway", code: "🇳🇴" },
+  { name: "Norway", code: "NO", emoji: "🇳🇴" },
   { name: "Denmark", code: "DK", emoji: "🇩🇰" },
   { name: "Finland", code: "FI", emoji: "🇫🇮" },
   { name: "South Africa", code: "ZA", emoji: "🇿🇦" },
@@ -63,7 +64,6 @@ const countries = [
 
 const Register = () => {
   const navigation = useNavigation();
-  // --- Використовуємо хук useTranslation для доступу до t та i18n ---
   const { t, i18n } = useTranslation();
 
   const [country, setCountry] = useState(null);
@@ -77,8 +77,6 @@ const Register = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [dimensionsSubscription, setDimensionsSubscription] = useState(null);
-  // Стан для відображення поточної вибраної мови на кнопці
-  // Використовуємо i18n.language, оскільки i18n.locale - це властивість i18n-js, а не i18next
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
   );
@@ -111,8 +109,6 @@ const Register = () => {
     }
   }, []);
 
-  // Оновлюємо displayedLanguageCode при зміні i18n.language
-  // Це буде реагувати на зміни мови, зроблені через i18n.changeLanguage()
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
@@ -121,19 +117,19 @@ const Register = () => {
     setRegistrationError("");
 
     if (!fullName.trim()) {
-      setRegistrationError(t("error_empty_fullname")); // Використовуємо t()
+      setRegistrationError(t("error_empty_fullname"));
       return;
     }
     if (!email.trim()) {
-      setRegistrationError(t("error_empty_email")); // Використовуємо t()
+      setRegistrationError(t("error_empty_email"));
       return;
     }
     if (!password.trim()) {
-      setRegistrationError(t("error_empty_password")); // Використовуємо t()
+      setRegistrationError(t("error_empty_password"));
       return;
     }
     if (password.length < 6) {
-      setRegistrationError(t("error_short_password")); // Використовуємо t()
+      setRegistrationError(t("error_short_password"));
       return;
     }
 
@@ -148,35 +144,30 @@ const Register = () => {
       if (authError) {
         console.error("Помилка реєстрації Supabase:", authError.message);
         if (authError.message.includes("already registered")) {
-          setRegistrationError(t("error_email_in_use")); // Використовуємо t()
+          setRegistrationError(t("error_email_in_use"));
         } else if (authError.message.includes("invalid email")) {
-          setRegistrationError(t("error_invalid_email")); // Використовуємо t()
+          setRegistrationError(t("error_invalid_email"));
         } else if (authError.message.includes("weak password")) {
-          setRegistrationError(t("error_weak_password")); // Використовуємо t()
+          setRegistrationError(t("error_weak_password"));
         } else {
           setRegistrationError(
-            t("error_registration_failed", { error: authError.message }) // Використовуємо t()
+            t("error_registration_failed", { error: authError.message })
           );
         }
         return;
       }
 
-      // Перевіряємо, чи користувач успішно зареєстрований
       if (data.user) {
         console.log("Supabase user registered. User ID:", data.user.id);
 
-        // Збереження додаткових даних профілю в таблицю "profile_doctor"
         const { error: profileError } = await supabase
           .from("profile_doctor")
           .insert([
             {
-              // НЕ передаємо 'id' сюди, дозволяємо базі даних згенерувати його автоматично
-              // id: data.user.id, // <<< ВИДАЛИТИ АБО ЗАКОМЕНТУВАТИ ЦЕЙ РЯДОК
-
-              user_id: data.user.id, // <<< ВИПРАВЛЕНО: Передаємо user ID до user_id стовпця
+              user_id: data.user.id,
               full_name: fullName.trim(),
               phone: phone.trim() || null,
-              country: country?.name || null,
+              country: country?.name || null, // Зберігаємо англійську назву, або можна зберігати t(`countries.${country.name}`)
               language: i18n.language || null,
             },
           ]);
@@ -186,34 +177,24 @@ const Register = () => {
             "Помилка збереження профілю в Supabase:",
             profileError.message
           );
-          setRegistrationError(t("error_profile_save_failed")); // Використовуємо t()
+          setRegistrationError(t("error_profile_save_failed"));
         } else {
-          // Успішна реєстрація та збереження профілю
-          Alert.alert(
-            t("success_title"), // Використовуємо t()
-            t("success_registration_message") // Використовуємо t()
-          );
-          // Очищення полів форми
+          Alert.alert(t("success_title"), t("success_registration_message"));
           setFullName("");
           setEmail("");
           setPassword("");
           setPhone("");
           setCountry(null);
-          // Перехід на екран входу
           navigation.navigate("Login");
         }
       } else {
-        // Якщо реєстрація Supabase Auth завершилася, але об'єкт користувача відсутній (рідкісний випадок)
         console.warn("Supabase signUp completed, but user object is missing.");
-        Alert.alert(
-          t("success_title"), // Використовуємо t()
-          t("success_registration_message") // Використовуємо t()
-        );
-        navigation.navigate("LoginScreen");
+        Alert.alert(t("success_title"), t("success_registration_message"));
+        navigation.navigate("Login");
       }
     } catch (err) {
       console.error("Загальна помилка при реєстрації:", err);
-      setRegistrationError(t("error_general_registration_failed")); // Використовуємо t()
+      setRegistrationError(t("error_general_registration_failed"));
     } finally {
       setIsRegistering(false);
     }
@@ -240,28 +221,23 @@ const Register = () => {
     closeCountryModal();
   };
 
-  // Оновлена функція вибору мови
   const handleLanguageSelect = (langCode) => {
-    // --- ВАЖЛИВО: Використовуємо i18n.changeLanguage() для i18next ---
     i18n.changeLanguage(langCode);
     closeLanguageModal();
-    // setDisplayedLanguageCode оновиться автоматично завдяки useEffect
   };
 
   const { width, height } = dimensions;
   const isLargeScreen = width > 768;
 
-  // Оновлені languages для модального вікна - використовуємо ключі з глобальних перекладів
   const languagesForModal = [
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
-    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" }, // --- ВАЖЛИВО: Змінено "ua" на "uk" ---
+    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
   ];
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container(width, height)}>
         <StatusBar style="auto" />
-        {/* Оновлена кнопка вибору мови */}
         <View style={styles.languageContainerRegister}>
           <TouchableOpacity
             style={styles.languageButtonRegister}
@@ -285,15 +261,16 @@ const Register = () => {
           onPress={openCountryModal}
         >
           <Text style={styles.selectCountryText}>
-            {country ? `${country.emoji} ${country.name}` : t("select_country")}
+            {country
+              ? `${country.emoji} ${t(`countries.${country.name}`)}` // Перекладаємо назву країни
+              : t("select_country")}
           </Text>
         </TouchableOpacity>
 
-        {/* Поле вводу для повного імені з іконкою */}
         <Text style={styles.subtitle2}>{t("fullname")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="person-outline" // Іконка для імені
+            name="person-outline"
             size={20}
             color="#B0BEC5"
             style={styles.icon}
@@ -306,11 +283,10 @@ const Register = () => {
           />
         </View>
 
-        {/* Поле вводу для електронної пошти з іконкою */}
         <Text style={styles.subtitle2}>{t("email")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="mail-outline" // Іконка для пошти
+            name="mail-outline"
             size={20}
             color="#B0BEC5"
             style={styles.icon}
@@ -325,11 +301,10 @@ const Register = () => {
           />
         </View>
 
-        {/* Поле вводу для пароля з іконкою */}
         <Text style={styles.subtitle2}>{t("password")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="lock-closed-outline" // Іконка для пароля
+            name="lock-closed-outline"
             size={20}
             color="#B0BEC5"
             style={styles.icon}
@@ -343,13 +318,12 @@ const Register = () => {
           />
         </View>
 
-        {/* Поле вводу для телефону з іконкою */}
         <Text style={styles.subtitle2}>{t("phone")}</Text>
         <View style={styles.inputContainer(width)}>
           <Ionicons
-            name="call-outline" // Іконка для телефону
+            name="call-outline"
             size={20}
-            color="black"
+            color="#B0BEC5"
             style={styles.icon}
           />
           <TextInput
@@ -369,9 +343,11 @@ const Register = () => {
           onPress={handleRegistration}
           disabled={isRegistering}
         >
-          <Text style={styles.registerButtonText}>
-            {isRegistering ? t("registering") : t("register")}
-          </Text>
+          {isRegistering ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.registerButtonText}>{t("register")}</Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.loginLink}
@@ -401,7 +377,9 @@ const Register = () => {
                     onPress={() => selectCountry(item)}
                   >
                     <Text style={styles.countryEmoji}>{item.emoji}</Text>
-                    <Text style={styles.countryName}>{item.name}</Text>
+                    <Text style={styles.countryName}>
+                      {t(`countries.${item.name}`)}
+                    </Text>
                   </TouchableOpacity>
                 ))}
                 <Pressable
@@ -415,7 +393,6 @@ const Register = () => {
           </ScrollView>
         </Modal>
 
-        {/* Оновлене модальне вікно для вибору мови */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -466,7 +443,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: width * 0.05,
     width: "100%",
   }),
-  // Оновлені стилі для кнопки мови
   languageContainerRegister: {
     flexDirection: "row",
     position: "absolute",
@@ -475,9 +451,9 @@ const styles = StyleSheet.create({
     paddingVertical: 70,
   },
   languageButtonRegister: {
-    backgroundColor: "#0EB3EB", // Синій фон
+    backgroundColor: "#0EB3EB",
     borderRadius: 10,
-    width: 71, // Фіксована ширина
+    width: 71,
     paddingVertical: 5,
     flexDirection: "row",
     alignItems: "center",
@@ -554,6 +530,7 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: "center",
     marginTop: 8,
+    justifyContent: "center",
   }),
   registerButtonText: {
     color: "#fff",
@@ -628,7 +605,6 @@ const styles = StyleSheet.create({
     color: "#757575",
     fontFamily: "Mont-Regular",
   },
-  // Стилі для нового модального вікна мови (як у Patsient_Home)
   modalOverlay: {
     flex: 1,
     justifyContent: "center",

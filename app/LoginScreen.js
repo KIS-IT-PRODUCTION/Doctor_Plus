@@ -8,27 +8,19 @@ import {
   ScrollView,
   Dimensions,
   Alert,
+  ActivityIndicator, // Додано для індикатора завантаження
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../providers/supabaseClient"; // Ваш Supabase клієнт
-import { useAuth } from "../providers/AuthProvider"; // Ваш AuthProvider для отримання сесії
-
-// --- ВАЖЛИВО: Використовуємо хук useTranslation з react-i18next ---
-import { useTranslation } from "react-i18next";
-
-// ВИДАЛЕНО:
-// - const translations = {...}; (більше не потрібно, переклади у .json файлах)
-// - import { getLocales } from "expo-localization";
-// - import { I18n } from "i18n-js";
-// - Ініціалізація i18n = new I18n(...) та setInitialLocale() (все це робиться глобально в i18n.js)
+import { supabase } from "../providers/supabaseClient";
+import { useAuth } from "../providers/AuthProvider";
+import { useTranslation } from "react-i18next"; // Імпортуємо useTranslation
 
 const LoginScreen = () => {
   const navigation = useNavigation();
-  const { session } = useAuth(); // Отримуємо сесію з вашого AuthProvider
-  // --- Використовуємо хук useTranslation для доступу до t ---
-  const { t } = useTranslation();
+  const { session } = useAuth();
+  const { t } = useTranslation(); // Ініціалізуємо хук useTranslation
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,28 +29,25 @@ const LoginScreen = () => {
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
-  // Перевірка, чи користувач вже увійшов, і перенаправлення
   useEffect(() => {
     if (session && session.user) {
-      // Перевіряємо також session.user, щоб бути впевненими, що це дійсно активна сесія
       navigation.replace("Patsient_Home");
     }
   }, [session, navigation]);
 
   const handleLogin = async () => {
-    setLoginError(""); // Очистити попередні помилки
+    setLoginError("");
 
-    // Валідація полів
     if (!email.trim()) {
-      setLoginError(t("error_empty_email")); // Використовуємо t()
+      setLoginError(t("error_empty_email")); // Переклад помилки
       return;
     }
     if (!password.trim()) {
-      setLoginError(t("error_empty_password")); // Використовуємо t()
+      setLoginError(t("error_empty_password")); // Переклад помилки
       return;
     }
 
-    setIsLoggingIn(true); // Встановити стан входу в true
+    setIsLoggingIn(true);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -68,20 +57,19 @@ const LoginScreen = () => {
 
       if (error) {
         console.error("Помилка входу Supabase:", error.message);
-        // Зверніть увагу: ми передаємо об'єкт з 'error' для динамічного значення в перекладі
+        // Використовуємо інтерполяцію для передачі оригінального повідомлення помилки
         setLoginError(t("error_login_failed", { error: error.message }));
       } else {
         console.log("Вхід Supabase успішний. Дані користувача:", data.user?.id);
-        // Сесія оновиться в AuthProvider, і useEffect тут спрацює для навігації
-        // Очистити поля вводу після успішного входу
         setEmail("");
         setPassword("");
+        // Навігація відбудеться через useEffect завдяки оновленню сесії в AuthProvider
       }
     } catch (err) {
       console.error("Загальна помилка входу:", err);
-      setLoginError(t("error_general_login_failed")); // Використовуємо t()
+      setLoginError(t("error_general_login_failed")); // Переклад загальної помилки
     } finally {
-      setIsLoggingIn(false); // Завжди повертати стан входу в false
+      setIsLoggingIn(false);
     }
   };
 
@@ -104,7 +92,7 @@ const LoginScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder={t("placeholder_email")}
+            placeholder={t("placeholder_email")} // Переклад плейсхолдера
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -122,7 +110,7 @@ const LoginScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder={t("placeholder_password")}
+            placeholder={t("placeholder_password")} // Переклад плейсхолдера
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
@@ -136,9 +124,13 @@ const LoginScreen = () => {
           onPress={handleLogin}
           disabled={isLoggingIn}
         >
-          <Text style={styles.loginButtonText}>
-            {isLoggingIn ? t("logging_in") : t("login_button")}{" "}
-          </Text>
+          {isLoggingIn ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.loginButtonText}>
+              {t("login_button")} {/* Переклад тексту кнопки */}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -146,8 +138,9 @@ const LoginScreen = () => {
           onPress={() => navigation.navigate("RegisterScreen")}
         >
           <Text style={styles.registerLinkText}>
-            {t("not_registered")}
-            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
+            {t("not_registered")} {/* Переклад тексту посилання */}
+            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>{" "}
+            {/* Переклад частини посилання */}
           </Text>
         </TouchableOpacity>
       </View>
@@ -172,14 +165,14 @@ const styles = StyleSheet.create({
   title: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 36 : 32,
     marginBottom: 9,
-    fontFamily: "Mont-Bold", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Bold",
     color: "#212121",
     textAlign: "center",
   }),
   subtitle: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 18 : 16,
     color: "#757575",
-    fontFamily: "Mont-Regular", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Regular",
     marginBottom: 24,
     textAlign: "center",
   }),
@@ -187,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     alignSelf: "flex-start",
     color: "#2A2A2A",
-    fontFamily: "Mont-Medium", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Medium",
     paddingHorizontal: 35,
     marginBottom: 8,
   },
@@ -205,7 +198,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    fontFamily: "Mont-Regular", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Regular",
   },
   loginButton: (width) => ({
     backgroundColor: "#0EB3EB",
@@ -215,12 +208,12 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: "center",
     marginTop: 16,
-    justifyContent: "center", // Щоб текст або індикатор був по центру
+    justifyContent: "center",
   }),
   loginButtonText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "bold", // Якщо використовується Mont-Bold, можна замінити
+    fontWeight: "bold",
     textAlign: "center",
   },
   errorText: {
@@ -234,7 +227,7 @@ const styles = StyleSheet.create({
   registerLinkText: {
     fontSize: 16,
     color: "#757575",
-    fontFamily: "Mont-Regular", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Regular",
   },
 });
 
