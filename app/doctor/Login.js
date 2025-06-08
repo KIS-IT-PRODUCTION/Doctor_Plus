@@ -7,42 +7,56 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  ActivityIndicator, // Додав ActivityIndicator для відображення завантаження
+  ActivityIndicator,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../../providers/supabaseClient";
-import { useAuth } from "../../providers/AuthProvider";
+import { useAuth } from "../../providers/AuthProvider"; // Використовуємо функції з AuthProvider
 import { useTranslation } from "react-i18next";
 
 const Login = () => {
   const navigation = useNavigation();
-  const { session, loading: authLoading, userRole } = useAuth(); // Отримуємо сесію, стан завантаження автентифікації та роль
+  // Отримуємо session, loading, userRole, signIn, signOut, authError з AuthProvider
+  const { session, loading: authLoading, userRole, signIn, signOut, authError } = useAuth();
   const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false); // Власний стан для індикатора входу
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
-  // Перевірка, чи користувач вже увійшов, і перенаправлення
+  // Перевірка, чи користувач вже увійшов, і перенаправлення (або блокування)
   useEffect(() => {
     // Чекаємо, поки AuthProvider завершить своє початкове завантаження
-    if (!authLoading) {
-      if (session && session.user) {
-        if (userRole === "doctor") {
-          // Якщо користувач - лікар, перенаправляємо на Profile_doctor
-          navigation.replace("Profile_doctor");
-        } else {
-          // Якщо користувач - пацієнт, або роль не визначена/інша, перенаправляємо на Patsient_Home
-          navigation.replace("Patsient_Home");
-        }
+    if (!authLoading && session && session.user) {
+      if (userRole === "doctor") {
+        // Якщо користувач - лікар, перенаправляємо на Profile_doctor
+        console.log("Login: User is a doctor, navigating to Profile_doctor.");
+        navigation.replace("Profile_doctor");
+      } else if (userRole === "patient") {
+        // Якщо користувач - пацієнт, виходимо з системи та показуємо помилку
+        console.log("Login: User is a patient. Logging out and showing error.");
+        signOut(); // Виходимо з системи
+        setLoginError(t("error_doctors_only_login")); // Повідомлення про помилку
+        setEmail(""); // Очищуємо поля
+        setPassword("");
       }
+      // Якщо userRole === null (ще не визначено), чекаємо, useEffect знову спрацює після визначення ролі
     }
-  }, [session, navigation, authLoading, userRole]); // Додаємо authLoading та userRole до залежностей
+  }, [session, navigation, authLoading, userRole, signOut, t]); // Додано signOut та t до залежностей
+
+  // Слідкуємо за помилками з AuthProvider
+  useEffect(() => {
+    if (authError) {
+      console.error("Login: AuthProvider error:", authError.message);
+      setLoginError(t("error_login_failed", { error: authError.message }));
+      setIsLoggingIn(false); // Завершуємо індикатор завантаження
+    }
+  }, [authError, t]);
+
 
   const handleLogin = async () => {
     setLoginError(""); // Очистити попередні помилки
@@ -59,29 +73,20 @@ const Login = () => {
 
     setIsLoggingIn(true); // Встановити стан входу в true
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
+    // Використовуємо функцію signIn з AuthProvider
+    const { success, error } = await signIn(email, password);
 
-      if (error) {
-        console.error("Помилка входу Supabase:", error.message);
-        // Динамічне повідомлення про помилку з перекладом
-        setLoginError(t("error_login_failed", { error: error.message }));
-      } else {
-        console.log("Вхід Supabase успішний. Дані користувача:", data.user?.id);
-        // Сесія оновиться в AuthProvider, і useEffect тут спрацює для навігації
-        // Очистити поля вводу після успішного входу
-        setEmail("");
-        setPassword("");
-      }
-    } catch (err) {
-      console.error("Загальна помилка входу:", err);
-      setLoginError(t("error_general_login_failed"));
-    } finally {
-      setIsLoggingIn(false); // Завжди повертати стан входу в false
+    if (error) {
+      console.error("Login: Помилка входу:", error.message);
+      setLoginError(t("error_login_failed", { error: error.message }));
+    } else if (success) {
+      console.log("Login: Вхід успішний. AuthProvider тепер відповідає за навігацію.");
+      // Сесія оновиться в AuthProvider, і useEffect тут спрацює для навігації
+      // Поля вводу очистяться після успішного входу, якщо перенаправлення відбудеться
+      setEmail("");
+      setPassword("");
     }
+    setIsLoggingIn(false); // Завжди повертати стан входу в false
   };
 
   return (

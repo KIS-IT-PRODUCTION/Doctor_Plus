@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  ActivityIndicator, // Переконаємось, що ActivityIndicator імпортований
+  ActivityIndicator,
   Modal,
   Pressable,
   TouchableWithoutFeedback,
@@ -111,6 +111,15 @@ const Profile_doctor = ({ route }) => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
+  // Функція для форматування досвіду роботи (як у ChooseSpecial)
+  const formatYearsText = useCallback((years) => {
+    if (years === null || years === undefined || isNaN(years) || years < 0) {
+      return t("not_specified");
+    }
+    // Використовуємо i18next для множини
+    return t("years_experience", { count: years });
+  }, [t]);
+
   const fetchDoctorData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -126,13 +135,13 @@ const Profile_doctor = ({ route }) => {
     try {
       const { data, error: fetchError } = await supabase
         .from("anketa_doctor")
-        .select("*, diploma_url, certificate_photo_url, consultation_cost")
-        .eq("user_id", doctorId) // Передача doctorId без || null
+        // Додаємо experience_years до запиту
+        .select("*, diploma_url, certificate_photo_url, consultation_cost, experience_years")
+        .eq("user_id", doctorId)
         .single();
 
       if (fetchError) {
         console.error("Error fetching doctor data from Supabase:", fetchError);
-        // Покращена обробка помилок Supabase
         if (fetchError.code === "PGRST116") { // No rows found
              setError(t("doctor_not_found"));
         } else {
@@ -184,10 +193,6 @@ const Profile_doctor = ({ route }) => {
   const languagesForModal = [
     { nameKey: "english", code: "en", emoji: "" },
     { nameKey: "ukrainian", code: "uk", emoji: "" },
-    // { nameKey: "german", code: "de", emoji: "🇩🇪" },
-    // { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
-    // { nameKey: "french", code: "fr", emoji: "🇫🇷" },
-    // { nameKey: "spanish", code: "es", emoji: "🇪🇸" },
   ];
 
   // Функції для безпечного парсингу JSON
@@ -216,17 +221,13 @@ const Profile_doctor = ({ route }) => {
   // ОНОВЛЕНО: Функція для отримання спеціалізацій
   const getSpecializations = useCallback((specializationData) => {
     const parsedSpecs = getParsedArray(specializationData);
-    // Якщо specializations - це масив значень (наприклад, ["oncologist", "pediatrician"]),
-    // то ми перекладаємо кожен елемент.
-    // Якщо specializations - це масив об'єктів (з nameKey і value),
-    // то ми беремо nameKey для перекладу.
     if (parsedSpecs.length > 0) {
       if (typeof parsedSpecs[0] === 'string') {
         // Якщо це масив рядків, перекладаємо кожен рядок
-        return parsedSpecs.map(specValue => t(specValue)).join(", ");
+        return parsedSpecs.map(specValue => t(`categories.${specValue}`)).join(", ");
       } else if (typeof parsedSpecs[0] === 'object' && parsedSpecs[0].nameKey) {
         // Якщо це масив об'єктів з nameKey, перекладаємо nameKey
-        return parsedSpecs.map(specObj => t(specObj.nameKey)).join(", ");
+        return parsedSpecs.map(specObj => t(`categories.${specObj.nameKey}`)).join(", ");
       }
     }
     return t("not_specified");
@@ -283,7 +284,7 @@ const Profile_doctor = ({ route }) => {
     avatar_url,
     communication_languages,
     specialization,
-    work_experience,
+    experience_years, // Тепер використовуємо experience_years
     work_location,
     consultation_cost,
     about_me,
@@ -331,7 +332,7 @@ const Profile_doctor = ({ route }) => {
                 onLoad={() => setLoadingAvatar(false)}
                 onError={() => {
                   setLoadingAvatar(false);
-                  setAvatarError(true); // Встановлюємо помилку завантаження
+                  setAvatarError(true);
                   console.error("Error loading avatar image:", avatar_url);
                 }}
               />
@@ -350,7 +351,7 @@ const Profile_doctor = ({ route }) => {
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("rating")}:</Text>
-              <ValueBox>🌟🌟</ValueBox>
+              <ValueBox>🌟🌟</ValueBox> 
             </View>
 
             <View style={styles.infoRowDynamic}>
@@ -368,7 +369,8 @@ const Profile_doctor = ({ route }) => {
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("work_experience")}:</Text>
               <ValueBox>
-                {work_experience || t("not_specified")}
+                {/* Використовуємо experience_years з бази і форматуємо */}
+                {formatYearsText(experience_years)}
               </ValueBox>
             </View>
 
@@ -380,7 +382,6 @@ const Profile_doctor = ({ route }) => {
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("consultation_cost")}:</Text>
               <ValueBox>
-                {/* ЗМІНА: Коректне відображення вартості консультації */}
                 {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
               </ValueBox>
             </View>

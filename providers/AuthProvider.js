@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true); // Завантаження починається з true
   const [userRole, setUserRole] = useState(null);
+  const [authError, setAuthError] = useState(null); // Додаємо стан для помилок автентифікації
 
   // Функція для визначення ролі користувача
   const fetchUserRole = useCallback(async (userSession) => {
@@ -63,6 +64,7 @@ export const AuthProvider = ({ children }) => {
 
         if (sessionError) {
           console.error("AuthProvider: Error getting initial session:", sessionError.message);
+          setAuthError(sessionError); // Зберігаємо помилку автентифікації
           // Можливо, тут варто обробити помилку і, наприклад, відправити користувача на екран входу
         }
 
@@ -76,6 +78,7 @@ export const AuthProvider = ({ children }) => {
           console.log(`AuthProvider: Auth state changed. Event: ${_event}, Session: ${currentSession ? 'present' : 'absent'}`);
           setSession(currentSession);
           await fetchUserRole(currentSession);
+          setAuthError(null); // Очищаємо помилку при зміні стану
           // Після будь-якої зміни стану автентифікації, знімаємо індикатор завантаження,
           // оскільки роль вже визначена або скинута.
           setLoading(false);
@@ -84,6 +87,7 @@ export const AuthProvider = ({ children }) => {
 
       } catch (error) {
         console.error("AuthProvider: Error during auth initialization:", error.message);
+        setAuthError(error); // Зберігаємо помилку автентифікації
         // Якщо щось пішло не так при ініціалізації, все одно знімаємо loading
       } finally {
         // Навіть якщо сталася помилка, setLoading має стати false,
@@ -104,14 +108,111 @@ export const AuthProvider = ({ children }) => {
         authSubscription.unsubscribe();
       }
     };
-  }, [fetchUserRole, loading]); // Додав `loading` як залежність, щоб `finally` блок міг перевірити його стан
+  }, [fetchUserRole]); // Видалив `loading` з залежностей `useEffect`, оскільки це може спричинити нескінченний цикл, якщо `loading` змінюється всередині `finally` блоку. `fetchUserRole` і так залежить від `userSession`.
+
+
+  // Функція для входу
+  const signIn = useCallback(async (email, password) => {
+    setLoading(true);
+    setAuthError(null); // Очищаємо попередні помилки
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setAuthError(error);
+        return { success: false, error };
+      }
+      // fetchUserRole буде викликаний через onAuthStateChange
+      return { success: true, data };
+    } catch (error) {
+      setAuthError(error);
+      return { success: false, error };
+    } finally {
+      // setLoading(false); // setLoading відбувається в onAuthStateChange
+    }
+  }, []);
+
+  // Функція для реєстрації
+  const signUp = useCallback(async (email, password, isDoctor) => {
+    setLoading(true);
+    setAuthError(null); // Очищаємо попередні помилки
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+
+      if (authError) {
+        console.error("AuthProvider signUp error:", authError.message);
+        setAuthError(authError);
+        return { success: false, error: authError };
+      }
+
+      const user = authData.user;
+      if (!user) {
+        const noUserError = new Error("User not created after sign up.");
+        setAuthError(noUserError);
+        return { success: false, error: noUserError };
+      }
+
+      // Якщо користувач є лікарем, створюємо запис у таблиці profile_doctor
+      if (isDoctor) {
+        console.log("AuthProvider: Creating doctor profile for user:", user.id);
+        const { error: doctorProfileError } = await supabase
+          .from('profile_doctor') // Назва вашої таблиці для лікарів
+          .insert([
+            { user_id: user.id } // Вставляємо user_id
+          ]);
+
+        if (doctorProfileError) {
+          console.error("AuthProvider: Error creating doctor profile:", doctorProfileError.message);
+          setAuthError(doctorProfileError);
+          // Важливо: якщо створення профілю лікаря не вдалося,
+          // можливо, варто скасувати реєстрацію або позначити користувача як пацієнта
+          // Або можна просто кинути помилку і дати UI вирішити
+          throw doctorProfileError; // Кидаємо помилку, щоб вона була спіймана у зовнішньому catch
+        }
+        console.log("AuthProvider: Doctor profile created successfully.");
+      }
+
+      // onAuthStateChange буде викликаний після signUp, тому session та userRole оновляться там.
+      // Не потрібно вручну setSession, setUserRole тут.
+      return { success: true, data: authData };
+
+    } catch (error) {
+      console.error("AuthProvider: Full sign-up process error:", error.message);
+      setAuthError(error);
+      return { success: false, error };
+    } finally {
+      // setLoading(false); // setLoading відбувається в onAuthStateChange
+    }
+  }, []); // Пусті залежності, оскільки supabase стабільний
+
+  // Функція для виходу
+  const signOut = useCallback(async () => {
+    setLoading(true);
+    setAuthError(null); // Очищаємо попередні помилки
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setAuthError(error);
+        return { success: false, error };
+      }
+      setSession(null);
+      setUserRole(null);
+      return { success: true };
+    } catch (error) {
+      setAuthError(error);
+      return { success: false, error };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const value = {
     session,
     loading,
     userRole,
-    // Додайте тут функції для входу/виходу, якщо вони є
-    // наприклад, async signIn(email, password) { ... }, async signOut() { ... }
+    authError, // Додаємо authError до контексту
+    signIn,
+    signUp,
+    signOut,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

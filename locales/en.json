@@ -295,5 +295,9 @@
     "United Arab Emirates": "United Arab Emirates",
     "Kuwait": "Kuwait",
     "Qatar": "Qatar"
-  }
+  },
+  "select_experience_placeholder": "Select experience",
+  "year_singular": "year",
+  "years_plural_nominative": "years",
+  "years_plural_genitive": "years"
 }

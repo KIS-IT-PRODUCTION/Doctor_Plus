@@ -295,5 +295,17 @@
     "United Arab Emirates": "Об'єднані Арабські Емірати",
     "Kuwait": "Кувейт",
     "Qatar": "Катар"
-  }
+  },
+    "select_experience_placeholder": "Виберіть досвід",
+  "year_singular": "рік",
+  "years_plural_nominative": "роки",
+  "years_plural_genitive": "років",
+
+  "days_in_app": "{{count}} днів",
+  "months_in_app": "{{count}} місяців",
+  "years_in_app": "{{count}} років",
+  "years_experience": "{{count}} років досвіду",
+  "loading_doctors": "Завантаження лікарів...",
+  "error_fetching_doctors": "Помилка завантаження лікарів",
+  "no_doctors_found": "Лікарів не знайдено за заданими критеріями."
 }

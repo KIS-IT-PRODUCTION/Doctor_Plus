@@ -15,7 +15,7 @@ import {
   Switch,
   Image,
   StatusBar,
-  SafeAreaView,
+  SafeAreaView,ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
-import { decode } from "base64-arraybuffer"; // Цей імпорт потрібен для перетворення base64 в ArrayBuffer
+import { decode } from "base64-arraybuffer";
 
 const countries = [
   { name: "Україна", code: "UA", emoji: "🇺🇦" },
@@ -33,7 +33,7 @@ const countries = [
   { name: "Canada", code: "CA", emoji: "🇨🇦" },
   { name: "Germany", code: "DE", emoji: "🇩🇪" },
   { name: "France", code: "FR", emoji: "🇫🇷" },
-  { name: "Poland", code: "PL", emoji: "🇵🇱" },
+  { name: "Poland", "code": "PL", emoji: "🇵🇱" },
 ];
 
 // Languages for consultation
@@ -72,6 +72,9 @@ const generateConsultationCostOptions = () => {
 };
 const consultationCostOptions = generateConsultationCostOptions();
 
+// Options for experience years (0 to 50 years)
+const experienceYearsOptions = Array.from({ length: 51 }, (_, i) => i);
+
 const Anketa_Settings = () => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -86,7 +89,8 @@ const Anketa_Settings = () => {
   const [photoUri, setPhotoUri] = useState(null);
   const [diplomaUri, setDiplomaUri] = useState(null);
   const [certificateUri, setCertificateUri] = useState(null);
-  const [experienceText, setExperienceText] = useState("");
+  // State for numeric experience years
+  const [experienceYears, setExperienceYears] = useState(null);
   const [workLocation, setWorkLocation] = useState("");
   const [achievements, setAchievements] = useState("");
   const [aboutMe, setAboutMe] = useState("");
@@ -106,6 +110,9 @@ const Anketa_Settings = () => {
   const [isSpecializationModalVisible, setIsSpecializationModalVisible] =
     useState(false);
   const [isConsultationCostModalVisible, setIsConsultationCostModalVisible] =
+    useState(false);
+  // Modal visibility for experience years
+  const [isExperienceYearsModalVisible, setIsExperienceYearsModalVisible] =
     useState(false);
 
   // UI RELATED STATES
@@ -146,6 +153,27 @@ const Anketa_Settings = () => {
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
+
+  // Function to format years text (e.g., "1 рік", "2 роки", "5 років")
+  const formatYearsText = (years) => {
+    if (years === null || years === undefined || isNaN(years) || years < 0) {
+      return t("select_experience_placeholder");
+    }
+    const lastDigit = years % 10;
+    const lastTwoDigits = years % 100;
+
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+      return `${years} ${t("years_plural_genitive")}`; // років
+    }
+    if (lastDigit === 1) {
+      return `${years} ${t("year_singular")}`; // рік
+    }
+    if (lastDigit >= 2 && lastDigit <= 4) {
+      return `${years} ${t("years_plural_nominative")}`; // роки
+    }
+    return `${years} ${t("years_plural_genitive")}`; // років
+  };
+
 
   // --- FETCH USER PROFILE DATA ---
   useEffect(() => {
@@ -223,7 +251,8 @@ const Anketa_Settings = () => {
           setDiplomaUri(data.diploma_url || null);
           setCertificateUri(data.certificate_photo_url || null);
 
-          setExperienceText(data.work_experience || "");
+          // Зчитуємо experience_years з БД
+          setExperienceYears(data.experience_years ? parseInt(data.experience_years, 10) : null);
           setWorkLocation(data.work_location || "");
           setAchievements(data.achievements || "");
           setAboutMe(data.about_me || "");
@@ -299,6 +328,15 @@ const Anketa_Settings = () => {
     setConsultationCost(cost.toString());
     closeConsultationCostModal();
   };
+
+  // Handlers for experience years modal
+  const openExperienceYearsModal = () => setIsExperienceYearsModalVisible(true);
+  const closeExperienceYearsModal = () => setIsExperienceYearsModalVisible(false);
+  const selectExperienceYears = (years) => {
+    setExperienceYears(years);
+    closeExperienceYearsModal();
+  };
+
 
   const uploadFile = async (uri, bucketName, userId, fileNamePrefix) => {
     console.log("Starting upload for URI:", uri);
@@ -383,7 +421,7 @@ const Anketa_Settings = () => {
       console.log("File data type for upload:", typeof fileBuffer);
       console.log("Determined MIME type for upload:", mimeType);
 
-      const filePath = `<span class="math-inline">\{userId\}/</span>{fileNamePrefix}_${Date.now()}.${fileExtension}`;
+      const filePath = `${userId}/${fileNamePrefix}_${Date.now()}.${fileExtension}`;
       console.log("Attempting to upload to path (key):", filePath);
 
       const { data, error } = await supabase.storage
@@ -548,7 +586,7 @@ const Anketa_Settings = () => {
         console.log("Uploading diploma from local URI:", diplomaUri);
         diplomaUrl = await uploadFile(
           diplomaUri,
-          "avatars", // ЗМІНА: Завантажуємо в бакет "avatars"
+          "avatars",
           user.id,
           "diploma"
         );
@@ -570,7 +608,7 @@ const Anketa_Settings = () => {
         console.log("Uploading certificate from local URI:", certificateUri);
         certUrl = await uploadFile(
           certificateUri,
-          "avatars", // ЗМІНА: Завантажуємо в бакет "avatars"
+          "avatars",
           user.id,
           "certificate"
         );
@@ -583,12 +621,10 @@ const Anketa_Settings = () => {
         certUrl = null;
       }
 
-      // --- КЛЮЧОВІ ЗМІНИ ТУТ: ПЕРЕДАЄМО ПРЯМО JAVASCRIPT-МАСИВИ ---
       const specializationsToSave = selectedSpecializations.map((spec) => spec.value);
       const languagesToSave = selectedConsultationLanguages.length > 0
           ? selectedConsultationLanguages
           : [i18n.language];
-      // --- КІНЕЦЬ КЛЮЧОВИХ ЗМІН ---
 
       const { error: doctorProfileError } = await supabase
         .from("anketa_doctor")
@@ -600,9 +636,10 @@ const Anketa_Settings = () => {
               email: user.email,
               phone: "",
               country: country?.name || null,
-              communication_languages: languagesToSave, // Тепер це JavaScript-масив
-              specialization: specializationsToSave,     // Тепер це JavaScript-масив
-              experience_years: null,
+              communication_languages: languagesToSave,
+              specialization: specializationsToSave,
+              experience_years: experienceYears,
+              work_experience: null, // Always null as the text input is removed
               education: null,
               achievements: achievements.trim() || null,
               about_me: aboutMe.trim() || null,
@@ -613,7 +650,6 @@ const Anketa_Settings = () => {
               avatar_url: avatarUrl,
               diploma_url: diplomaUrl,
               certificate_photo_url: certUrl,
-              work_experience: experienceText.trim() || null,
               work_location: workLocation.trim() || null,
               is_verified: false,
               agreed_to_terms: agreedToTerms,
@@ -658,6 +694,7 @@ const Anketa_Settings = () => {
       cleanupUris.forEach((uri) => URL.revokeObjectURL(uri));
     };
   }, [photoUri, diplomaUri, certificateUri]);
+  
   const handleSignOut = async () => {
     Alert.alert(
       t("logout_confirm_title"),
@@ -740,7 +777,7 @@ const Anketa_Settings = () => {
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={styles.signOutButtonAboveSearch} // Новий стиль для позиціонування
+            style={styles.signOutButtonAboveSearch}
             onPress={handleSignOut}
           >
             <Ionicons name="log-out-outline" size={24} color="white" />
@@ -856,24 +893,23 @@ const Anketa_Settings = () => {
             )}
           </View>
 
-          {/* Досвід роботи */}
+          {/* ОНОВЛЕНО: Досвід роботи (років) - тепер це основне поле "Досвід роботи" */}
           <Text style={styles.inputLabel}>{t("work_experience")}</Text>
-          <View style={styles.inputContainer(width)}>
-            <TextInput
-              style={styles.input}
-              placeholder={t("work_experience")}
-              value={experienceText}
-              onChangeText={setExperienceText}
-              multiline={true}
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.selectButton(width)}
+            onPress={openExperienceYearsModal}
+          >
+            <Text style={styles.selectButtonText}>
+              {formatYearsText(experienceYears)}
+            </Text>
+          </TouchableOpacity>
 
           {/* Місце роботи */}
           <Text style={styles.inputLabel}>{t("work_location")}</Text>
           <View style={styles.inputContainer(width)}>
             <TextInput
               style={styles.input}
-              placeholder={t("work_location")}
+              placeholder={t("work_location_placeholder")}
               value={workLocation}
               onChangeText={setWorkLocation}
             />
@@ -884,7 +920,7 @@ const Anketa_Settings = () => {
           <View style={styles.inputContainer(width)}>
             <TextInput
               style={styles.input}
-              placeholder={t("achievements")}
+              placeholder={t("achievements_placeholder")}
               value={achievements}
               onChangeText={setAchievements}
               multiline={true}
@@ -909,10 +945,10 @@ const Anketa_Settings = () => {
           <View style={styles.inputContainer(width)}>
             <TextInput
               style={styles.input}
-              placeholder="Від 00.00 до 00.00"
-              keyboardType="default"
+              placeholder={t("consultation_cost_range_placeholder")}
               value={consultationCostRange}
               onChangeText={setConsultationCostRange}
+              keyboardType="default"
             />
           </View>
 
@@ -939,284 +975,285 @@ const Anketa_Settings = () => {
               numberOfLines={3}
             />
           </View>
-          {/* Згода з умовами */}
-          <View style={styles.agreementContainer}>
+
+          {/* Умови співпраці (Switch) */}
+          <View style={styles.agreementContainer}> 
             <Switch
-              trackColor={{
-                false: "#767577",
-                true: "rgb(3, 88, 101)",
-              }}
-              thumbColor={agreedToTerms ? "rgba(14, 179, 235, 1)" : "#f4f3f4"}
+              trackColor={{ false: "#767577", true: "#0EB3EB" }}
+              thumbColor={agreedToTerms ? "#f4f3f4" : "#f4f3f4"}
+              ios_backgroundColor="#3e3e3e"
               onValueChange={setAgreedToTerms}
               value={agreedToTerms}
             />
-            <Text style={styles.agreementText}>{t("agree_to_terms")}</Text>
+            <Text style={styles.agreementText}>{t("agree_to_terms")}</Text> 
           </View>
 
+          {/* Save Button */}
           {profileSaveError ? (
             <Text style={styles.errorText}>{profileSaveError}</Text>
           ) : null}
-
           <TouchableOpacity
-            style={styles.saveProfileButton(width)}
+            style={styles.saveProfileButton(width)} 
             onPress={handleSaveProfile}
             disabled={isSavingProfile}
           >
-            <Text style={styles.saveProfileButtonText}>
-              {isSavingProfile ? t("saving") : t("save_profile")}
-            </Text>
+            {isSavingProfile ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveProfileButtonText}>{t("save_profile")}</Text> 
+            )}
           </TouchableOpacity>
-
-          {/* Country Modal */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={isCountryModalVisible}
-            onRequestClose={closeCountryModal}
-          >
-            <Pressable style={styles.centeredView} onPress={closeCountryModal}>
-              <TouchableWithoutFeedback>
-                <View style={[styles.modalView(width), styles.modalBorder]}>
-                  {/* ЗМІНА: Додано modalBorder */}
-                  <Text style={styles.modalTitle}>
-                    {t("select_country_modal_title")}
-                  </Text>
-                  <ScrollView style={styles.modalScrollView}>
-                    {countries.map((item) => (
-                      <TouchableOpacity
-                        key={item.code}
-                        style={styles.countryItem}
-                        onPress={() => selectCountry(item)}
-                      >
-                        <Text style={styles.countryEmoji}>{item.emoji}</Text>
-                        <Text style={styles.countryName}>{item.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <Pressable
-                    style={[styles.button, styles.buttonClose]}
-                    onPress={closeCountryModal}
-                  >
-                    <Text style={styles.textStyle}>{t("close")}</Text>
-                  </Pressable>
-                </View>
-              </TouchableWithoutFeedback>
-            </Pressable>
-          </Modal>
-
-          {/* General Language Modal */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={isGeneralLanguageModalVisible}
-            onRequestClose={closeGeneralLanguageModal}
-          >
-            <Pressable
-              style={styles.centeredView}
-              onPress={closeGeneralLanguageModal}
-            >
-              <TouchableWithoutFeedback>
-                <View style={[styles.modalView(width), styles.modalBorder]}>
-                  {/* ЗМІНА: Додано modalBorder */}
-                  <Text style={styles.modalTitle}>{t("select_language")}</Text>
-                  <ScrollView style={styles.modalScrollView}>
-                    {generalAppLanguages.map((lang) => (
-                      <TouchableOpacity
-                        key={lang.code}
-                        style={styles.languageOption}
-                        onPress={() => handleGeneralLanguageSelect(lang.code)}
-                      >
-                        <Text style={styles.languageOptionText}>
-                          {lang.emoji} {t(lang.nameKey)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <Pressable
-                    style={[styles.button, styles.buttonClose]}
-                    onPress={closeGeneralLanguageModal}
-                  >
-                    <Text style={styles.textStyle}>{t("close")}</Text>
-                  </Pressable>
-                </View>
-              </TouchableWithoutFeedback>
-            </Pressable>
-          </Modal>
-
-          {/* Consultation Language Modal */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={isConsultationLanguageModalVisible}
-            onRequestClose={closeConsultationLanguageModal}
-          >
-            <Pressable
-              style={styles.centeredView}
-              onPress={closeConsultationLanguageModal}
-            >
-              <TouchableWithoutFeedback>
-                <View style={[styles.modalView(width), styles.modalBorder]}>
-                  {/* ЗМІНА: Додано modalBorder */}
-                  <Text style={styles.modalTitle}>
-                    {t("select_consultation_language")}
-                  </Text>
-                  <ScrollView style={styles.modalScrollView}>
-                    {consultationLanguages.map((lang) => (
-                      <TouchableOpacity
-                        key={lang.code}
-                        style={[
-                          styles.countryItem,
-                          selectedConsultationLanguages.includes(lang.code) &&
-                            styles.countryItemSelected,
-                        ]}
-                        onPress={() =>
-                          toggleConsultationLanguageSelect(lang.code)
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.countryName,
-                            selectedConsultationLanguages.includes(lang.code) &&
-                              styles.countryItemTextSelected,
-                          ]}
-                        >
-                          {lang.emoji} {t(lang.nameKey)}
-                        </Text>
-                        {selectedConsultationLanguages.includes(lang.code) && (
-                          <Ionicons
-                            name="checkmark"
-                            size={20}
-                            color="#0EB3EB"
-                            style={styles.checkmarkIcon}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <Pressable
-                    style={[styles.button, styles.buttonClose]}
-                    onPress={closeConsultationLanguageModal}
-                  >
-                    <Text style={styles.textStyle}>{t("close")}</Text>
-                  </Pressable>
-                </View>
-              </TouchableWithoutFeedback>
-            </Pressable>
-          </Modal>
-
-          {/* Specialization Modal */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={isSpecializationModalVisible}
-            onRequestClose={closeSpecializationModal}
-          >
-            <Pressable
-              style={styles.centeredView}
-              onPress={closeSpecializationModal}
-            >
-              <TouchableWithoutFeedback>
-                <View style={[styles.modalView(width), styles.modalBorder]}>
-                  {/* ЗМІНА: Додано modalBorder */}
-                  <Text style={styles.modalTitle}>
-                    {t("select_specialization_modal_title")}
-                  </Text>
-                  <ScrollView style={styles.modalScrollView}>
-                    {specializations.map((spec) => (
-                      <TouchableOpacity
-                        key={spec.value}
-                        style={[
-                          styles.countryItem,
-                          selectedSpecializations.some(
-                            (selectedSpec) => selectedSpec.value === spec.value
-                          ) && styles.countryItemSelected,
-                        ]}
-                        onPress={() => toggleSpecializationSelect(spec)}
-                      >
-                        <Text
-                          style={[
-                            styles.countryName,
-                            selectedSpecializations.some(
-                              (selectedSpec) =>
-                                selectedSpec.value === spec.value
-                            ) && styles.countryItemTextSelected,
-                          ]}
-                        >
-                          {t(spec.nameKey)}
-                        </Text>
-                        {selectedSpecializations.some(
-                          (s) => s.value === spec.value
-                        ) && (
-                          <Ionicons
-                            name="checkmark"
-                            size={20}
-                            color="#0EB3EB"
-                            style={styles.checkmarkIcon}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <Pressable
-                    style={[styles.button, styles.buttonClose]}
-                    onPress={closeSpecializationModal}
-                  >
-                    <Text style={styles.textStyle}>{t("close")}</Text>
-                  </Pressable>
-                </View>
-              </TouchableWithoutFeedback>
-            </Pressable>
-          </Modal>
-
-          {/* Consultation Cost Modal */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={isConsultationCostModalVisible}
-            onRequestClose={closeConsultationCostModal}
-          >
-            <Pressable
-              style={styles.centeredView}
-              onPress={closeConsultationCostModal}
-            >
-              <TouchableWithoutFeedback>
-                <View
-                  style={[
-                    styles.consultationCostModalContent,
-                    styles.modalBorder,
-                  ]}
-                >
-                  {/* ЗМІНА: Додано modalBorder */}
-                  <Text style={styles.modalTitle}>
-                    {t("select_consultation_cost")}
-                  </Text>
-                  <ScrollView style={styles.pickerScrollView}>
-                    {consultationCostOptions.map((cost) => (
-                      <TouchableOpacity
-                        key={cost}
-                        style={[
-                          styles.pickerOption,
-                          consultationCost === cost.toString() &&
-                            styles.pickerOptionSelected,
-                        ]}
-                        onPress={() => selectConsultationCost(cost)}
-                      >
-                        <Text style={styles.pickerOptionText}>${cost}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <Pressable
-                    style={[styles.button, styles.buttonClose]}
-                    onPress={closeConsultationCostModal}
-                  >
-                    <Text style={styles.textStyle}>{t("close")}</Text>
-                  </Pressable>
-                </View>
-              </TouchableWithoutFeedback>
-            </Pressable>
-          </Modal>
         </View>
       </ScrollView>
+
+      {/* Modals Section */}
+      {/* Country Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isCountryModalVisible}
+        onRequestClose={closeCountryModal}
+      >
+        <TouchableWithoutFeedback onPress={closeCountryModal}>
+          <View style={styles.centeredView}> 
+            <View style={[styles.modalView(width), styles.modalBorder]}> 
+              <ScrollView style={styles.modalScrollView}> 
+                {countries.map((item, index) => (
+                  <Pressable
+                    key={item.code}
+                    style={[
+                      styles.countryItem, /* Updated style name */
+                      country && country.code === item.code && styles.countryItemSelected, /* Updated style name */
+                    ]}
+                    onPress={() => selectCountry(item)}
+                  >
+                    <Text style={styles.countryEmoji}>{item.emoji}</Text> 
+                    <Text
+                      style={[
+                        styles.countryName, /* Updated style name */
+                        country && country.code === item.code && styles.countryItemTextSelected, /* Updated style name */
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable style={[styles.button, styles.buttonClose]} onPress={closeCountryModal}> {/* Updated style names */}
+                <Text style={styles.textStyle}>{t("close")}</Text> 
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* General Language Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isGeneralLanguageModalVisible}
+        onRequestClose={closeGeneralLanguageModal}
+      >
+        <TouchableWithoutFeedback onPress={closeGeneralLanguageModal}>
+          <View style={styles.centeredView}> 
+            <View style={[styles.languageModalContent, styles.modalBorder]}> 
+              <ScrollView style={styles.modalScrollView}> 
+                {generalAppLanguages.map((lang, index) => (
+                  <Pressable
+                    key={lang.code}
+                    style={styles.languageOption} 
+                    onPress={() => handleGeneralLanguageSelect(lang.code)}
+                  >
+                    <Text
+                      style={[
+                        styles.languageOptionText, /* Updated style name */
+                        i18n.language === lang.code && styles.countryItemTextSelected, /* Reused style for selected text */
+                      ]}
+                    >
+                      {t(lang.nameKey)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable
+                style={[styles.button, styles.buttonClose]} /* Updated style names */
+                onPress={closeGeneralLanguageModal}
+              >
+                <Text style={styles.textStyle}>{t("close")}</Text> 
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Consultation Language Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isConsultationLanguageModalVisible}
+        onRequestClose={closeConsultationLanguageModal}
+      >
+        <TouchableWithoutFeedback onPress={closeConsultationLanguageModal}>
+          <View style={styles.centeredView}> 
+            <View style={[styles.languageModalContent, styles.modalBorder]}> 
+              <ScrollView style={styles.modalScrollView}> 
+                {consultationLanguages.map((lang) => (
+                  <Pressable
+                    key={lang.code}
+                    style={styles.languageOption} 
+                    onPress={() => toggleConsultationLanguageSelect(lang.code)}
+                  >
+                    <Text
+                      style={[
+                        styles.languageOptionText, /* Updated style name */
+                        selectedConsultationLanguages.includes(lang.code) &&
+                          styles.countryItemTextSelected, /* Reused style for selected text */
+                      ]}
+                    >
+                      {t(lang.nameKey)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable
+                style={[styles.button, styles.buttonClose]} /* Updated style names */
+                onPress={closeConsultationLanguageModal}
+              >
+                <Text style={styles.textStyle}>{t("close")}</Text> 
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Specialization Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isSpecializationModalVisible}
+        onRequestClose={closeSpecializationModal}
+      >
+        <TouchableWithoutFeedback onPress={closeSpecializationModal}>
+          <View style={styles.centeredView}> 
+            <View style={[styles.modalView(width), styles.modalBorder]}> 
+              <ScrollView style={styles.modalScrollView}> 
+                {specializations.map((spec) => (
+                  <Pressable
+                    key={spec.value}
+                    style={styles.countryItem} 
+                    onPress={() => toggleSpecializationSelect(spec)}
+                  >
+                    <Text
+                      style={[
+                        styles.countryName, /* Reused style for consistency */
+                        selectedSpecializations.some(
+                          (s) => s.value === spec.value
+                        ) && styles.countryItemTextSelected, /* Reused style for selected text */
+                      ]}
+                    >
+                      {t(spec.nameKey)}
+                    </Text>
+                    {selectedSpecializations.some(s => s.value === spec.value) && (
+                      <Ionicons name="checkmark-circle" size={24} color="#0EB3EB" style={styles.checkmarkIcon} />
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable
+                style={[styles.button, styles.buttonClose]} /* Updated style names */
+                onPress={closeSpecializationModal}
+              >
+                <Text style={styles.textStyle}>{t("close")}</Text> 
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Consultation Cost Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isConsultationCostModalVisible}
+        onRequestClose={closeConsultationCostModal}
+      >
+        <TouchableWithoutFeedback onPress={closeConsultationCostModal}>
+          <View style={styles.centeredView}> 
+            <View style={[styles.consultationCostModalContent, styles.modalBorder]}> 
+              <ScrollView style={styles.pickerScrollView}> 
+                {consultationCostOptions.map((cost) => (
+                  <Pressable
+                    key={cost}
+                    style={[
+                      styles.pickerOption, /* Updated style name */
+                      consultationCost === cost.toString() && styles.pickerOptionSelected, /* Updated style name */
+                    ]}
+                    onPress={() => selectConsultationCost(cost)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText, /* Updated style name */
+                        consultationCost === cost.toString() &&
+                          styles.countryItemTextSelected, /* Reused style for selected text */
+                      ]}
+                    >
+                      ${cost}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable
+                style={[styles.button, styles.buttonClose]} /* Updated style names */
+                onPress={closeConsultationCostModal}
+              >
+                <Text style={styles.textStyle}>{t("close")}</Text> 
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Experience Years Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isExperienceYearsModalVisible}
+        onRequestClose={closeExperienceYearsModal}
+      >
+        <TouchableWithoutFeedback onPress={closeExperienceYearsModal}>
+          <View style={styles.centeredView}> 
+            <View style={[styles.modalContentYears, styles.modalBorder]}> 
+              <ScrollView style={styles.pickerScrollView}> {/* Reusing pickerScrollView */}
+                {experienceYearsOptions.map((year) => (
+                  <Pressable
+                    key={year}
+                    style={[
+                      styles.pickerOption, /* Reusing pickerOption */
+                      experienceYears === year && styles.pickerOptionSelected, /* Reusing pickerOptionSelected */
+                    ]}
+                    onPress={() => selectExperienceYears(year)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText, /* Reusing pickerOptionText */
+                        experienceYears === year && styles.countryItemTextSelected, /* Reusing selectedOptionText for consistency */
+                      ]}
+                    >
+                      {formatYearsText(year)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable
+                style={[styles.button, styles.buttonClose]} /* Updated style names */
+                onPress={closeExperienceYearsModal}
+              >
+                <Text style={styles.textStyle}>{t("close")}</Text> 
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1600,6 +1637,31 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Bold",
     marginLeft: 8,
   },
+  
+    modalContentYears: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    width: "80%",
+    maxHeight: "70%", // Можна налаштувати висоту
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  saveButton: (width) => ({ // Тут saveButton визначено як функція
+    backgroundColor: "#0EB3EB",
+    borderRadius: 555,
+    paddingVertical: 15,
+    width: width * 0.9,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    marginBottom: 40,
+  }),
 });
 
 export default Anketa_Settings;
