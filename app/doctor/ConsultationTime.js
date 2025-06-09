@@ -6,133 +6,256 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  Alert, // Using Alert for simple messages as per previous context
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTranslation } from 'react-i18next'; // For localization
+import { useTranslation } from 'react-i18next';
+import { supabase } from '../../providers/supabaseClient';
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = (width - 60) / 3; // For 3 columns: total width - horizontal padding / 3
+const ITEM_WIDTH = (width - 60) / 3;
 
 const ConsultationTime = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
-  const doctorId = route.params?.doctorId; // Assuming doctorId is passed via route params
+  const doctorId = route.params?.doctorId;
+  console.log("Current doctorId (on load):", doctorId);
 
-  const [scheduleData, setScheduleData] = useState([]);
-  const [selectedSlot, setSelectedSlot] = useState(null); // State to hold the currently selected slot
+  const [doctorAvailableSlots, setDoctorAvailableSlots] = useState({});
+  const [scheduleData, setScheduleData] = useState([]); // Початковий стан - порожній масив
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Function to generate the schedule for the next 14 days
   const generateSchedule = useCallback(() => {
     const today = new Date();
     const days = [];
-    for (let i = 0; i < 14; i++) { // Generate for 14 days
+    for (let i = 0; i < 14; i++) {
       const currentDay = new Date(today);
       currentDay.setDate(today.getDate() + i);
 
-      // Format date for display (e.g., "Понеділок 1 травня")
-      // Using 'uk-UA' locale for Ukrainian formatting
       const options = { weekday: 'long', day: 'numeric', month: 'long' };
       const displayDate = new Intl.DateTimeFormat('uk-UA', options).format(currentDay);
+      const dateString = currentDay.toISOString().split('T')[0];
 
       const slots = [];
-      // Generate hourly slots from 9 AM to 5 PM (inclusive of 5 PM start, ending at 6 PM)
       for (let hour = 9; hour <= 17; hour++) {
         const startHour = String(hour).padStart(2, '0');
-        const endHour = String(hour + 1).padStart(2, '0');
+        const slotId = `${dateString}-${startHour}:00`;
         slots.push({
-          time: `${startHour}:00-${endHour}:00`,
-          // Simulate availability: roughly 70% available
-          available: Math.random() > 0.3,
-          // Unique ID for each slot
-          id: `${currentDay.toDateString()}-${startHour}:00`,
-          date: currentDay.toISOString().split('T')[0], // YYYY-MM-DD for easier handling
-          rawTime: `${startHour}:00`, // Store raw time for selection
+          time: `${startHour}:00-${String(hour + 1).padStart(2, '0')}:00`,
+          id: slotId,
+          date: dateString,
+          rawTime: `${startHour}:00`,
         });
       }
       days.push({
         date: currentDay,
-        displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1), // Capitalize first letter
+        displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
         slots: slots,
       });
     }
-    return days;
+    console.log("Schedule generated:", days);
+    return days; // Завжди повертає масив
   }, []);
 
+  const fetchDoctorSchedule = useCallback(async () => {
+    if (!doctorId) {
+      console.warn("No doctorId provided to fetch schedule. Cannot fetch.");
+      setLoading(false);
+      setScheduleData(generateSchedule()); // Забезпечуємо ініціалізацію scheduleData
+      return;
+    }
+    setLoading(true);
+    console.log("Attempting to fetch doctor schedule for doctorId:", doctorId);
+    try {
+      const { data, error } = await supabase
+        .from('doctor_availability')
+        .select('date, time_slot')
+        .eq('doctor_id', doctorId)
+        .gte('date', new Date().toISOString().split('T')[0]);
+
+      if (error) {
+        console.error("Error fetching doctor schedule:", error.message);
+        Alert.alert(t('error'), t('failed_to_load_schedule'));
+        setScheduleData(generateSchedule()); // Забезпечуємо ініціалізацію scheduleData
+        return;
+      }
+
+      const fetchedSlots = {};
+      // *** Важлива зміна: Перевірка, чи data є масивом ***
+      if (Array.isArray(data)) {
+        data.forEach(item => {
+          const formattedTimeSlot = item.time_slot.substring(0, 5);
+          const slotId = `${item.date}-${formattedTimeSlot}`;
+          fetchedSlots[slotId] = true;
+        });
+      } else {
+        console.warn("Supabase returned non-array data, or data is null/undefined:", data);
+      }
+
+      console.log("Fetched slots from DB (fetchedSlots object):", fetchedSlots); 
+      setDoctorAvailableSlots(fetchedSlots);
+      setScheduleData(generateSchedule());
+      console.log("Doctor schedule fetched and states updated.");
+    } catch (err) {
+      console.error("Catch error fetching doctor schedule:", err.message);
+      Alert.alert(t('error'), t('failed_to_load_schedule'));
+      setScheduleData(generateSchedule()); // Забезпечуємо ініціалізацію scheduleData
+    } finally {
+      setLoading(false);
+    }
+  }, [doctorId, t, generateSchedule]);
+
   useEffect(() => {
-    setScheduleData(generateSchedule());
-  }, [generateSchedule]);
+    fetchDoctorSchedule();
+  }, [fetchDoctorSchedule]);
+
+  const handleSlotPress = (slot) => {
+    setDoctorAvailableSlots(prevSlots => {
+      const newSlots = { ...prevSlots };
+      const wasSelected = newSlots[slot.id];
+      if (wasSelected) {
+        delete newSlots[slot.id];
+        console.log(`Slot ${slot.id} deselected.`);
+      } else {
+        newSlots[slot.id] = true;
+        console.log(`Slot ${slot.id} selected.`);
+      }
+      return newSlots;
+    });
+  };
+
+  const saveDoctorAvailability = async () => {
+    if (!doctorId) {
+      Alert.alert(t('error'), t('doctor_id_missing'));
+      return;
+    }
+    setSaving(true);
+    console.log("Attempting to save doctor availability...");
+    try {
+      const slotsToSave = [];
+      // Додамо перевірку Array.isArray для scheduleData
+      if (Array.isArray(scheduleData)) { 
+        scheduleData.forEach(dayData => {
+          // Додамо перевірку Array.isArray для dayData.slots
+          if (Array.isArray(dayData.slots)) { 
+            dayData.slots.forEach(slot => {
+              if (doctorAvailableSlots[slot.id]) {
+                slotsToSave.push({
+                  doctor_id: doctorId,
+                  date: slot.date,
+                  time_slot: slot.rawTime,
+                });
+              }
+            });
+          }
+        });
+      }
+
+      console.log("Slots prepared for insertion:", slotsToSave);
+
+      const todayDateString = new Date().toISOString().split('T')[0];
+      console.log(`Deleting doctor's availability for doctor_id: ${doctorId} from date: ${todayDateString}`);
+      const { error: deleteError } = await supabase
+        .from('doctor_availability')
+        .delete()
+        .eq('doctor_id', doctorId)
+        .gte('date', todayDateString);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+      console.log("Old slots deleted successfully.");
+
+      if (slotsToSave.length > 0) {
+        const { error: insertError } = await supabase
+          .from('doctor_availability')
+          .insert(slotsToSave);
+
+        if (insertError) {
+          throw insertError;
+        }
+        console.log("New slots inserted successfully.");
+      } else {
+        console.log("No slots to insert (all were de-selected or none selected).");
+      }
+
+      Alert.alert(t('success'), t('schedule_saved_successfully'));
+    } catch (err) {
+      console.error("Error saving doctor availability:", err.message);
+      Alert.alert(t('error'), `${t('failed_to_save_schedule')}: ${err.message}`);
+    } finally {
+      setSaving(false);
+      console.log("Saving process finished. Re-fetching schedule...");
+      fetchDoctorSchedule();
+    }
+  };
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
-  const handleSlotPress = (slot) => {
-    if (slot.available) {
-      setSelectedSlot(slot);
-      Alert.alert(
-        t('confirm_appointment'),
-        `${t('you_selected')}: ${slot.displayDate || ''} ${slot.time}\n${t('for_doctor')}: ${doctorId || t('unknown_doctor')}`,
-        [
-          {
-            text: t('cancel'),
-            onPress: () => setSelectedSlot(null),
-            style: 'cancel',
-          },
-          {
-            text: t('confirm'),
-            onPress: () => {
-              // Here you would typically send this booking information to your backend
-              console.log('Confirmed booking:', slot);
-              Alert.alert(t('booking_confirmed'), t('your_appointment_is_booked'));
-              // Navigate back or to a confirmation screen
-              // navigation.navigate('ConfirmationScreen', { selectedSlot: slot, doctorId });
-            },
-          },
-        ]
-      );
-    } else {
-      Alert.alert(t('slot_unavailable'), t('this_time_slot_is_already_booked'));
-    }
-  };
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0EB3EB" />
+        <Text style={styles.loadingText}>{t('loading_schedule')}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('appointment')}</Text>
-        <View style={{ width: 48 }} /> {/* Placeholder to keep title centered */}
+        <Text style={styles.headerTitle}>{t('set_my_availability')}</Text>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={saveDoctorAvailability}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>{t('save_schedule')}</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
-        {scheduleData.map((dayData, dayIndex) => (
+        {/* *** Ключова зміна: Перевірка Array.isArray перед .map *** */}
+        {Array.isArray(scheduleData) && scheduleData.map((dayData, dayIndex) => (
           <View key={dayIndex} style={styles.dayContainer}>
             <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
             <View style={styles.slotsContainer}>
-              {dayData.slots.map((slot, slotIndex) => (
-                <TouchableOpacity
-                  key={slot.id}
-                  style={[
-                    styles.timeSlotButton,
-                    !slot.available && styles.timeSlotButtonUnavailable,
-                    selectedSlot?.id === slot.id && styles.timeSlotButtonSelected,
-                  ]}
-                  onPress={() => handleSlotPress({ ...slot, displayDate: dayData.displayDate })}
-                  disabled={!slot.available}
-                >
-                  <Text style={[
-                    styles.timeSlotText,
-                    !slot.available && styles.timeSlotTextUnavailable,
-                    selectedSlot?.id === slot.id && styles.timeSlotTextSelected,
-                  ]}>
-                    {slot.time}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {/* *** Ключова зміна: Перевірка Array.isArray перед .map *** */}
+              {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
+                const isSlotSelected = doctorAvailableSlots[slot.id];
+                console.log(`Slot ID: ${slot.id}, isSlotSelected: ${isSlotSelected}`);
+                return (
+                  <TouchableOpacity
+                    key={slot.id}
+                    style={[
+                      styles.timeSlotButton,
+                      isSlotSelected && styles.timeSlotButtonSelected,
+                      !isSlotSelected && styles.timeSlotButtonUnavailable,
+                    ]}
+                    onPress={() => handleSlotPress(slot)}
+                  >
+                    <Text style={[
+                      styles.timeSlotText,
+                      isSlotSelected && styles.timeSlotTextSelected,
+                      !isSlotSelected && styles.timeSlotTextUnavailable,
+                    ]}>
+                      {slot.time}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         ))}
@@ -145,6 +268,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#333',
   },
   header: {
     flexDirection: 'row',
@@ -172,7 +306,20 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
-    fontFamily: 'Mont-Bold', // Assuming you have this font
+    // fontFamily: 'Mont-Bold',
+  },
+  saveButton: {
+    backgroundColor: '#0EB3EB',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    // fontFamily: 'Mont-Medium',
   },
   scrollViewContent: {
     paddingHorizontal: 15,
@@ -197,23 +344,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#CFD8DC',
     paddingBottom: 5,
-    fontFamily: 'Mont-Bold',
+    // fontFamily: 'Mont-Bold',
   },
   slotsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    // alignContent: 'flex-start', // Align content to the start of the cross axis
   },
   timeSlotButton: {
     width: ITEM_WIDTH,
-    backgroundColor: '#90CAF9', // Light blue
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#64B5F6',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -221,11 +365,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   timeSlotButtonUnavailable: {
-    backgroundColor: '#E0E0E0', // Grey for unavailable
+    backgroundColor: '#E0E0E0',
     borderColor: '#BDBDBD',
   },
   timeSlotButtonSelected: {
-    backgroundColor: '#0EB3EB', // A darker blue for selected
+    backgroundColor: '#0EB3EB',
     borderColor: '#0A8BA6',
     shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 2 },
@@ -234,15 +378,14 @@ const styles = StyleSheet.create({
   },
   timeSlotText: {
     fontSize: 14,
-    color: '#1A237E', // Dark blue text
     fontWeight: '600',
-    fontFamily: 'Mont-Medium',
+    // fontFamily: 'Mont-Medium',
   },
   timeSlotTextUnavailable: {
-    color: '#757575', // Darker grey text for unavailable
+    color: '#757575',
   },
   timeSlotTextSelected: {
-    color: '#FFFFFF', // White text for selected
+    color: '#FFFFFF',
   },
 });
 

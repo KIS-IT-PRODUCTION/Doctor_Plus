@@ -467,7 +467,7 @@ const ChooseSpecial = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "white",
     paddingTop: 0,
   },
   loadingContainer: {
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 35,
     marginRight: 15,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "#3498DB",
   },
   avatarPlaceholder: {
@@ -680,8 +680,9 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
     justifyContent: "flex-end",
+    zIndex: 1000,
   },
   sortModalContainer: {
     backgroundColor: "#fff",
