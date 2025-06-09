@@ -29,6 +29,8 @@ const Login = () => {
   const isLargeScreen = width > 768;
 
   // Перевірка, чи користувач вже увійшов, і перенаправлення (або блокування)
+  // Цей useEffect спрацює ТІЛЬКИ після успішного входу та визначення ролі.
+  // Якщо дані введені неправильно, сесія не буде встановлена, і цей блок не виконається.
   useEffect(() => {
     // Чекаємо, поки AuthProvider завершить своє початкове завантаження
     if (!authLoading && session && session.user) {
@@ -49,6 +51,7 @@ const Login = () => {
   }, [session, navigation, authLoading, userRole, signOut, t]); // Додано signOut та t до залежностей
 
   // Слідкуємо за помилками з AuthProvider
+  // Цей useEffect відобразить будь-які помилки, що виникли під час аутентифікації.
   useEffect(() => {
     if (authError) {
       console.error("Login: AuthProvider error:", authError.message);
@@ -61,27 +64,28 @@ const Login = () => {
   const handleLogin = async () => {
     setLoginError(""); // Очистити попередні помилки
 
-    // Валідація полів
+    // Валідація полів: Якщо поля порожні, встановлюємо помилку і НЕ ПРОДОВЖУЄМО.
     if (!email.trim()) {
       setLoginError(t("error_empty_email"));
-      return;
+      return; // Зупиняє виконання функції, запобігаючи спробі входу
     }
     if (!password.trim()) {
       setLoginError(t("error_empty_password"));
-      return;
+      return; // Зупиняє виконання функції, запобігаючи спробі входу
     }
 
-    setIsLoggingIn(true); // Встановити стан входу в true
+    setIsLoggingIn(true); // Встановити стан входу в true (для індикатора завантаження)
 
     // Використовуємо функцію signIn з AuthProvider
     const { success, error } = await signIn(email, password);
 
+    // Якщо signIn повертає помилку, відображаємо її. Навігації не відбувається.
     if (error) {
       console.error("Login: Помилка входу:", error.message);
       setLoginError(t("error_login_failed", { error: error.message }));
     } else if (success) {
       console.log("Login: Вхід успішний. AuthProvider тепер відповідає за навігацію.");
-      // Сесія оновиться в AuthProvider, і useEffect тут спрацює для навігації
+      // Сесія оновиться в AuthProvider, і useEffect вище спрацює для навігації.
       // Поля вводу очистяться після успішного входу, якщо перенаправлення відбудеться
       setEmail("");
       setPassword("");
@@ -133,6 +137,7 @@ const Login = () => {
           />
         </View>
 
+        {/* Цей блок відображає помилку, якщо loginError містить текст */}
         {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
 
         <TouchableOpacity

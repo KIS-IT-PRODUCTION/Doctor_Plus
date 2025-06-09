@@ -1,4 +1,3 @@
-// providers/AuthProvider.js
 import React, {
   createContext,
   useState,
@@ -113,7 +112,7 @@ export const AuthProvider = ({ children }) => {
 
   // Функція для входу
   const signIn = useCallback(async (email, password) => {
-    setLoading(true);
+    setLoading(true); // Встановлюємо loading в true на початку
     setAuthError(null); // Очищаємо попередні помилки
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -127,7 +126,10 @@ export const AuthProvider = ({ children }) => {
       setAuthError(error);
       return { success: false, error };
     } finally {
-      // setLoading(false); // setLoading відбувається в onAuthStateChange
+      // !!! ВАЖЛИВО: setLoading(false) має бути тут,
+      // щоб скинути індикатор завантаження, навіть якщо вхід не вдався
+      // і onAuthStateChange не спрацював.
+      setLoading(false);
     }
   }, []);
 
@@ -180,7 +182,10 @@ export const AuthProvider = ({ children }) => {
       setAuthError(error);
       return { success: false, error };
     } finally {
-      // setLoading(false); // setLoading відбувається в onAuthStateChange
+      // !!! ВАЖЛИВО: setLoading(false) має бути тут,
+      // щоб скинути індикатор завантаження, навіть якщо реєстрація не вдався
+      // і onAuthStateChange не спрацював.
+      setLoading(false);
     }
   }, []); // Пусті залежності, оскільки supabase стабільний
 

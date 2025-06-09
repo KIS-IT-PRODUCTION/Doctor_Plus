@@ -32,7 +32,7 @@ import Login from "./app/doctor/Login";
 import Anketa_Settings from "./app/doctor/Anketa_Settings";
 import Profile_doctor from "./app/doctor/Profile_doctor";
 import ConsultationTime from "./app/doctor/ConsultationTime";
-
+import ConsultationTimePatient from "./app/ConsultationTimePatient";
 // Запобігаємо автоматичному прихованню Splash Screen, доки програма не буде готова
 SplashScreen.preventAutoHideAsync();
 
@@ -100,8 +100,8 @@ function InitialNavigator() {
       <Stack.Screen name="Review" component={Review} />
       <Stack.Screen name="ChooseSpecial" component={ChooseSpecial} />
       <Stack.Screen name="WriteReview" component={WriteReview} />
-      {/* Для екрану Profile, якщо на нього переходить пацієнт, doctorId потрібно буде передавати звідкись інакше */}
       <Stack.Screen name="Profile" component={Profile} />
+      <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
       <Stack.Screen
         name="Profile_doctor"
         component={Profile_doctor}

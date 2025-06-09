@@ -158,7 +158,7 @@ const Profile = ({ route }) => {
 
   const handleChooseConsultationTime = () => {
     if (doctorId) {
-      navigation.navigate("ConsultationTime", { doctorId: doctorId });
+      navigation.navigate("ConsultationTimePatient", { doctorId: doctorId });
     } else {
       Alert.alert(t("error"), t("doctor_id_missing_for_consultation"));
     }
