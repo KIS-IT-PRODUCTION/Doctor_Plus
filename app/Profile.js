@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,141 +6,429 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import Icon from "../assets/icon.svg"; // Переконайтеся, що шлях правильний
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  TouchableWithoutFeedback,
+  Dimensions,
+  Alert,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { supabase } from "../providers/supabaseClient";
 
-import { useTranslation } from 'react-i18next'; // Імпорт для перекладів
+// Reusable component for displaying values in a styled box
+const ValueBox = ({ children }) => {
+  const isEmpty =
+    !children ||
+    (typeof children === "string" && children.trim() === "") ||
+    (Array.isArray(children) && children.length === 0);
 
-// Функція для відображення прапорів, така ж як і раніше
+  if (isEmpty) {
+    return (
+      <Text style={[styles.value, styles.noValueText]}>Not specified</Text>
+    );
+  }
+  return (
+    <View style={styles.valueBox}>
+      {typeof children === "string" ? (
+        <Text style={styles.valueText}>{children}</Text>
+      ) : (
+        children
+      )}
+    </View>
+  );
+};
+
+// Функція для відображення прапорів мов
 const LanguageFlags = ({ languages }) => {
-    const getFlag = (code) => {
-        switch (code) {
-          case 'UA': return '🇺🇦';
-          case 'DE': return '🇩🇪';
-          default: return '🏳️'; // Дефолтний прапор, якщо не знайдено
-        }
-      };
-    
-      return (
-        <View style={styles.flagsContainer}>
-          {languages.map((lang, index) => (
-            <Text key={index} style={styles.flagText}>{getFlag(lang)}</Text>
-          ))}
-        </View>
-      );
-    };
+  const getFlag = (code) => {
+    switch (String(code).toUpperCase()) {
+      case "UK":
+        return "🇺🇦";
+      case "DE":
+        return "🇩🇪";
+      case "PL":
+        return "🇵🇱";
+      case "EN":
+        return "🇬🇧";
+      case "FR":
+        return "🇫🇷";
+      case "ES":
+        return "🇪🇸";
+      default:
+        return "❓";
+    }
+  };
+
+  if (!languages || languages.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.flagsContainer}>
+      {languages.map(
+        (lang, index) =>
+          typeof lang === "string" && (
+            <Text key={index} style={styles.flagText}>
+              {getFlag(lang)}
+            </Text>
+          )
+      )}
+    </View>
+  );
+};
 
 const Profile = ({ route }) => {
   const navigation = useNavigation();
-  const { t } = useTranslation(); // Використання хука перекладу
+  const { t, i18n } = useTranslation();
 
-  // Приклад даних лікаря (повинні надходити з пропсів або API)
-  // Для демонстрації, використовуємо дані схожі на ті, що у DoctorCard
-  const doctor = {
-    id: '1',
-    avatar: require('../assets/Doctor Photo/doctor.png'),
-    name: 'Слобоженко Іван Сергійович',
-    rating: '🌟🌟🌟🌟🌟', // Або '100%', як у DoctorCard, але на зображенні зірки
-    languages: ['UA', 'DE'],
-    specialization: 'кардіолог, хірург',
-    achievements: 'старший лікар',
-    timeInApp: '1 рік',
-    consultations: '74',
-    aboutMe: 'Я маю багаторічний досвід у діагностиці та лікуванні різноманітних захворювань, що дозволяє мені чітко розуміти потреби пацієнтів та клінічні робочі процеси', // Приклад з зображення
-    certificatePhoto: require('../assets/Doctor Photo/sertuficat.png'), // Додайте шлях до зображення сертифіката
-    workExperience: 'Впровадив новий протокол лікування, що значно покращило результати пацієнтів з певним захворюванням, успішно провів складну операцію, врятувавши життя пацієнту. Очолив дослідницьку групу, яка зробила важливе відкриття у галузі медицини. Отримав нагороду за видатний внесок у охорону здоров’я та громади.', // Приклад з зображення
-    workLocation: 'Кардіолог - у відділенні кардіології обласної лікарні в Києві.', // Приклад з зображення
-  };
+  const doctorId = route.params?.doctorId ? String(route.params.doctorId) : null;
+
+  const [doctor, setDoctor] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [loadingAvatar, setLoadingAvatar] = useState(true);
+  const [loadingCertificate, setLoadingCertificate] = useState(true);
+  const [loadingDiploma, setLoadingDiploma] = useState(true);
+
+  const [avatarError, setAvatarError] = useState(false);
+  const [certificateError, setCertificateError] = useState(false);
+  const [diplomaError, setDiplomaError] = useState(false);
+
+  const formatYearsText = useCallback((years) => {
+    if (years === null || years === undefined || isNaN(years) || years < 0) {
+      return t("not_specified");
+    }
+    return t("years_experience", { count: years });
+  }, [t]);
+
+  const fetchDoctorData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setDoctor(null);
+
+    if (!doctorId) {
+      console.warn("Profile: doctorId is undefined/null, cannot fetch data.");
+      setError(t("doctor_id_missing"));
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("anketa_doctor")
+        .select("*, diploma_url, certificate_photo_url, consultation_cost, experience_years")
+        .eq("user_id", doctorId)
+        .single();
+
+      if (fetchError) {
+        console.error("Error fetching doctor data from Supabase:", fetchError);
+        if (fetchError.code === "PGRST116") {
+             setError(t("doctor_not_found"));
+        } else {
+             setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
+        }
+      } else {
+        setDoctor(data);
+        setLoadingAvatar(true);
+        setLoadingCertificate(true);
+        setLoadingDiploma(true);
+        setAvatarError(false);
+        setCertificateError(false);
+        setDiplomaError(false);
+      }
+    } catch (err) {
+      console.error("Unexpected error during data fetch:", err);
+      setError(`${t("unexpected_error")}: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [doctorId, t]);
+
+  useEffect(() => {
+    fetchDoctorData();
+  }, [fetchDoctorData]);
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
   const handleChooseConsultationTime = () => {
-    console.log('Обрати час консультації');
-    // Тут логіка переходу на екран вибору часу консультації
+    if (doctorId) {
+      navigation.navigate("ConsultationTime", { doctorId: doctorId });
+    } else {
+      Alert.alert(t("error"), t("doctor_id_missing_for_consultation"));
+    }
   };
+
+  const getParsedArray = useCallback((value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value;
+    }
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.warn("Warning: Invalid JSON format for array (expected array or parsable JSON string):", value, e);
+      return [];
+    }
+  }, []);
+
+  const getLanguages = useCallback((languagesData) => {
+    return getParsedArray(languagesData).map((lang) => String(lang).toUpperCase());
+  }, [getParsedArray]);
+
+  const getSpecializations = useCallback((specializationData) => {
+    const parsedSpecs = getParsedArray(specializationData);
+    if (parsedSpecs.length > 0) {
+      if (typeof parsedSpecs[0] === 'string') {
+        return parsedSpecs.map(specValue => t(`categories.${specValue}`)).join(", ");
+      } else if (typeof parsedSpecs[0] === 'object' && parsedSpecs[0].nameKey) {
+        return parsedSpecs.map(specObj => t(`categories.${specObj.nameKey}`)).join(", ");
+      }
+    }
+    return t("not_specified");
+  }, [getParsedArray, t]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0EB3EB" />
+        <Text style={styles.loadingText}>{t("loading_profile_data")}</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => fetchDoctorData()}
+        >
+          <Text style={styles.retryButtonText}>{t("retry")}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backToHomeButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!doctor) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.noDoctorText}>{t("doctor_not_found")}</Text>
+        <TouchableOpacity
+          style={styles.backToHomeButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const {
+    full_name,
+    avatar_url,
+    communication_languages,
+    specialization,
+    experience_years,
+    work_location,
+    consultation_cost,
+    about_me,
+    achievements,
+    certificate_photo_url,
+    diploma_url,
+  } = doctor;
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header for patient view */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBackPress}
+        >
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('profile')}</Text> {/* Переклад "Профіль" */}
-        <View style={styles.rightIcon}>
-          <Icon width={50} height={50} />
-        </View>
+
+        <Text style={styles.headerTitle}>{t("profile")}</Text>
+
+        <View style={{ width: 48 }} />
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
-        {/* Doctor Main Info */}
         <View style={styles.doctorMainInfo}>
-          <Image source={doctor.avatar} style={styles.avatar} />
+          <View style={styles.avatarContainer}>
+            {avatar_url && !avatarError ? (
+              <>
+                {loadingAvatar && (
+                  <ActivityIndicator
+                    size="large"
+                    color="#0EB3EB"
+                    style={styles.avatarLoadingIndicator}
+                  />
+                )}
+                <Image
+                  source={{ uri: avatar_url }}
+                  style={styles.avatar}
+                  onLoad={() => setLoadingAvatar(false)}
+                  onError={() => {
+                    setLoadingAvatar(false);
+                    setAvatarError(true);
+                    console.error("Error loading avatar image:", avatar_url);
+                  }}
+                />
+              </>
+            ) : (
+              <View style={styles.emptyAvatar}>
+                <Ionicons name="person-circle-outline" size={80} color="#3498DB" />
+                <Text style={styles.emptyAvatarText}>{t("no_photo")}</Text>
+              </View>
+            )}
+          </View>
+
           <View style={styles.doctorDetails}>
-            <Text style={styles.doctorName}>{doctor.name}</Text>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>{t('rating')}:</Text> {/* Переклад "Рейтинг" */}
-              <Text style={styles.value}>{doctor.rating}</Text>
+            <Text style={styles.doctorName}>{full_name || t("not_specified")}</Text>
+
+            <View style={styles.infoRowDynamic}>
+              <Text style={styles.label}>{t("rating")}:</Text>
+              <ValueBox>🌟🌟</ValueBox>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>{t('communication_language')}:</Text> {/* Переклад "Мова спілкування" */}
-              <LanguageFlags languages={doctor.languages} />
+
+            <View style={styles.infoRowDynamic}>
+              <Text style={styles.label}>{t("communication_language")}:</Text>
+              <ValueBox>
+                <LanguageFlags languages={getLanguages(communication_languages)} />
+              </ValueBox>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>{t('specialization')}:</Text> {/* Переклад "Спеціалізація" */}
-              <Text style={styles.value}>{doctor.specialization}</Text>
+
+            <View style={styles.infoRowDynamic}>
+              <Text style={styles.label}>{t("specialization")}:</Text>
+              <ValueBox>{getSpecializations(specialization)}</ValueBox>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>{t('achievements')}:</Text> {/* Переклад "Досягнення" */}
-              <Text style={styles.value}>{doctor.achievements}</Text>
+
+            <View style={styles.infoRowDynamic}>
+              <Text style={styles.label}>{t("work_experience")}:</Text>
+              <ValueBox>
+                {formatYearsText(experience_years)}
+              </ValueBox>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>{t('time_in_app')}:</Text> {/* Переклад "Час в додатку" */}
-              <Text style={styles.value}>{doctor.timeInApp}</Text>
+
+            <View style={styles.infoRowDynamic}>
+              <Text style={styles.label}>{t("work_location")}:</Text>
+              <ValueBox>{work_location || t("not_specified")}</ValueBox>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>{t('consultations_count')}:</Text> {/* Переклад "Кількість консультацій" */}
-              <Text style={styles.value}>{doctor.consultations}</Text>
+
+            <View style={styles.infoRowDynamic}>
+              <Text style={styles.label}>{t("consultation_cost")}:</Text>
+              <ValueBox>
+                {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
+              </ValueBox>
             </View>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.consultationButton} onPress={handleChooseConsultationTime}>
-          <Text style={styles.consultationButtonText}>{t('choose_consultation_time')}</Text> {/* Переклад "Обрати час консультації" */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={handleChooseConsultationTime}
+        >
+          <Text style={styles.actionButtonText}>
+            {t("choose_consultation_time")}
+          </Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitleLink}>{t('more_about_doctor')}</Text> {/* Переклад "Більше інформації про лікаря" */}
+        <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
 
-        {/* About Me Section */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t('about_me')}</Text> {/* Переклад "Про себе" */}
-          <Text style={styles.sectionContent}>{doctor.aboutMe}</Text>
+          <Text style={styles.sectionHeader}>{t("about_me")}</Text>
+          <Text style={styles.sectionContent}>
+            {about_me || t("not_specified")}
+          </Text>
+        </View>
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>{t("achievements")}</Text>
+          <Text style={styles.sectionContent}>
+            {achievements || t("not_specified")}
+          </Text>
         </View>
 
-        {/* Certificate Section */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t('certificate_photo')}</Text> {/* Переклад "Фото сертифіката" */}
-          {doctor.certificatePhoto && (
-            <Image source={doctor.certificatePhoto} style={styles.certificateImage} />
+          <Text style={styles.sectionHeader}>{t("place_of_work")}</Text>
+          <Text style={styles.sectionContent}>
+            {work_location || t("not_specified")}
+          </Text>
+        </View>
+
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
+          {certificate_photo_url && !certificateError ? (
+            <View style={styles.imageWrapper}>
+              {loadingCertificate && (
+                <ActivityIndicator
+                  size="small"
+                  color="#0EB3EB"
+                  style={styles.imageLoadingIndicator}
+                />
+              )}
+              <Image
+                source={{ uri: certificate_photo_url }}
+                style={styles.certificateImage}
+                onLoad={() => setLoadingCertificate(false)}
+                onError={() => {
+                  setLoadingCertificate(false);
+                  setCertificateError(true);
+                  console.error("Error loading certificate image:", certificate_photo_url);
+                }}
+              />
+            </View>
+          ) : (
+            <View style={styles.emptyImage}>
+              <Ionicons name="image-outline" size={60} color="#A7D9EE" />
+              <Text style={styles.emptyImageText}>{t("no_certificate_photo")}</Text>
+            </View>
           )}
         </View>
 
-        {/* Achievements / Work Experience Section */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t('achievements')}</Text> {/* Переклад "Досягнення" (або "Досвід роботи" якщо це більш підходить) */}
-          <Text style={styles.sectionContent}>{doctor.workExperience}</Text>
+          <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
+          {diploma_url && !diplomaError ? (
+            <View style={styles.imageWrapper}>
+              {loadingDiploma && (
+                <ActivityIndicator
+                  size="small"
+                  color="#0EB3EB"
+                  style={styles.imageLoadingIndicator}
+                />
+              )}
+              <Image
+                source={{ uri: diploma_url }}
+                style={styles.certificateImage}
+                onLoad={() => setLoadingDiploma(false)}
+                onError={() => {
+                  setLoadingDiploma(false);
+                  setDiplomaError(true);
+                  console.error("Error loading diploma image:", diploma_url);
+                }}
+              />
+            </View>
+          ) : (
+            <View style={styles.emptyImage}>
+              <Ionicons name="image-outline" size={60} color="#A7D9EE" />
+              <Text style={styles.emptyImageText}>{t("no_diploma_photo")}</Text>
+            </View>
+          )}
         </View>
-
-        {/* Work Location Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t('place_of_work')}</Text> {/* Переклад "Місце роботи" */}
-          <Text style={styles.sectionContent}>{doctor.workLocation}</Text>
-        </View>
-
       </ScrollView>
     </View>
   );
@@ -149,21 +437,77 @@ const Profile = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "white",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#000000",
+    fontFamily: "Mont-Regular",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#ffebee",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#000000",
+    textAlign: "center",
+    marginBottom: 15,
+    fontFamily: "Mont-Regular",
+  },
+  retryButton: {
+    backgroundColor: "#0EB3EB",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+  },
+  retryButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "bold",
+    fontFamily: "Mont-Bold",
+  },
+  noDoctorText: {
+    fontSize: 18,
+    textAlign: "center",
+    color: "#000000",
+    marginTop: 50,
+    fontFamily: "Mont-Regular",
+  },
+  backToHomeButton: {
+    backgroundColor: "#0EB3EB",
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    marginTop: 20,
+  },
+  backToHomeButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "bold",
+    fontFamily: "Mont-Bold",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
     paddingTop: 50,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   backButton: {
-    marginRight: 15,
     backgroundColor: "rgba(14, 179, 235, 0.2)",
     borderRadius: 25,
     width: 48,
@@ -173,138 +517,238 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#000000",
     flex: 1,
-    textAlign: 'center',
-  },
-  rightIcon: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 15,
+    textAlign: "center",
+    marginHorizontal: 10,
+    fontFamily: "Mont-Bold",
   },
   scrollViewContent: {
     paddingHorizontal: 15,
     paddingBottom: 20,
   },
   doctorMainInfo: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: "#E3F2FD",
     borderRadius: 15,
     padding: 20,
     marginTop: 20,
-    alignItems: 'center',
+    alignItems: "center",
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    position: "relative",
+  },
+  avatarContainer: {
+    width: 115,
+    height: 115,
+    borderRadius: 50,
+    marginBottom: 15,
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: 'hidden', // Ensures content stays within bounds
   },
   avatar: {
-    width: 100,
-    height: 100,
+    width: 115,
+    height: 115,
     borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#3498DB',
-    marginBottom: 15,
+    borderWidth: 0.5,
+    borderColor: "#3498DB",
+  },
+  emptyAvatar: {
+    width: 115,
+    height: 115,
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyAvatarText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 5,
+    fontFamily: "Mont-Regular",
   },
   doctorDetails: {
-    width: '100%',
+    width: "100%",
   },
   doctorName: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#000000",
+    textAlign: "center",
     marginBottom: 10,
+    fontFamily: "Mont-Bold",
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
+  infoRowDynamic: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#CFD8DC',
-    paddingBottom: 5,
+    borderBottomColor: "#CFD8DC",
+    paddingBottom: 8,
   },
   label: {
     fontSize: 15,
-    color: '#555',
-    fontWeight: '500',
+    color: "#000000",
+    fontWeight: "500",
+    fontFamily: "Mont-Regular",
+    marginBottom: 5,
   },
-  value: {
+  valueBox: {
+    backgroundColor: "#D1E8F6",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: "stretch",
+  },
+  valueText: {
     fontSize: 15,
-    color: '#333',
-    fontWeight: 'normal',
-    flexShrink: 1, // Дозволяє тексту переноситися
+    color: "#000000",
+    fontFamily: "Mont-Medium",
+    textAlign: "left",
+  },
+  noValueText: {
+    color: "#777",
+    fontStyle: "italic",
+    fontFamily: "Mont-Regular",
+    paddingTop: 0,
   },
   flagsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
   },
   flagText: {
     fontSize: 18,
     marginRight: 5,
   },
-  consultationButton: {
-    backgroundColor: '#0EB3EB',
+  actionButton: {
+    backgroundColor: "#0EB3EB",
     paddingVertical: 15,
     borderRadius: 25,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 20,
     marginHorizontal: 15,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
-  consultationButtonText: {
-    color: '#FFF',
+  actionButtonText: {
+    color: "#FFF",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
+    fontFamily: "Mont-Bold",
   },
   sectionTitleLink: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0EB3EB',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#000000",
+    textAlign: "center",
     marginTop: 25,
     marginBottom: 15,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
+    fontFamily: "Mont-Bold",
   },
   sectionContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#E3F2FD",
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+    position: "relative",
   },
   sectionHeader: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#000000",
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#CFD8DC",
     paddingBottom: 5,
+    fontFamily: "Mont-Bold",
   },
   sectionContent: {
     fontSize: 14,
-    color: '#555',
+    color: "#000000",
     lineHeight: 20,
+    fontFamily: "Mont-Regular",
   },
-  certificateImage: {
-    width: '100%',
-    height: 200, // Регулюйте висоту за потребою
-    resizeMode: 'contain', // Або 'cover'
+  imageWrapper: {
+    width: "100%",
+    height: 200,
     borderRadius: 10,
     marginTop: 10,
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  certificateImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "contain",
+    borderRadius: 10,
+  },
+  noImageText: {
+    textAlign: "center",
+    marginTop: 10,
+    fontStyle: "italic",
+    fontFamily: "Mont-Regular",
+    color: "#000000",
+  },
+  emptyImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 10,
+    marginTop: 10,
+    backgroundColor: "#f0f0f0",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyImageText: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 5,
+    fontFamily: "Mont-Regular",
+  },
+  imageLoadingIndicator: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: 10,
+  },
+  avatarLoadingIndicator: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: 50,
   },
 });
 

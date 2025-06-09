@@ -299,5 +299,10 @@
   "select_experience_placeholder": "Select experience",
   "year_singular": "year",
   "years_plural_nominative": "years",
-  "years_plural_genitive": "years"
+  "years_plural_genitive": "years",
+  "years_experience": "{{count}} years experience",
+   "days_in_app": "{{count}} days",
+  "months_in_app": "{{count}} months",
+  "years_in_app": "{{count}} years"
+
 }

@@ -76,7 +76,7 @@ const DoctorCard = ({ doctor }) => {
 
   const handleGoToDoctor = () => {
     console.log(`Перейти до лікаря: ${doctor.full_name}`);
-    navigation.navigate("Profile_doctor", { doctorId: doctor.user_id });
+    navigation.navigate("Profile", { doctorId: doctor.user_id });
   };
 
   return (
