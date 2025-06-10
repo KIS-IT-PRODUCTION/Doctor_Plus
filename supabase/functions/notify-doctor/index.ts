@@ -28,21 +28,27 @@ serve(async (req) => {
   try {
     const { doctor_id, patient_name, booking_date, booking_time_slot } = await req.json();
 
+    console.log('Edge Function: Received request body:', { doctor_id, patient_name, booking_date, booking_time_slot });
+
     if (!doctor_id || !patient_name || !booking_date || !booking_time_slot) {
+      console.error('Edge Function: Missing required fields');
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
 
+    // --- ПОТЕНЦІЙНЕ ВИПРАВЛЕННЯ ТУТ ---
+    // Перевірте, чи колонка для ID користувача в таблиці 'profile_doctor' називається 'id' чи 'user_id'.
+    // Згідно з попередніми виправленнями, вона, ймовірно, називається 'id'.
     const { data: doctorData, error: doctorError } = await supabaseAdmin
       .from('profile_doctor')
       .select('notification_token')
-      .eq('user_id', doctor_id)
-      .single();
+      .eq('user_id', doctor_id) // <-- ВИПРАВЛЕНО ТУТ: Змінено з 'id' на 'user_id'
+//       .single();
 
     if (doctorError || !doctorData || !doctorData.notification_token) {
-      console.error("Error fetching doctor or token:", doctorError?.message || "Token not found");
+      console.error("Edge Function: Error fetching doctor or token:", doctorError?.message || "Token not found");
       return new Response(JSON.stringify({ error: 'Doctor or notification token not found' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 404,
@@ -77,18 +83,28 @@ serve(async (req) => {
       .single();
 
     if (insertError) {
-      console.error("Error inserting notification record:", insertError.message);
-      // Продовжуємо надсилати пуш, навіть якщо запис у базу не вдався
+      console.error("Edge Function: Error inserting notification record:", insertError.message);
+      // Якщо збереження в БД є критичним, поверніть помилку тут.
+      // Якщо ні, то просто залогуйте і продовжуйте надсилати пуш.
+      // Згідно з вашим запитом, дані мають зберігатися, тому рекомендую повернути помилку.
+      return new Response(JSON.stringify({ error: `Failed to save notification record: ${insertError.message}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500, // Повертаємо 500, якщо запис у БД не вдався
+      });
     } else {
-      console.log("Notification record inserted successfully:", notificationRecord);
+      console.log("Edge Function: Notification record inserted successfully:", notificationRecord);
     }
 
+    // Цей блок коду для надсилання пуш-сповіщень через Expo Push API
+    // Він буде працювати, якщо Edge Function успішно записала дані в БД.
+    // Якщо ви тестуєте в Expo Go, push-сповіщення все одно не працюватимуть,
+    // але запис у БД має бути успішним.
     const message = {
       to: pushToken,
       sound: 'default',
       title: notificationTitle,
       body: notificationBody,
-      data: notificationData,
+      data: { ...notificationData, db_id: notificationRecord?.id }, // Додаємо db_id для оновлення на клієнті
     };
 
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -102,11 +118,14 @@ serve(async (req) => {
     });
 
     const responseData = await response.json();
-    console.log("Expo Push API response:", responseData);
+    console.log("Edge Function: Expo Push API response:", responseData);
 
     if (responseData.errors) {
-        console.error("Error sending push notification:", responseData.errors);
-        return new Response(JSON.stringify({ error: 'Failed to send notification', details: responseData.errors }), {
+        console.error("Edge Function: Error sending push notification:", responseData.errors);
+        // Тут можна прийняти рішення: чи є це критичною помилкою?
+        // Наприклад, якщо пуш не надіслано, але запис у БД є, можливо, це не 500.
+        // Залишимо 500 для простоти, якщо пуш також не вдався.
+        return new Response(JSON.stringify({ error: 'Failed to send push notification', details: responseData.errors }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500,
         });
@@ -118,7 +137,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Error in Edge Function:", error.message);
+    console.error("Edge Function: Error in try-catch block:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

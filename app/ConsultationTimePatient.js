@@ -1,3 +1,5 @@
+// ConsultationTimePatient.js
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -14,14 +16,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../providers/supabaseClient'; // Переконайтеся, що шлях правильний
 
+// --- КОНСТАНТИ ТА НАЛАШТУВАННЯ ---
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
 
-// !!! НОВЕ: Константа для URL вашої Edge Function
-// ПЕРЕВІРТЕ ЩЕ РАЗ, ЧИ ЦЕ ТОЧНО ВАШ URL ПРОЕКТУ
+// !!! ВАЖЛИВО: Замініть цей URL на URL вашої Supabase Edge Function
+// Ви знайдете його в панелі керування Supabase -> Edge Functions -> Ваша функція 'notify-doctor'
 const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor';
+// Якщо ви тестуєте локально з `supabase functions serve`, URL буде щось на зразок:
+// const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'http://localhost:54321/functions/v1/notify-doctor';
 
 
+// --- ОСНОВНИЙ КОМПОНЕНТ ---
 const ConsultationTimePatient = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -29,7 +35,7 @@ const ConsultationTimePatient = ({ route }) => {
   console.log("Booking screen: doctorId:", doctorId);
 
   const [patientId, setPatientId] = useState(null); // ID поточного пацієнта
-  const [patientProfile, setPatientProfile] = useState(null); // !!! НОВЕ: Для зберігання профілю пацієнта (ім'я)
+  const [patientProfile, setPatientProfile] = useState(null); // Для зберігання профілю пацієнта (ім'я)
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false); // Для індикатора завантаження під час бронювання
@@ -57,11 +63,11 @@ const ConsultationTimePatient = ({ route }) => {
         setPatientId(user.id);
         console.log("Current patientId:", user.id);
 
-        // !!! НОВЕ: Отримання профілю пацієнта для його імені
+        // Отримання профілю пацієнта для його імені
         const { data: profileData, error: profileError } = await supabase
           .from('profiles') // Або 'profile_patient', залежно від вашої таблиці
           .select('full_name') // Або 'first_name', 'last_name', тощо
-          .eq('user_id', user.id)
+          .eq('id', user.id) // <--- ВИПРАВЛЕНО ТУТ: змінено з 'user_id' на 'id'
           .single();
 
         if (profileError) {
@@ -159,7 +165,7 @@ const ConsultationTimePatient = ({ route }) => {
       if (Array.isArray(bookedData)) {
         bookedData.forEach(item => {
           const formattedTimeSlot = item.booking_time_slot.substring(0, 5);
-          const slotId = `${item.booking_date}-${formattedTimeSlot}`;
+          const slotId = `${item.date}-${formattedTimeSlot}`;
           allBookedMap[slotId] = true;
           if (item.patient_id === patientId) {
             myBookings[slotId] = true;
@@ -182,7 +188,7 @@ const ConsultationTimePatient = ({ route }) => {
   }, [doctorId, patientId, t, generateSchedule]);
 
   useEffect(() => {
-    // !!! Змінено: тепер також очікуємо patientProfile, щоб отримати ім'я пацієнта
+    // Чекаємо, поки будуть доступні doctorId, patientId та patientProfile
     if (doctorId && patientId && patientProfile) {
       fetchAvailableSlotsAndBookings();
     }
@@ -227,7 +233,7 @@ const ConsultationTimePatient = ({ route }) => {
     }
   };
 
-  // !!! НОВА ФУНКЦІЯ: для виклику Edge Function
+  // ФУНКЦІЯ: для виклику Edge Function для надсилання сповіщення лікарю
   const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot) => {
     console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot });
     try {
@@ -235,6 +241,8 @@ const ConsultationTimePatient = ({ route }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // Можливо, вам знадобиться додати авторизаційний заголовок, якщо ваша Edge Function захищена
+          // 'Authorization': `Bearer ${await supabase.auth.getSession()?.access_token}`
         },
         body: JSON.stringify({
           doctor_id: doctorId,
@@ -276,7 +284,7 @@ const ConsultationTimePatient = ({ route }) => {
       Alert.alert(t('error'), t('doctor_id_missing_cannot_book'));
       return;
     }
-    // !!! НОВЕ: Перевірка наявності імені пацієнта
+    // Перевірка наявності імені пацієнта
     if (!patientProfile || !patientProfile.full_name) {
       Alert.alert(t('error'), t('failed_to_get_patient_name'));
       return;
@@ -321,11 +329,13 @@ const ConsultationTimePatient = ({ route }) => {
       }
 
       // 3. Видалення попередніх бронювань цього пацієнта для цього лікаря (якщо пацієнт може мати лише одне активне бронювання)
+      // Цей крок гарантує, що у пацієнта є лише одне активне бронювання для цього лікаря.
+      // Якщо ви хочете дозволити кілька бронювань, видаліть цей блок.
       const { error: deletePrevError } = await supabase
         .from('patient_bookings')
         .delete()
         .eq('patient_id', patientId)
-        .eq('doctor_id', doctorId); // Видаляємо лише бронювання цього пацієнта з цим лікарем
+        .eq('doctor_id', doctorId);
       if (deletePrevError) {
         console.warn("Warning: Could not delete previous booking (if any):", deletePrevError.message);
       }
@@ -343,8 +353,8 @@ const ConsultationTimePatient = ({ route }) => {
       if (insertError) throw insertError;
 
       Alert.alert(t('success'), t('slot_booked_successfully'));
-      
-      // !!! НОВЕ: Виклик Edge Function для надсилання сповіщення
+
+      // Виклик Edge Function для надсилання сповіщення
       const notificationSent = await sendNotificationViaEdgeFunction(
         doctorId,
         patientProfile.full_name, // Використовуємо отримане ім'я пацієнта
@@ -357,7 +367,6 @@ const ConsultationTimePatient = ({ route }) => {
       } else {
         console.warn("Failed to trigger notification via Edge Function.");
       }
-
 
       setSelectedSlot(null); // Очищаємо вибір після успішного бронювання
       fetchAvailableSlotsAndBookings(); // Перезавантажуємо слоти, щоб оновити UI (підсвітити нове бронювання)
@@ -479,6 +488,7 @@ const ConsultationTimePatient = ({ route }) => {
   );
 };
 
+// --- СТИЛІ ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -502,16 +512,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    // Змінено на column для вертикального розміщення елементів
     flexDirection: 'column',
-    alignItems: 'center', // Центрування по горизонталі
+    alignItems: 'center',
   },
-  headerTopRow: { // Новий стиль для верхнього ряду (кнопка назад + заголовок)
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%', // Займає всю ширину
-    marginBottom: 10, // Відступ до кнопки бронювання
+    width: '100%',
+    marginBottom: 10,
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.2)",
@@ -525,7 +534,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
-    flex: 1, // Дозволяє зайняти доступний простір, шоб центруватись
+    flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
   },
@@ -541,8 +550,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
-    marginTop: 10, // Додано відступ від заголовка
-    width: '80%', // Можна налаштувати ширину кнопки
+    marginTop: 10,
+    width: '80%',
   },
   bookButtonText: {
     color: '#FFFFFF',
@@ -636,7 +645,7 @@ const styles = StyleSheet.create({
   },
   timeSlotTextBookedByMe: {
     color: '#FFFFFF',
-    fontWeight: '70',
+    fontWeight: '700', // Змінено на 700 для кращої видимості
   },
   timeSlotButtonUnavailableByDoctor: {
     backgroundColor: '#F7F7F7',
