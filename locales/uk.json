@@ -332,5 +332,30 @@
   "schedule_saved_successfully": "Розклад успішно збережено!",
   "failed_to_save_schedule": "Не вдалося зберегти розклад.",
   "failed_to_get_user_info": "Не вдалося отримати інформацію про користувача.",
-  "user_not_logged_in_please_login": "Користувач не увійшов. Будь ласка, увійдіть."
+  "user_not_logged_in_please_login": "Користувач не увійшов. Будь ласка, увійдіть.",
+    "selectSpecialization": "Обрати спеціалізацію",
+    "loading_specializations": "Завантаження спеціалізацій...",
+    "failed_to_get_patient_profile": "Не вдалося отримати профіль пацієнта",
+    "goTo": "Перейти",
+    "loading_doctors": "Завантаження лікарів...",
+    "confirm_booking": "Підтвердити бронювання",
+    "read": "Прочитано",
+    "confirmed_read": "Підтверджено/Прочитано",
+    "loading_messages": "Завантаження повідомлень...",
+    "failed_to_mark_as_read": "Не вдалося позначити як прочитане",
+    "booking_confirmed_successfully": "Бронювання успішно підтверджено",
+    "failed_to_confirm_booking": "Не вдалося підтвердити бронювання",
+    "patient": "Пацієнт",
+    "booked_on_date": "забронював на дату",
+    "at_time": "на час",
+    "view_details": "Переглянути деталі",
+    "view_booking": "Переглянути бронювання",
+    "mark_as_read": "Позначити як прочитане",
+    
+    "new_booking_notification_title": "Нове бронювання",
+    "ok": "ОК",
+    "locale": "uk-UA",
+    "date": "Дата",
+    "time": "Час"
+    
 }

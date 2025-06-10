@@ -17,6 +17,11 @@ import { supabase } from '../providers/supabaseClient'; // Переконайт�
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
 
+// !!! НОВЕ: Константа для URL вашої Edge Function
+// ПЕРЕВІРТЕ ЩЕ РАЗ, ЧИ ЦЕ ТОЧНО ВАШ URL ПРОЕКТУ
+const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor';
+
+
 const ConsultationTimePatient = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -24,6 +29,7 @@ const ConsultationTimePatient = ({ route }) => {
   console.log("Booking screen: doctorId:", doctorId);
 
   const [patientId, setPatientId] = useState(null); // ID поточного пацієнта
+  const [patientProfile, setPatientProfile] = useState(null); // !!! НОВЕ: Для зберігання профілю пацієнта (ім'я)
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false); // Для індикатора завантаження під час бронювання
@@ -32,28 +38,49 @@ const ConsultationTimePatient = ({ route }) => {
   const [doctorAvailableSlotsMap, setDoctorAvailableSlotsMap] = useState({}); // Слоти, доступні лікарем
   const [allBookedSlotsMap, setAllBookedSlotsMap] = useState({}); // Всі слоти, заброньовані іншими пацієнтами
   const [myBookingsMap, setMyBookingsMap] = useState({}); // Мої особисті бронювання з цим лікарем
-  
+
   const [selectedSlot, setSelectedSlot] = useState(null); // Слот, який пацієнт щойно вибрав
 
-  // Отримуємо ID поточного пацієнта
+  // Отримуємо ID та профіль поточного пацієнта
   useEffect(() => {
-    const getPatientSession = async () => {
+    const getPatientSessionAndProfile = async () => {
+      setLoading(true); // Починаємо завантаження
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
         console.error("Error getting user session:", error.message);
         Alert.alert(t('error'), t('failed_to_get_user_info'));
-        navigation.goBack(); // Повертаємося, якщо не можемо отримати інформацію про користувача
+        navigation.goBack();
+        setLoading(false); // Завершуємо завантаження у випадку помилки
         return;
       }
       if (user) {
         setPatientId(user.id);
         console.log("Current patientId:", user.id);
+
+        // !!! НОВЕ: Отримання профілю пацієнта для його імені
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles') // Або 'profile_patient', залежно від вашої таблиці
+          .select('full_name') // Або 'first_name', 'last_name', тощо
+          .eq('user_id', user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Error fetching patient profile:", profileError.message);
+          Alert.alert(t('error'), t('failed_to_get_patient_profile'));
+          setLoading(false);
+          return;
+        }
+        if (profileData) {
+          setPatientProfile(profileData);
+          console.log("Patient profile:", profileData);
+        }
       } else {
         Alert.alert(t('error'), t('user_not_logged_in_please_login'));
         navigation.goBack();
       }
+      setLoading(false); // Завершуємо завантаження
     };
-    getPatientSession();
+    getPatientSessionAndProfile();
   }, [t, navigation]);
 
   const generateSchedule = useCallback(() => {
@@ -155,10 +182,11 @@ const ConsultationTimePatient = ({ route }) => {
   }, [doctorId, patientId, t, generateSchedule]);
 
   useEffect(() => {
-    if (doctorId && patientId) {
+    // !!! Змінено: тепер також очікуємо patientProfile, щоб отримати ім'я пацієнта
+    if (doctorId && patientId && patientProfile) {
       fetchAvailableSlotsAndBookings();
     }
-  }, [doctorId, patientId, fetchAvailableSlotsAndBookings]);
+  }, [doctorId, patientId, patientProfile, fetchAvailableSlotsAndBookings]);
 
 
   const handleSlotPress = (slot) => {
@@ -199,6 +227,42 @@ const ConsultationTimePatient = ({ route }) => {
     }
   };
 
+  // !!! НОВА ФУНКЦІЯ: для виклику Edge Function
+  const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot) => {
+    console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot });
+    try {
+      const response = await fetch(SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          doctor_id: doctorId,
+          patient_name: patientFullName,
+          booking_date: bookingDate,
+          booking_time_slot: bookingTimeSlot,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Edge Function returned an error:', data.error);
+        Alert.alert(t('error'), `${t('failed_to_send_notification')}: ${data.error || 'Невідома помилка'}`);
+        return false;
+      }
+
+      console.log('Edge Function call successful:', data);
+      return true;
+
+    } catch (error) {
+      console.error('Network or unexpected error calling Edge Function:', error);
+      Alert.alert(t('error'), `${t('failed_to_send_notification')}: ${error.message}`);
+      return false;
+    }
+  };
+
+
   const bookSelectedSlot = async () => {
     if (!selectedSlot) {
       Alert.alert(t('no_slot_selected'), t('please_select_a_slot_to_book'));
@@ -210,6 +274,11 @@ const ConsultationTimePatient = ({ route }) => {
     }
     if (!doctorId) {
       Alert.alert(t('error'), t('doctor_id_missing_cannot_book'));
+      return;
+    }
+    // !!! НОВЕ: Перевірка наявності імені пацієнта
+    if (!patientProfile || !patientProfile.full_name) {
+      Alert.alert(t('error'), t('failed_to_get_patient_name'));
       return;
     }
 
@@ -234,21 +303,21 @@ const ConsultationTimePatient = ({ route }) => {
         .eq('doctor_id', doctorId)
         .eq('booking_date', selectedSlot.date)
         .eq('booking_time_slot', selectedSlot.rawTime);
-      
+
       if (bookingCheckError) throw bookingCheckError;
 
       if (currentBookings && currentBookings.length > 0) {
-          // Якщо слот вже заброньовано, і це не моє попереднє бронювання, кидаємо помилку
-          if (currentBookings[0].patient_id !== patientId) {
-              throw new Error(t('slot_just_booked_by_another_patient'));
-          } else {
-              // Якщо це моє попереднє бронювання, ми його просто оновимо або залишимо
-              console.log("Slot is already booked by current patient, no action needed or consider update/delete previous.");
-              Alert.alert(t('info'), t('slot_already_your_booking'));
-              setSelectedSlot(null); // Clear selection
-              fetchAvailableSlotsAndBookings(); // Re-fetch to update UI
-              return;
-          }
+        // Якщо слот вже заброньовано, і це не моє попереднє бронювання, кидаємо помилку
+        if (currentBookings[0].patient_id !== patientId) {
+          throw new Error(t('slot_just_booked_by_another_patient'));
+        } else {
+          // Якщо це моє попереднє бронювання, ми його просто оновимо або залишимо
+          console.log("Slot is already booked by current patient, no action needed or consider update/delete previous.");
+          Alert.alert(t('info'), t('slot_already_your_booking'));
+          setSelectedSlot(null); // Clear selection
+          fetchAvailableSlotsAndBookings(); // Re-fetch to update UI
+          return;
+        }
       }
 
       // 3. Видалення попередніх бронювань цього пацієнта для цього лікаря (якщо пацієнт може мати лише одне активне бронювання)
@@ -274,8 +343,25 @@ const ConsultationTimePatient = ({ route }) => {
       if (insertError) throw insertError;
 
       Alert.alert(t('success'), t('slot_booked_successfully'));
+      
+      // !!! НОВЕ: Виклик Edge Function для надсилання сповіщення
+      const notificationSent = await sendNotificationViaEdgeFunction(
+        doctorId,
+        patientProfile.full_name, // Використовуємо отримане ім'я пацієнта
+        selectedSlot.date,
+        selectedSlot.rawTime
+      );
+
+      if (notificationSent) {
+        console.log("Notification successfully triggered via Edge Function.");
+      } else {
+        console.warn("Failed to trigger notification via Edge Function.");
+      }
+
+
       setSelectedSlot(null); // Очищаємо вибір після успішного бронювання
       fetchAvailableSlotsAndBookings(); // Перезавантажуємо слоти, щоб оновити UI (підсвітити нове бронювання)
+
     } catch (err) {
       console.error("Error booking slot:", err.message);
       Alert.alert(t('error'), `${t('failed_to_book_slot')}: ${err.message}`);
@@ -306,7 +392,7 @@ const ConsultationTimePatient = ({ route }) => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('book_consultation')}</Text>
           {/* Пустий View для вирівнювання, якщо потрібно, або просто відсутність елемента справа */}
-          <View style={{ width: 48, height: 48 }} /> 
+          <View style={{ width: 48, height: 48 }} />
         </View>
 
         <TouchableOpacity
@@ -367,11 +453,11 @@ const ConsultationTimePatient = ({ route }) => {
                 if (isSelected && !isMyBooking) { // Якщо це не моя бронь, але я її вибрав, тоді синій
                   buttonStyle.push(styles.timeSlotButtonSelected);
                   textStyle.push(styles.timeSlotTextSelected);
-                } else if (isSelected && isMyBooking) { 
-                    // Якщо це моя бронь і я її вибрав (для скасування, наприклад), 
+                } else if (isSelected && isMyBooking) {
+                    // Якщо це моя бронь і я її вибрав (для скасування, наприклад),
                     // залишаємо її зеленою, як заброньовану, але вона все одно вважається selectedSlot
                 }
-                
+
                 return (
                   <TouchableOpacity
                     key={slot.id}
@@ -417,7 +503,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     // Змінено на column для вертикального розміщення елементів
-    flexDirection: 'column', 
+    flexDirection: 'column',
     alignItems: 'center', // Центрування по горизонталі
   },
   headerTopRow: { // Новий стиль для верхнього ряду (кнопка назад + заголовок)
@@ -443,14 +529,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 10,
   },
-  bookButton: { 
-    backgroundColor: '#0EB3EB', 
+  bookButton: {
+    backgroundColor: '#0EB3EB',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000', 
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -458,7 +544,7 @@ const styles = StyleSheet.create({
     marginTop: 10, // Додано відступ від заголовка
     width: '80%', // Можна налаштувати ширину кнопки
   },
-  bookButtonText: { 
+  bookButtonText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
@@ -468,7 +554,7 @@ const styles = StyleSheet.create({
   },
   dayContainer: {
     marginTop: 20,
-    backgroundColor: '#E3F2FD', 
+    backgroundColor: '#E3F2FD',
     borderRadius: 15,
     padding: 15,
     shadowColor: '#000',
@@ -491,7 +577,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  timeSlotButton: { 
+  timeSlotButton: {
     width: ITEM_WIDTH,
     borderRadius: 10,
     paddingVertical: 12,
@@ -503,22 +589,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 1,
-    justifyContent: 'center', 
+    justifyContent: 'center',
   },
-  timeSlotText: { 
+  timeSlotText: {
     fontSize: 14,
     fontWeight: '600',
-    textAlign: 'center', 
+    textAlign: 'center',
   },
-  timeSlotButtonAvailable: { 
-    backgroundColor: '#E0E0E0', 
+  timeSlotButtonAvailable: {
+    backgroundColor: '#E0E0E0',
     borderColor: '#BDBDBD',
   },
   timeSlotTextAvailable: {
-    color: '#757575', 
+    color: '#757575',
   },
-  timeSlotButtonSelected: { 
-    backgroundColor: '#0EB3EB', 
+  timeSlotButtonSelected: {
+    backgroundColor: '#0EB3EB',
     borderColor: '#0A8BA6',
     shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 2 },
@@ -527,20 +613,20 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   timeSlotTextSelected: {
-    color: '#FFFFFF', 
+    color: '#FFFFFF',
     fontWeight: '700',
   },
-  timeSlotButtonBookedByOther: { 
-    backgroundColor: '#F0F0F0', 
+  timeSlotButtonBookedByOther: {
+    backgroundColor: '#F0F0F0',
     borderColor: '#D9D9D9',
-    opacity: 0.7, 
+    opacity: 0.7,
   },
   timeSlotTextBookedByOther: {
-    color: '#A0A0A0', 
+    color: '#A0A0A0',
     fontWeight: '500',
   },
-  timeSlotButtonBookedByMe: { 
-    backgroundColor: '#4CAF50', 
+  timeSlotButtonBookedByMe: {
+    backgroundColor: '#4CAF50',
     borderColor: '#2E7D32',
     shadowColor: '#4CAF50',
     shadowOffset: { width: 0, height: 2 },
@@ -549,16 +635,16 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   timeSlotTextBookedByMe: {
-    color: '#FFFFFF', 
+    color: '#FFFFFF',
     fontWeight: '70',
   },
-  timeSlotButtonUnavailableByDoctor: { 
-    backgroundColor: '#F7F7F7', 
+  timeSlotButtonUnavailableByDoctor: {
+    backgroundColor: '#F7F7F7',
     borderColor: '#E0E0E0',
     opacity: 0.4,
   },
   timeSlotTextUnavailableByDoctor: {
-    color: '#C0C0C0', 
+    color: '#C0C0C0',
     fontWeight: '500',
   },
 });

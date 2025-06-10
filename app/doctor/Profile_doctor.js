@@ -12,16 +12,95 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Alert,
+  Platform, // <-- ДОДАНО
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../../assets/icon.svg";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../providers/supabaseClient";
+import * as Notifications from 'expo-notifications'; // <-- ДОДАНО
+import * as Device from 'expo-device';     // <-- ДОДАНО
+
+
+const { width } = Dimensions.get("window");
+
+// ДОДАНО: Конфігурація обробника сповіщень для Expo
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
+// ДОДАНО: Функція для реєстрації push-сповіщень
+async function registerForPushNotificationsAsync(userId) {
+  let token;
+
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      Alert.alert('Помилка', 'Не вдалося отримати токен для push-сповіщень! Перевірте дозволи в налаштуваннях вашого пристрою.');
+      console.error('Failed to get push token for push notification!');
+      return;
+    }
+
+    try {
+      // !!! ВАЖЛИВО: Замініть 'your-expo-project-id' на реальний ID вашого Expo проекту.
+      // Його можна знайти в файлі app.json у полі 'extra.eas.projectId' або просто 'projectId'.
+      // Якщо ви не використовуєте EAS build, то може бути і без projectId.
+      token = (await Notifications.getExpoPushTokenAsync({ projectId: 'your-expo-project-id' })).data;
+      console.log("Expo Push Token:", token);
+    } catch (e) {
+      console.error("Error getting Expo push token:", e);
+      Alert.alert('Помилка', 'Не вдалося отримати токен сповіщень. Перевірте підключення.');
+      return;
+    }
+
+  } else {
+    // Це повідомлення з'явиться, якщо ви запускаєте на емуляторі/симуляторі
+    Alert.alert('Помилка', 'Push-сповіщення працюють лише на фізичних пристроях!');
+    console.log('Must use physical device for Push Notifications');
+    return; // Немає сенсу продовжувати, якщо не фізичний пристрій
+  }
+
+  // Зберігаємо токен у Supabase
+  if (token && userId) {
+    const { data, error } = await supabase
+      .from('profile_doctor') // Ваша таблиця для профілів лікарів
+      .update({ notification_token: token })
+      .eq('user_id', userId); // Припускаємо, що у вас є 'user_id' як ідентифікатор користувача в цій таблиці.
+
+    if (error) {
+      console.error("Error saving notification token to Supabase:", error.message);
+      // Можна відобразити Alert, але, можливо, це не критично для користувача, якщо токен не зберігся
+      // Alert.alert('Помилка', `Не вдалося зберегти токен сповіщень: ${error.message}`);
+    } else {
+      console.log("Notification token saved successfully for doctor user_id:", userId);
+    }
+  }
+
+  return token;
+}
+
 
 // Reusable component for displaying values in a styled box
 const ValueBox = ({ children }) => {
-  // Перевірка на null, undefined, порожній рядок або масив
   const isEmpty =
     !children ||
     (typeof children === "string" && children.trim() === "") ||
@@ -37,16 +116,15 @@ const ValueBox = ({ children }) => {
       {typeof children === "string" ? (
         <Text style={styles.valueText}>{children}</Text>
       ) : (
-        children // Render React elements directly if not a string
+        children
       )}
     </View>
   );
 };
 
-// Функція для відображення прапорів мов
 const LanguageFlags = ({ languages }) => {
   const getFlag = (code) => {
-    switch (String(code).toUpperCase()) { // Перетворення на рядок і до верхнього регістру
+    switch (String(code).toUpperCase()) {
       case "UK":
         return "🇺🇦";
       case "DE":
@@ -60,12 +138,12 @@ const LanguageFlags = ({ languages }) => {
       case "ES":
         return "🇪🇸";
       default:
-        return "❓"; // Якщо код невідомий
+        return "❓";
     }
   };
 
   if (!languages || languages.length === 0) {
-    return null; // Не рендерити нічого, якщо мов немає
+    return null;
   }
 
   return (
@@ -107,26 +185,74 @@ const Profile_doctor = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
+  // !!! ДОДАНО: Стан для зберігання user_id поточного лікаря
+  const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
+
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
+
+
+  // ДОДАНО: useEffect для отримання user_id поточного лікаря
+  useEffect(() => {
+    const getDoctorSession = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error("Error getting doctor user session:", error.message);
+        // Можливо, перенаправити на екран входу, якщо сесія не дійсна
+        // navigation.replace('Auth');
+        return;
+      }
+      if (user) {
+        setCurrentDoctorUserId(user.id);
+      } else {
+        // Якщо користувача немає, можливо, він не увійшов як лікар
+        console.log("No doctor user session found.");
+      }
+    };
+    getDoctorSession();
+  }, []); // Пустий масив залежностей означає, що цей ефект запускається один раз при монтажі
+
+
+  // ДОДАНО: useEffect для реєстрації push-токенів, коли user_id лікаря доступний
+  useEffect(() => {
+    if (currentDoctorUserId) {
+      registerForPushNotificationsAsync(currentDoctorUserId);
+    }
+    // Зауваження: Слухачі сповіщень (addNotificationReceivedListener, addNotificationResponseReceivedListener)
+    // тепер розміщені у файлі Messege.js, тому тут їх додавати не потрібно,
+    // якщо Messege.js є постійно активним або викликається при старті додатку.
+    // Якщо Messege.js викликається тільки тоді, коли користувач переходить на екран повідомлень,
+    // то вам потрібно буде переконатися, що Messege.js монтується і слухачі активуються
+    // при запуску додатку або що слухачі для фонового режиму/закритого додатку налаштовані в App.js.
+    // Для простоти, ми вважаємо, що Messege.js достатньо активний, коли лікар відкриває додаток.
+
+  }, [currentDoctorUserId]); // Цей ефект спрацює, коли currentDoctorUserId буде встановлено
 
   // Функція для форматування досвіду роботи (як у ChooseSpecial)
   const formatYearsText = useCallback((years) => {
     if (years === null || years === undefined || isNaN(years) || years < 0) {
       return t("not_specified");
     }
-    // Використовуємо i18next для множини
     return t("years_experience", { count: years });
   }, [t]);
 
   const fetchDoctorData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setDoctor(null); // Скидаємо дані лікаря при новому запиті
+    setDoctor(null);
 
-    if (!doctorId) {
-      console.warn("Profile_doctor: doctorId is undefined/null, cannot fetch data.");
+    // ВАЖЛИВО: Використовуйте `currentDoctorUserId`, якщо це профіль *поточного* увійшовшого лікаря
+    // Якщо цей компонент використовується для перегляду профілю *будь-якого* лікаря (наприклад, з пошуку пацієнтом),
+    // то використовуйте `doctorId` з `route.params`.
+    // Якщо це профіль лікаря, який дивиться *свій власний* профіль, то `doctorId` з `route.params` може бути null,
+    // і тоді треба використовувати `currentDoctorUserId`.
+    // Я припускаю, що цей екран може бути як для перегляду власного профілю, так і чужого.
+    // Тож, ID для запиту:
+    const idToFetch = doctorId || currentDoctorUserId; // Спершу беремо з параметрів, потім з сесії
+
+    if (!idToFetch) {
+      console.warn("Profile_doctor: No doctor ID available to fetch data.");
       setError(t("doctor_id_missing"));
       setLoading(false);
       return;
@@ -135,22 +261,19 @@ const Profile_doctor = ({ route }) => {
     try {
       const { data, error: fetchError } = await supabase
         .from("anketa_doctor")
-        // Додаємо experience_years до запиту
         .select("*, diploma_url, certificate_photo_url, consultation_cost, experience_years")
-        .eq("user_id", doctorId)
+        .eq("user_id", idToFetch)
         .single();
 
       if (fetchError) {
         console.error("Error fetching doctor data from Supabase:", fetchError);
-        if (fetchError.code === "PGRST116") { // No rows found
-             setError(t("doctor_not_found"));
+        if (fetchError.code === "PGRST116") {
+           setError(t("doctor_not_found"));
         } else {
-             setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
+           setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
         }
-
       } else {
         setDoctor(data);
-        // Скидаємо стани завантаження та помилок зображень при успішному завантаженні даних
         setLoadingAvatar(true);
         setLoadingCertificate(true);
         setLoadingDiploma(true);
@@ -164,11 +287,15 @@ const Profile_doctor = ({ route }) => {
     } finally {
       setLoading(false);
     }
-  }, [doctorId, t]); // Додаємо t до залежностей useCallback
+  }, [doctorId, currentDoctorUserId, t]); // Додаємо currentDoctorUserId до залежностей
 
+  // Важливо: перевірте, чи `fetchDoctorData` не викликається безкінечно
+  // Якщо `doctorId` не змінюється, а `currentDoctorUserId` встановлюється тільки один раз,
+  // то це повинно бути нормально. Якщо `fetchDoctorData` залежить від `doctor` або іншого стану,
+  // це може створити циклічну залежність.
   useEffect(() => {
     fetchDoctorData();
-  }, [fetchDoctorData]); // Залежність від useCallback
+  }, [fetchDoctorData]);
 
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
@@ -183,8 +310,13 @@ const Profile_doctor = ({ route }) => {
   };
 
   const handleChooseConsultationTime = () => {
-    if (doctorId) {
-      navigation.navigate("ConsultationTime", { doctorId: doctorId });
+    // Якщо це власний профіль лікаря (тобто doctorId з route.params може бути null),
+    // то для навігації в ConsultationTime потрібен user_id поточного лікаря.
+    // Якщо це чужий профіль, використовуємо doctorId з route.params.
+    const targetDoctorId = doctorId || currentDoctorUserId;
+
+    if (targetDoctorId) {
+      navigation.navigate("ConsultationTime", { doctorId: targetDoctorId });
     } else {
       Alert.alert(t("error"), t("doctor_id_missing_for_consultation"));
     }
@@ -195,16 +327,11 @@ const Profile_doctor = ({ route }) => {
     { nameKey: "ukrainian", code: "uk", emoji: "" },
   ];
 
-  // Функції для безпечного парсингу JSON
   const getParsedArray = useCallback((value) => {
     if (!value) return [];
-
-    // Ключова зміна: спочатку перевіряємо, чи value вже є масивом
     if (Array.isArray(value)) {
-      return value; // Якщо це вже масив, повертаємо його як є
+      return value;
     }
-
-    // Якщо це не масив, намагаємося розпарсити, припускаючи, що це JSON-рядок
     try {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
@@ -218,15 +345,12 @@ const Profile_doctor = ({ route }) => {
     return getParsedArray(languagesData).map((lang) => String(lang).toUpperCase());
   }, [getParsedArray]);
 
-  // ОНОВЛЕНО: Функція для отримання спеціалізацій
   const getSpecializations = useCallback((specializationData) => {
     const parsedSpecs = getParsedArray(specializationData);
     if (parsedSpecs.length > 0) {
       if (typeof parsedSpecs[0] === 'string') {
-        // Якщо це масив рядків, перекладаємо кожен рядок
         return parsedSpecs.map(specValue => t(`categories.${specValue}`)).join(", ");
       } else if (typeof parsedSpecs[0] === 'object' && parsedSpecs[0].nameKey) {
-        // Якщо це масив об'єктів з nameKey, перекладаємо nameKey
         return parsedSpecs.map(specObj => t(`categories.${specObj.nameKey}`)).join(", ");
       }
     }
@@ -243,14 +367,13 @@ const Profile_doctor = ({ route }) => {
     );
   }
 
-  // Якщо error встановлено, показуємо помилку
   if (error) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
-          onPress={() => fetchDoctorData()} // Викликаємо useCallback функцію
+          onPress={() => fetchDoctorData()}
         >
           <Text style={styles.retryButtonText}>{t("retry")}</Text>
         </TouchableOpacity>
@@ -264,7 +387,6 @@ const Profile_doctor = ({ route }) => {
     );
   }
 
-  // Після завантаження, якщо doctor все ще null (наприклад, жодного запису не знайдено)
   if (!doctor) {
     return (
       <View style={styles.container}>
@@ -284,7 +406,7 @@ const Profile_doctor = ({ route }) => {
     avatar_url,
     communication_languages,
     specialization,
-    experience_years, // Тепер використовуємо experience_years
+    experience_years,
     work_location,
     consultation_cost,
     about_me,
@@ -309,15 +431,26 @@ const Profile_doctor = ({ route }) => {
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
-        <View style={styles.rightIcon}>
-          <Icon width={50} height={50} />
-        </View>
+        {/* Іконка сповіщень */}
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={() => navigation.navigate("Messege")}
+        >
+          <Ionicons
+            name="notifications-outline"
+            size={24}
+            color="white"
+          />
+          {/* Цей бейдж "5" статичний, його потрібно буде оновити динамічно */}
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationNumber}>5</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
         <View style={styles.doctorMainInfo}>
           {avatar_url && !avatarError ? (
-            // Контейнер для аватару та його індикатора
             <View style={styles.avatarContainer}>
               {loadingAvatar && (
                 <ActivityIndicator
@@ -351,7 +484,7 @@ const Profile_doctor = ({ route }) => {
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("rating")}:</Text>
-              <ValueBox>🌟🌟</ValueBox> 
+              <ValueBox>🌟🌟</ValueBox>
             </View>
 
             <View style={styles.infoRowDynamic}>
@@ -369,7 +502,6 @@ const Profile_doctor = ({ route }) => {
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("work_experience")}:</Text>
               <ValueBox>
-                {/* Використовуємо experience_years з бази і форматуємо */}
                 {formatYearsText(experience_years)}
               </ValueBox>
             </View>
@@ -623,6 +755,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 15,
+  },
+    notificationButton: {
+    width: width * 0.12,
+    height: width * 0.12,
+    backgroundColor: "rgba(14, 179, 235, 0.69)",
+    borderRadius: width * 0.06,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 5,
+    right: 10,
+    backgroundColor: "#E04D53",
+    borderRadius: 1000,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    borderColor: "white",
+    borderWidth: 1,
+  },
+  notificationNumber: {
+    color: "white",
+    fontSize: 10,
   },
   scrollViewContent: {
     paddingHorizontal: 15,
