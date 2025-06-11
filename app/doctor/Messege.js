@@ -7,52 +7,62 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
-  ActivityIndicator, // Додаємо для індикації завантаження
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../assets/icon.svg";
+import Icon from "../../assets/icon.svg";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
-import { supabase } from '../providers/supabaseClient'; // !!! РОЗКОМЕНТУВАЛИ: Для роботи з Supabase
+import { supabase } from '../../providers/supabaseClient';
 
 export default function Messege() {
   const navigation = useNavigation();
   const { t } = useTranslation();
 
   const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true); // Новий стан для індикатора завантаження
-  const [currentDoctorId, setCurrentDoctorId] = useState(null); // ID поточного лікаря
+  const [loading, setLoading] = useState(true);
+  const [currentDoctorId, setCurrentDoctorId] = useState(null);
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
-  // Функція для додавання нового повідомлення до списку (з Expo Notification)
   const addNewMessage = useCallback((notificationContent) => {
     const { title, body, data } = notificationContent;
     const now = new Date();
-    // Форматуємо дату відповідно до локалі користувача
     const messageDate = new Intl.DateTimeFormat(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(now);
     const messageTime = new Intl.DateTimeFormat(t('locale'), { hour: '2-digit', minute: '2-digit' }).format(now);
 
-    setMessages(prevMessages => [
-      {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 9), // Унікальний ID для UI
-        db_id: data.db_id, // Зберігаємо ID з бази даних, якщо він є
-        title: title,
-        body: body,
-        date: messageDate,
-        time: messageTime,
-        is_read: data.is_read || false, // Позначаємо як прочитане, якщо прийшло зі статусом
-        type: data.type || 'general',
-        rawData: data,
-      },
-      ...prevMessages,
-    ]);
+    setMessages(prevMessages => {
+      // Check for duplicates based on db_id (if available) or a unique combination
+      const isDuplicate = prevMessages.some(msg =>
+        (data.db_id && msg.db_id === data.db_id) ||
+        (msg.title === title && msg.body === body && msg.date === messageDate && msg.time === messageTime)
+      );
+
+      if (isDuplicate) {
+        console.log("Duplicate message received, not adding to UI.");
+        return prevMessages;
+      }
+
+      return [
+        {
+          id: data.db_id || (Date.now().toString() + Math.random().toString(36).substring(2, 9)), // Use db_id if present
+          db_id: data.db_id || null, // Store db_id for updates
+          title: title,
+          body: body,
+          date: messageDate,
+          time: messageTime,
+          is_read: data.is_read || false,
+          type: data.type || 'general',
+          rawData: data || {}, // Ensure rawData is an object
+        },
+        ...prevMessages,
+      ];
+    });
   }, [t]);
 
-  // Функція для завантаження повідомлень з Supabase
   const fetchMessagesFromSupabase = useCallback(async (doctorId) => {
     if (!doctorId) {
       console.warn("Doctor ID is missing, cannot fetch notifications.");
@@ -66,8 +76,8 @@ export default function Messege() {
       const { data, error } = await supabase
         .from('doctor_notifications')
         .select('*')
-        .eq('doctor_id', doctorId) // Фільтруємо за doctor_id
-        .order('created_at', { ascending: false }); // Сортуємо від найновіших
+        .eq('doctor_id', doctorId)
+        .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
@@ -75,17 +85,16 @@ export default function Messege() {
 
       console.log("Fetched notifications:", data);
 
-      // Форматуємо дані для відображення в UI
       const formattedMessages = data.map(notif => ({
-        id: notif.id, // Використовуємо реальний ID з БД
-        db_id: notif.id, // Зберігаємо для оновлення
+        id: notif.id,
+        db_id: notif.id,
         title: notif.title,
         body: notif.body,
         date: new Intl.DateTimeFormat(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at)),
         time: new Intl.DateTimeFormat(t('locale'), { hour: '2-digit', minute: '2-digit' }).format(new Date(notif.created_at)),
         is_read: notif.is_read,
         type: (notif.data && notif.data.type) || 'general',
-        rawData: notif.data || {},
+        rawData: notif.data || {}, // Ensure rawData is an object
       }));
 
       setMessages(formattedMessages);
@@ -98,7 +107,6 @@ export default function Messege() {
     }
   }, [t]);
 
-  // Отримання ID поточного лікаря
   useEffect(() => {
     const getDoctorId = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -114,18 +122,15 @@ export default function Messege() {
     getDoctorId();
   }, []);
 
-  // useFocusEffect для завантаження повідомлень при фокусуванні екрану
   useFocusEffect(
     useCallback(() => {
       if (currentDoctorId) {
         fetchMessagesFromSupabase(currentDoctorId);
       }
-      // Функція очищення (немає необхідності для цього випадку)
       return () => {};
     }, [currentDoctorId, fetchMessagesFromSupabase])
   );
 
-  // useEffect для налаштування слухачів сповіщень Expo
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -137,46 +142,28 @@ export default function Messege() {
 
     const notificationReceivedListener = Notifications.addNotificationReceivedListener(notification => {
       console.log('Сповіщення отримано на передньому плані (Messege.js):', notification);
-      const { title, body, data } = notification.request.content;
-
-      // Якщо повідомлення прийшло через Expo (push-сповіщення), додаємо його в UI
-      // При цьому, якщо воно вже є в БД (наприклад, з Edge Function),
-      // то після fetchMessagesFromSupabase() воно буде продубльовано,
-      // якщо не перевіряти на дублікати.
-      // Найкраще, якщо Edge Function зберігає в БД, а потім відправляє PUSH,
-      // то PUSH-сповіщення повинно містити 'db_id', щоб ми могли оновити існуючий запис
-      // або принаймні перевірити його наявність.
-      // Для простоти, поки що просто додаємо, але варто подумати про уникнення дублікатів.
-      // Якщо push-сповіщення містить data.db_id, ми можемо перевірити, чи вже є повідомлення з таким db_id.
-      addNewMessage(notification.request.content); // Ця функція вже додає новий запис
-
-      // Немає потреби показувати Alert, якщо повідомлення вже додається в список.
-      // Alert.alert(title, body, [{ text: t('ok') }]);
+      addNewMessage(notification.request.content);
     });
 
     const notificationResponseListener = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('Користувач натиснув на сповіщення (Messege.js):', response);
       const { title, body, data } = response.notification.request.content;
 
-      // Якщо користувач натиснув на сповіщення з фону або закритого стану,
-      // також додаємо його до списку, якщо потрібно, щоб воно з'явилося після переходу
-      // Імовірно, краще просто перезавантажити з БД, якщо екран фокусується,
-      // щоб отримати актуальний стан is_read.
+      // When user interacts with notification, ensure it's added/updated in the list
       addNewMessage(response.notification.request.content);
 
-      if (data && data.type === 'new_booking') {
+      if (data && data.type === 'new_booking' && data.patient_name && data.booking_date && data.booking_time_slot) {
         Alert.alert(
           t('new_booking_notification_title'),
           `${t('patient')}: ${data.patient_name}\n${t('date')}: ${data.booking_date}\n${t('time')}: ${data.booking_time_slot}.`,
           [{ text: t('view_details'), onPress: () => {
-              // Тут можна реалізувати навігацію на екран деталей бронювання
-              // navigation.navigate('DoctorBookings', { bookingId: data.booking_id });
-              console.log("Перехід до деталей бронювання");
+              // Add navigation to booking details screen here if needed
+              console.log("Navigate to booking details");
             }
           }]
         );
       } else {
-          Alert.alert(title, body, [{ text: t('ok') }]);
+          Alert.alert(title || t('notification_title_default'), body || t('notification_body_default'), [{ text: t('ok') }]);
       }
     });
 
@@ -186,8 +173,6 @@ export default function Messege() {
     };
   }, [t, addNewMessage]);
 
-
-  // Функція для позначення сповіщення як прочитаного
   const markAsRead = useCallback(async (messageId) => {
     setMessages(prevMessages =>
       prevMessages.map(msg =>
@@ -195,19 +180,16 @@ export default function Messege() {
       )
     );
     try {
-      // Оновлюємо статус в Supabase
       const { error } = await supabase
         .from('doctor_notifications')
         .update({ is_read: true })
-        .eq('id', messageId); // Використовуємо messageId, який має бути db_id
+        .eq('id', messageId);
 
       if (error) {
         console.error("Error marking notification as read:", error.message);
         Alert.alert(t('error'), t('failed_to_mark_as_read'));
       } else {
         console.log("Notification marked as read in DB:", messageId);
-        // Після успішного оновлення в БД, можна також оновити бейдж на головному екрані
-        // Шляхом виклику функції з Profile_doctor або оновлення глобального стану
       }
     } catch (error) {
       console.error("Network error marking notification as read:", error.message);
@@ -215,28 +197,14 @@ export default function Messege() {
     }
   }, [t]);
 
-  // Функція для підтвердження бронювання (якщо це вимагає окремої дії, крім просто "прочитано")
   const handleConfirmBooking = useCallback(async (message) => {
-    // Якщо ви хочете, щоб кнопка "Підтвердити" просто позначала сповіщення як прочитане
-    await markAsRead(message.db_id); // Використовуємо db_id для оновлення в базі даних
+    await markAsRead(message.db_id); // Mark as read immediately
 
-    // Або, якщо "Підтвердити" означає іншу дію, наприклад, оновлення статусу бронювання:
-    /*
-    try {
-        const { error } = await supabase
-            .from('patient_bookings')
-            .update({ status: 'confirmed' }) // Припустимо, у вас є поле status
-            .eq('id', message.rawData.booking_id); // Потрібен booking_id з rawData
+    // You can add additional logic here for actually "confirming" the booking
+    // For example, updating a 'status' column in 'patient_bookings'
+    // For now, it just marks the notification as read.
+    Alert.alert(t('success'), t('booking_confirmed_successfully_message'));
 
-        if (error) throw error;
-        Alert.alert(t('success'), t('booking_confirmed_successfully'));
-        // Після підтвердження, також позначте як прочитане
-        await markAsRead(message.db_id);
-    } catch (error) {
-        console.error("Error confirming booking:", error.message);
-        Alert.alert(t('error'), `${t('failed_to_confirm_booking')}: ${error.message}`);
-    }
-    */
   }, [t, markAsRead]);
 
 
@@ -249,10 +217,8 @@ export default function Messege() {
     );
   }
 
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -279,36 +245,33 @@ export default function Messege() {
                 <Text style={styles.timestampText}>{message.time}</Text>
               </View>
               <View style={[styles.messageCard, message.is_read && styles.messageCardRead]}>
-                <Text style={styles.cardTitle}>{message.title}</Text>
-                <Text style={styles.cardText}>{message.body}</Text>
-                {/* Якщо є додаткові дії або посилання, додайте їх тут */}
-                {message.type === 'new_booking' && message.rawData && (
+                <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
+                <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
+                
+                {message.type === 'new_booking' && (
                     <View>
-                        <Text style={styles.bookingDetailsText}>
-                            {t('patient')}: {message.rawData.patient_name}
+                        {/* <Text style={styles.bookingDetailsText}>
+                            {t('patient')}: {(message.body) || t('not_specified')}
                         </Text>
                         <Text style={styles.bookingDetailsText}>
-                            {t('date')}: {message.rawData.booking_date}
+                            {t('date')}: {(message.date) || t('not_specified')}
                         </Text>
                         <Text style={styles.bookingDetailsText}>
-                            {t('time')}: {message.rawData.booking_time_slot}
-                        </Text>
+                            {t('time')}: {(message.time) || t('not_specified')}
+                        </Text> */}
 
-                        {/* Кнопка "Підтвердити" */}
-                        {!message.is_read && ( // Показуємо кнопку, тільки якщо повідомлення не прочитано
+                        {!message.is_read ? (
                             <TouchableOpacity
                                 style={styles.confirmBookingButton}
                                 onPress={() => handleConfirmBooking(message)}
                             >
                                 <Text style={styles.confirmBookingButtonText}>{t('confirm_booking')}</Text>
                             </TouchableOpacity>
-                        )}
-                        {message.is_read && ( // Якщо прочитано, можна показати статус "Підтверджено" або просто не показувати кнопку
+                        ) : (
                             <Text style={styles.confirmedText}>{t('confirmed_read')}</Text>
                         )}
                     </View>
                 )}
-                {/* Опція для позначення як прочитаного, якщо немає кнопки підтвердження */}
                 {message.type !== 'new_booking' && !message.is_read && (
                     <TouchableOpacity
                         style={styles.markAsReadButton}
@@ -335,13 +298,13 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     paddingTop: 50,
   },
-  loadingContainer: { // Стилі для індикатора завантаження
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'white',
   },
-  loadingText: { // Стилі для тексту індикатора завантаження
+  loadingText: {
     marginTop: 10,
     fontSize: 16,
     color: '#333',
@@ -402,7 +365,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2.22,
     elevation: 3,
   },
-  messageCardRead: { // Новий стиль для прочитаних повідомлень (можна зробити їх трохи тьмянішими)
+  messageCardRead: {
     opacity: 0.7,
     backgroundColor: '#F5F5F5',
   },
@@ -424,8 +387,8 @@ const styles = StyleSheet.create({
     color: "#444",
     marginBottom: 4,
   },
-  confirmBookingButton: { // Стиль для кнопки "Підтвердити"
-    backgroundColor: '#4CAF50', // Зелений
+  confirmBookingButton: {
+    backgroundColor: '#4CAF50',
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 25,
@@ -437,13 +400,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  confirmBookingButtonText: { // Стиль для тексту кнопки "Підтвердити"
+  confirmBookingButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: "Mont-SemiBold",
   },
-  markAsReadButton: { // Стиль для кнопки "Позначити як прочитане" (для загальних повідомлень)
-    backgroundColor: '#0EB3EB', // Синій
+  markAsReadButton: {
+    backgroundColor: '#0EB3EB',
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
@@ -456,15 +419,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Mont-SemiBold",
   },
-  confirmedText: { // Стиль для тексту "Підтверджено" або "Прочитано"
+  confirmedText: {
     fontSize: 14,
     fontFamily: "Mont-SemiBold",
-    color: '#2E7D32', // Темно-зелений
+    color: '#2E7D32',
     marginTop: 10,
     alignSelf: 'flex-start',
     paddingVertical: 5,
     paddingHorizontal: 10,
-    backgroundColor: '#E8F5E9', // Світло-зелений фон
+    backgroundColor: '#E8F5E9',
     borderRadius: 10,
   },
   emptyMessagesContainer: {

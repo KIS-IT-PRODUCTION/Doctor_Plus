@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,41 +10,109 @@ import {
   Animated,
   Easing,
   ActivityIndicator,
+  Platform, // Import Platform for OS-specific styling
+  SafeAreaView, // Import SafeAreaView for proper layout on iOS
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../assets/icon.svg"; // Переконайтеся, що шлях до icon.svg правильний
+import Icon from "../assets/icon.svg"; // Make sure the path to icon.svg is correct
 
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 
+// Helper for safe JSON parsing
+const getParsedArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn(
+      "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
+      value,
+      e
+    );
+    return [];
+  }
+};
+
+// Reusable component for displaying values in a styled box
+const InfoBox = ({ label, value, children }) => {
+  const isEmpty =
+    !value && (!children || (Array.isArray(children) && children.length === 0));
+  return (
+    <View style={styles.infoBoxRow}>
+      <Text style={styles.infoBoxLabel}>{label}:</Text>
+      <View style={styles.infoBoxValueContainer}>
+        {isEmpty ? (
+          <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
+            Not specified
+          </Text>
+        ) : children ? (
+          children
+        ) : (
+          <Text style={styles.infoBoxValueText}>{value}</Text>
+        )}
+      </View>
+    </View>
+  );
+};
+
+// Data for specializations and languages (should ideally come from a central config/API)
+const specializationsList = [
+  { value: "general_practitioner", nameKey: "categories.general_practitioner" },
+  { value: "pediatrician", nameKey: "categories.pediatrician" },
+  { value: "cardiologist", nameKey: "categories.cardiologist" },
+  { value: "dermatologist", nameKey: "categories.dermatologist" },
+  { value: "neurologist", nameKey: "categories.neurologist" },
+  { value: "surgeon", nameKey: "categories.surgeon" },
+  { value: "psychiatrist", nameKey: "categories.psychiatrist" },
+  { value: "dentist", nameKey: "categories.dentist" },
+  { value: "ophthalmologist", nameKey: "categories.ophthalmologist" },
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
+  { value: "gastroenterologist", nameKey: "categories.gastroenterologist" },
+  { value: "endocrinologist", nameKey: "categories.endocrinologist" },
+  { value: "oncologist", nameKey: "categories.oncologist" },
+  { value: "allergist", nameKey: "categories.allergist" },
+  { value: "physiotherapist", nameKey: "categories.physiotherapist" },
+];
+
+const consultationLanguagesList = [
+  { code: "UK", nameKey: "ukrainian", emoji: "🇺🇦" },
+  { code: "DE", nameKey: "german", emoji: "🇩🇪" },
+  { code: "PL", nameKey: "polish", emoji: "🇵🇱" },
+  { code: "EN", nameKey: "english", emoji: "🇬🇧" },
+  { code: "FR", nameKey: "french", emoji: "🇫🇷" },
+  { code: "ES", nameKey: "spanish", emoji: "🇪🇸" },
+];
+
+// Функція для відображення прапорів мов
 const LanguageFlags = ({ languages }) => {
   const getFlag = (code) => {
-    switch (code) {
-      case "UK":
-        return "🇺🇦";
-      case "DE":
-        return "🇩🇪";
-      case "PL":
-        return "🇵🇱";
-      case "EN":
-        return "🇬🇧";
-      case "FR":
-        return "🇫🇷";
-      case "ES":
-        return "🇪🇸";
-      default:
-        return ""; // За замовчуванням, якщо мова не розпізнана
-    }
+    const lang = consultationLanguagesList.find(
+      (item) => item.code === code.toUpperCase()
+    );
+    return lang ? lang.emoji : "❓"; // Default to a question mark if not recognized
   };
+
+  if (!languages || languages.length === 0) {
+    return (
+      <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
+        Not specified
+      </Text>
+    );
+  }
 
   return (
     <View style={styles.flagsContainer}>
       {languages.map(
-        (lang, index) =>
-          typeof lang === "string" && (
+        (langCode, index) =>
+          typeof langCode === "string" && (
             <Text key={index} style={styles.flagText}>
-              {getFlag(lang.toUpperCase())}
+              {getFlag(langCode)}
             </Text>
           )
       )}
@@ -56,27 +124,40 @@ const DoctorCard = ({ doctor }) => {
   const navigation = useNavigation();
   const { t } = useTranslation();
 
-  // Функція для форматування досвіду роботи
-  const formatYearsText = (years) => {
-    if (years === null || years === undefined || isNaN(years) || years < 0) {
-      return t("not_specified");
-    }
-    // Використовуємо i18next для множини, тому просто передаємо число
-    return t("years_experience", { count: years });
-  };
+  const formatYearsText = useCallback(
+    (years) => {
+      if (years === null || years === undefined || isNaN(years) || years < 0) {
+        return t("not_specified");
+      }
+      const lastDigit = years % 10;
+      const lastTwoDigits = years % 100;
 
-  // Функція для форматування часу в додатку
-  const formatTimeInApp = (timeInApp) => {
-    if (!timeInApp) return t("not_specified");
-
-    // Оскільки `timeInApp` вже є відформатованим рядком з `fetchDoctors`,
-    // просто повертаємо його.
-    return timeInApp;
-  };
+      if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+        return `${years} ${t("years_plural_genitive")}`;
+      }
+      if (lastDigit === 1) {
+        return `${years} ${t("year_singular")}`;
+      }
+      if (lastDigit >= 2 && lastDigit <= 4) {
+        return `${years} ${t("years_plural_nominative")}`;
+      }
+      return `${years} ${t("years_plural_genitive")}`;
+    },
+    [t]
+  );
 
   const handleGoToDoctor = () => {
-    console.log(`Перейти до лікаря: ${doctor.full_name}`);
     navigation.navigate("Profile", { doctorId: doctor.user_id });
+  };
+
+  const getTranslatedSpecializations = (specializationKeys) => {
+    const parsedKeys = getParsedArray(specializationKeys);
+    return parsedKeys
+      .map((specKey) => {
+        const spec = specializationsList.find((s) => s.value === specKey);
+        return spec ? t(spec.nameKey) : specKey; // Fallback to key if not found
+      })
+      .join(", ");
   };
 
   return (
@@ -86,55 +167,32 @@ const DoctorCard = ({ doctor }) => {
           <Image source={{ uri: doctor.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={40} color="#ccc" />
+            <Ionicons name="person" size={40} color="#666" />
           </View>
         )}
-        <View style={styles.doctorInfo}>
-          <Text style={styles.doctorName}>{doctor.full_name}</Text>
-          {/* Рейтинг прибрано, оскільки колонка відсутня */}
-          <View style={styles.ratingRow}>
-            <Text style={styles.ratingText}>{t("rating")}: </Text>
-            {/* Відображаємо "N/A", оскільки рейтинг не вибирається */}
-            <Text style={styles.ratingValue}>{"N/A"}</Text>
-          </View>
-          <View style={styles.languageRow}>
-            <Text style={styles.languageText}>
-              {t("communication_language")}:{" "}
-            </Text>
+        <View style={styles.doctorSummary}>
+          <Text style={styles.doctorName}>{doctor.full_name || t("not_specified")}</Text>
+          <InfoBox label={t("rating")} value="N/A" />
+          <InfoBox label={t("communication_language")}>
             <LanguageFlags languages={doctor.communication_languages || []} />
-          </View>
+          </InfoBox>
         </View>
       </View>
 
-      {/* Specialization */}
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>{t("specialization")}: </Text>
-        <Text style={styles.detailValue}>
-          {doctor.specialization || t("not_specified")}
-        </Text>
-      </View>
-
-      {/* Work Experience */}
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>{t("work_experience")}: </Text>
-        <Text style={styles.detailValue}>
-          {formatYearsText(doctor.experience_years)}
-        </Text>
-      </View>
-
-      {/* Time in App (автоматично розраховується) */}
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>{t("time_in_app")}: </Text>
-        <Text style={styles.detailValue}>
-          {formatTimeInApp(doctor.time_in_app)}
-        </Text>
-      </View>
-
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>{t("consultations_count")}: </Text>
-        <Text style={styles.detailValue}>
-          {doctor.consultations_count || "0"}
-        </Text>
+      <View style={styles.cardDetails}>
+        <InfoBox
+          label={t("specialization")}
+          value={getTranslatedSpecializations(doctor.specialization)}
+        />
+        <InfoBox
+          label={t("work_experience")}
+          value={formatYearsText(doctor.experience_years)}
+        />
+        <InfoBox label={t("time_in_app")} value={doctor.time_in_app || t("not_specified")} />
+        <InfoBox
+          label={t("consultations_count")}
+          value={doctor.consultations_count?.toString() || "0"}
+        />
       </View>
 
       <View style={styles.cardFooter}>
@@ -145,7 +203,7 @@ const DoctorCard = ({ doctor }) => {
           {t("price")}:{" "}
           {doctor.consultation_cost
             ? `${doctor.consultation_cost}$`
-            : t("not_specified")}
+            : t("not_specified_price")}
         </Text>
       </View>
     </View>
@@ -155,7 +213,7 @@ const DoctorCard = ({ doctor }) => {
 const ChooseSpecial = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { specialization } = route.params || {};
+  const { specialization: initialSpecialization } = route.params || {};
 
   const { t } = useTranslation();
   const [isSortModalVisible, setSortModalVisible] = useState(false);
@@ -165,156 +223,112 @@ const ChooseSpecial = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Default sort by experience years descending, as rating is not available
+  // Default sort by experience years descending
   const [currentSortOption, setCurrentSortOption] = useState("experience_desc");
 
-  useEffect(() => {
-    let isActive = true; // Флаг для запобігання оновленню стану на розмонтованому компоненті
-    let timer; // Оголошуємо timer тут, щоб він був доступний у функції очищення
+  const fetchDoctors = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let query = supabase
+        .from("anketa_doctor")
+        .select("*, consultation_cost, experience_years, created_at, avatar_url");
 
-    const fetchDataDelayed = async () => {
-      // Невелика затримка, щоб переконатися, що компонент повністю змонтований
-      // перед початком завантаження даних та оновлення стану.
-      timer = setTimeout(async () => { // Присвоюємо значення timer
-        if (!isActive) return; // Перевірка, чи компонент все ще активний після затримки
+      if (initialSpecialization) {
+        // Use 'cs' (contains string) for array contains matching for JSONB columns
+        // This assumes 'specialization' in DB is a JSONB array of strings e.g., ["cardiologist", "pediatrician"]
+        query = query.filter(
+          "specialization",
+          "cs",
+          `["${initialSpecialization}"]`
+        );
+      }
 
-        setLoading(true);
-        setError(null);
-        try {
-          // Видалено 'rating' із запиту, оскільки стовпця немає
-          let query = supabase
-            .from("anketa_doctor")
-            .select("*, consultation_cost, experience_years, created_at");
+      switch (currentSortOption) {
+        case "experience_desc":
+          query = query.order("experience_years", {
+            ascending: false,
+            nullsFirst: false,
+          }); // Nulls at the end
+          break;
+        case "experience_asc":
+          query = query.order("experience_years", {
+            ascending: true,
+            nullsFirst: true,
+          }); // Nulls at the beginning
+          break;
+        case "price_asc":
+          query = query.order("consultation_cost", {
+            ascending: true,
+            nullsFirst: true,
+          }); // Nulls at the beginning
+          break;
+        case "price_desc":
+          query = query.order("consultation_cost", {
+            ascending: false,
+            nullsFirst: false,
+          }); // Nulls at the end
+          break;
+        default:
+          query = query.order("experience_years", {
+            ascending: false,
+            nullsFirst: false,
+          });
+      }
 
-          if (specialization) {
-            query = query.filter('specialization', 'cs', `["${specialization}"]`);
-          }
+      const { data, error: fetchError } = await query;
 
-          // Додаємо console.log, щоб перевірити, яка опція сортування вибрана
-          console.log("Current Sort Option:", currentSortOption);
+      if (fetchError) {
+        console.error("Error fetching doctors:", fetchError);
+        setError(`${t("error_fetching_doctors")}: ${fetchError.message}`);
+        setDoctors([]); // Clear doctors on error
+      } else {
+        const processedDoctors = data.map((doctor) => {
+          const parsedCommunicationLanguages = getParsedArray(
+            doctor.communication_languages
+          );
 
-          // Застосування сортування на основі currentSortOption
-          switch (currentSortOption) {
-            // Випадки для rating_desc та rating_asc видалено
-            case "experience_desc":
-              query = query.order("experience_years", { ascending: false, nullsFirst: false });
-              break;
-            case "experience_asc":
-              query = query.order("experience_years", { ascending: true, nullsFirst: true });
-              break;
-            case "price_asc":
-              query = query.order("consultation_cost", { ascending: true, nullsFirst: true });
-              break;
-            case "price_desc":
-              // Важливо: ascending: false для спадання (від найбільшого до найменшого)
-              query = query.order("consultation_cost", { ascending: false, nullsFirst: false });
-              break;
-            default:
-              // Дефолтне сортування за досвідом, якщо опція невідома
-              query = query.order("experience_years", { ascending: false, nullsFirst: false });
-          }
+          let timeInAppDisplay = t("not_specified");
+          if (doctor.created_at) {
+            const joinedDate = new Date(doctor.created_at);
+            const now = new Date();
+            const diffTime = Math.abs(now.getTime() - joinedDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-          const { data, error: fetchError } = await query;
-
-          if (isActive) { // Перевірка isActive перед оновленням стану
-            if (fetchError) {
-              console.error("Помилка отримання лікарів:", fetchError);
-              setError(t("error_fetching_doctors") + ": " + fetchError.message);
+            if (diffDays < 30) {
+              timeInAppDisplay = t("days_in_app", { count: diffDays });
+            } else if (diffDays < 365) {
+              const diffMonths = Math.floor(diffDays / 30);
+              timeInAppDisplay = t("months_in_app", { count: diffMonths });
             } else {
-              const parsedDoctors = data.map((doctor) => {
-                let parsedCommunicationLanguages = [];
-                if (doctor.communication_languages) {
-                  if (Array.isArray(doctor.communication_languages)) {
-                    parsedCommunicationLanguages = doctor.communication_languages;
-                  } else {
-                    try {
-                      parsedCommunicationLanguages = JSON.parse(
-                        doctor.communication_languages
-                      );
-                    } catch (e) {
-                      console.warn(
-                        "Warning: Invalid communication_languages format for doctor:",
-                        doctor.user_id,
-                        doctor.communication_languages,
-                        e
-                      );
-                    }
-                  }
-                }
-
-                let joinedSpecializations = "";
-                if (doctor.specialization) {
-                  if (Array.isArray(doctor.specialization)) {
-                    joinedSpecializations = doctor.specialization
-                      .map((specKey) => t(`categories.${specKey}`))
-                      .join(", ");
-                  } else {
-                    try {
-                      joinedSpecializations = JSON.parse(doctor.specialization)
-                        .map((specKey) => t(`categories.${specKey}`))
-                        .join(", ");
-                    } catch (e) {
-                      console.warn(
-                        "Warning: Invalid specialization format for doctor:",
-                        doctor.user_id,
-                        doctor.specialization,
-                        e
-                      );
-                    }
-                  }
-                }
-
-                let timeInAppDisplay = t("not_specified");
-                if (doctor.created_at) {
-                  const joinedDate = new Date(doctor.created_at);
-                  const now = new Date();
-                  const diffTime = Math.abs(now.getTime() - joinedDate.getTime());
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                  if (diffDays < 30) {
-                    timeInAppDisplay = t("days_in_app", { count: diffDays });
-                  } else if (diffDays < 365) {
-                    const diffMonths = Math.floor(diffDays / 30);
-                    timeInAppDisplay = t("months_in_app", { count: diffMonths });
-                  } else {
-                    const diffYears = Math.floor(diffDays / 365);
-                    timeInAppDisplay = t("years_in_app", { count: diffYears });
-                  }
-                }
-
-                return {
-                  ...doctor,
-                  communication_languages: parsedCommunicationLanguages,
-                  specialization: joinedSpecializations,
-                  time_in_app: timeInAppDisplay,
-                };
-              });
-              setDoctors(parsedDoctors);
+              const diffYears = Math.floor(diffDays / 365);
+              timeInAppDisplay = t("years_in_app", { count: diffYears });
             }
           }
-        } catch (e) {
-          if (isActive) { // Перевірка isActive перед оновленням стану
-            console.error("Неочікувана помилка:", e);
-            setError(t("unexpected_error") + ": " + e.message);
-          }
-        } finally {
-          if (isActive) { // Перевірка isActive перед оновленням стану
-            setLoading(false);
-          }
-        }
-      }, 10); // Невелика затримка (10 мс)
-    };
 
-    fetchDataDelayed(); // Викликаємо функцію відкладеного завантаження даних
+          return {
+            ...doctor,
+            communication_languages: parsedCommunicationLanguages,
+            // specialization is now handled by getTranslatedSpecializations in DoctorCard
+            time_in_app: timeInAppDisplay,
+          };
+        });
+        setDoctors(processedDoctors);
+      }
+    } catch (e) {
+      console.error("Unexpected error during doctor fetch:", e);
+      setError(`${t("unexpected_error")}: ${e.message}`);
+      setDoctors([]); // Clear doctors on unexpected error
+    } finally {
+      setLoading(false);
+    }
+  }, [t, initialSpecialization, currentSortOption]);
 
-    return () => {
-      isActive = false; // Очистка при розмонтуванні компонента
-      clearTimeout(timer); // Очистити таймер, щоб уникнути витоків пам'яті
-    };
-  }, [t, specialization, currentSortOption]);
+  useEffect(() => {
+    fetchDoctors();
+  }, [fetchDoctors]);
 
   const sortOptions = [
-    // Опції сортування за рейтингом видалено
     { label: t("sort_by_experience_desc"), value: "experience_desc" },
     { label: t("sort_by_experience_asc"), value: "experience_asc" },
     { label: t("sort_by_price_asc"), value: "price_asc" },
@@ -361,9 +375,19 @@ const ChooseSpecial = () => {
   };
 
   const handleSortOptionSelect = (option) => {
-    console.log("Обрано опцію сортування:", option.label);
     setCurrentSortOption(option.value);
     closeSortModal();
+  };
+
+  // Get translated specialization for header
+  const getHeaderTitle = () => {
+    if (initialSpecialization) {
+      const spec = specializationsList.find(
+        (s) => s.value === initialSpecialization
+      );
+      return spec ? t(spec.nameKey) : t("doctors");
+    }
+    return t("doctors");
   };
 
   if (loading) {
@@ -379,10 +403,7 @@ const ChooseSpecial = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => setLoading(true)}
-        >
+        <TouchableOpacity style={styles.retryButton} onPress={fetchDoctors}>
           <Text style={styles.retryButtonText}>{t("retry")}</Text>
         </TouchableOpacity>
       </View>
@@ -390,14 +411,12 @@ const ChooseSpecial = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {specialization ? t(`categories.${specialization}`) : t("doctors")}
-        </Text>
+        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.rightIcon}>
           <Icon width={50} height={50} />
         </View>
@@ -407,7 +426,7 @@ const ChooseSpecial = () => {
         <Text style={styles.sortButtonText}>{t("sort")}</Text>
       </TouchableOpacity>
 
-      <ScrollView style={styles.scrollViewContent}>
+      <ScrollView contentContainerStyle={styles.scrollViewContent}>
         {doctors.length > 0 ? (
           doctors.map((doctor) => (
             <DoctorCard key={doctor.user_id} doctor={doctor} />
@@ -436,14 +455,16 @@ const ChooseSpecial = () => {
                   key={option.value}
                   style={[
                     styles.sortOptionButton,
-                    currentSortOption === option.value && styles.sortOptionSelected,
+                    currentSortOption === option.value &&
+                    styles.sortOptionSelected,
                   ]}
                   onPress={() => handleSortOptionSelect(option)}
                 >
                   <Text
                     style={[
                       styles.sortOptionText,
-                      currentSortOption === option.value && styles.sortOptionTextSelected,
+                      currentSortOption === option.value &&
+                      styles.sortOptionTextSelected,
                     ]}
                   >
                     {option.label}
@@ -460,15 +481,18 @@ const ChooseSpecial = () => {
           </Animated.View>
         </Animated.View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "white",
+  },
   container: {
     flex: 1,
     backgroundColor: "white",
-    paddingTop: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -479,6 +503,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: "#000000",
+    fontFamily: "Mont-Regular",
   },
   errorContainer: {
     flex: 1,
@@ -492,6 +517,7 @@ const styles = StyleSheet.create({
     color: "#000000",
     textAlign: "center",
     marginBottom: 15,
+    fontFamily: "Mont-Regular",
   },
   retryButton: {
     backgroundColor: "#0EB3EB",
@@ -503,19 +529,21 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
+    fontFamily: "Mont-Bold",
   },
   noDoctorsFound: {
     fontSize: 18,
     textAlign: "center",
     marginTop: 50,
     color: "#777",
+    fontFamily: "Mont-Regular",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
-    paddingTop: 50,
+    paddingTop: Platform.OS === "android" ? 30 : 0, // Adjust for Android status bar
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
@@ -536,6 +564,7 @@ const styles = StyleSheet.create({
     color: "#333",
     flex: 1,
     textAlign: "center",
+    fontFamily: "Mont-Bold",
   },
   rightIcon: {
     width: 50,
@@ -562,19 +591,19 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
+    fontFamily: "Mont-Bold",
   },
   scrollViewContent: {
-    flex: 1,
     paddingHorizontal: 15,
     paddingBottom: 20,
   },
   card: {
-    backgroundColor: "#E3F2FD",
+    backgroundColor: "#E3F2FD", // Light blue background
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
-    elevation: 3,
-    shadowColor: "#000",
+    elevation: 3, // Android shadow
+    shadowColor: "#000", // iOS shadow
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -583,85 +612,88 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 10,
+    borderBottomWidth: 1, // Separator
+    borderBottomColor: "#CFD8DC",
+    paddingBottom: 10,
   },
   avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 80, // Slightly larger avatar
+    height: 80,
+    borderRadius: 40, // Half of width/height for perfect circle
     marginRight: 15,
-    borderWidth: 1,
-    borderColor: "#3498DB",
+    borderWidth: 2, // More prominent border
+    borderColor: "#0EB3EB", // Primary theme color
+    backgroundColor: "#F5F5F5", // Placeholder background
   },
   avatarPlaceholder: {
-    backgroundColor: "#f0f0f0",
     justifyContent: "center",
     alignItems: "center",
   },
-  doctorInfo: {
+  doctorSummary: {
     flex: 1,
   },
   doctorName: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 5,
+    marginBottom: 8, // More space
+    fontFamily: "Mont-Bold",
   },
-  ratingRow: {
+  infoBoxRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 3,
+    marginBottom: 4, // Tighter spacing for info rows
   },
-  ratingText: {
-    fontSize: 14,
+  infoBoxLabel: {
+    fontSize: 13,
     color: "#555",
+    marginRight: 5,
+    fontFamily: "Mont-Medium",
   },
-  ratingValue: {
+  infoBoxValueContainer: {
+    flex: 1,
+    flexDirection: "row", // Ensure flags display horizontally
+    alignItems: "center",
+    flexWrap: "wrap", // Allow content to wrap
+  },
+  infoBoxValueText: {
     fontSize: 14,
-    fontWeight: "bold",
     color: "#333",
+    fontWeight: "500",
+    fontFamily: "Mont-Regular",
+    flexShrink: 1, // Allow text to shrink
   },
-  languageRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  languageText: {
-    fontSize: 14,
-    color: "#555",
+  notSpecifiedText: {
+    fontStyle: "italic",
+    color: "#777",
   },
   flagsContainer: {
     flexDirection: "row",
-    marginLeft: 5,
+    alignItems: "center",
+    flexWrap: "wrap",
   },
   flagText: {
-    fontSize: 16,
-    marginRight: 3,
-  },
-  detailsRow: {
-    flexDirection: "row",
-    marginBottom: 3,
-  },
-  detailLabel: {
-    fontSize: 13,
-    color: "#777",
+    fontSize: 18,
     marginRight: 5,
   },
-  detailValue: {
-    fontSize: 13,
-    color: "#333",
-    fontWeight: "500",
-    flexShrink: 1,
+  cardDetails: {
+    paddingTop: 10,
+    marginBottom: 10,
   },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 15,
+    borderTopWidth: 1, // Separator
+    borderTopColor: "#CFD8DC",
+    paddingTop: 10,
   },
   goToButton: {
-    backgroundColor: "#4DD0E1",
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    backgroundColor: "#0EB3EB", // Use primary theme color
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 25,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -672,17 +704,18 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 15,
     fontWeight: "bold",
+    fontFamily: "Mont-Bold",
   },
   priceText: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#3498DB",
+    color: "#3498DB", // A distinct blue for price
+    fontFamily: "Mont-Bold",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)", // Darker overlay
     justifyContent: "flex-end",
-    zIndex: 1000,
   },
   sortModalContainer: {
     backgroundColor: "#fff",
@@ -702,14 +735,16 @@ const styles = StyleSheet.create({
   },
   sortOptionButton: {
     paddingVertical: 15,
+    paddingHorizontal: 10, // Added horizontal padding
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     alignItems: "flex-start",
   },
   sortOptionText: {
     fontSize: 16,
-    color: "#0EB3EB",
+    color: "#333", // Darker text for non-selected
     fontWeight: "500",
+    fontFamily: "Mont-Regular",
   },
   sortOptionSelected: {
     backgroundColor: "rgba(14, 179, 235, 0.1)",
@@ -718,6 +753,7 @@ const styles = StyleSheet.create({
   sortOptionTextSelected: {
     fontWeight: "bold",
     color: "#0EB3EB",
+    fontFamily: "Mont-Bold",
   },
   closeSortButton: {
     backgroundColor: "#0EB3EB",
@@ -731,6 +767,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
+    fontFamily: "Mont-Bold",
   },
 });
 

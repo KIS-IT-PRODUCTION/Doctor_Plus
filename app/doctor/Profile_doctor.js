@@ -13,9 +13,10 @@ import {
   Dimensions,
   Alert,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons"; // Переконайтеся, що це імпортовано
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../providers/supabaseClient";
 import * as Notifications from "expo-notifications";
@@ -207,6 +208,9 @@ const Profile_doctor = ({ route }) => {
   // ID поточного залогіненого користувача (якщо це лікар, що переглядає свій профіль)
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  // Стан для pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
 
   // Ефект для оновлення коду відображення мови при зміні мови i18n
   useEffect(() => {
@@ -452,6 +456,16 @@ const Profile_doctor = ({ route }) => {
   }, [getParsedArray, t]);
 
 
+  // Функція для оновлення даних профілю
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // Викликаємо функції для оновлення всіх необхідних даних
+    await fetchDoctorData();
+    await fetchUnreadNotificationsCount();
+    setRefreshing(false);
+  }, [fetchDoctorData, fetchUnreadNotificationsCount]);
+
+
   // --- Умовний рендеринг: Завантаження, Помилка, Відсутність доктора ---
   if (loading) {
     return (
@@ -547,7 +561,17 @@ const Profile_doctor = ({ route }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollViewContent}>
+      <ScrollView
+        style={styles.scrollViewContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#0EB3EB"]}
+            tintColor={"#0EB3EB"}
+          />
+        }
+      >
         <View style={styles.doctorMainInfo}>
           {avatar_url && !avatarError ? (
             <View style={styles.avatarContainer}>
@@ -619,19 +643,23 @@ const Profile_doctor = ({ route }) => {
           </View>
         </View>
 
+        {/* Кнопка "Вибрати час консультації" з іконкою */}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={handleChooseConsultationTime}
         >
+          <Ionicons name="time-outline" size={24} color="white" style={styles.buttonIcon} />
           <Text style={styles.actionButtonText}>
             {t("choose_consultation_time")}
           </Text>
         </TouchableOpacity>
 
+        {/* Кнопка "Налаштування профілю" з іконкою */}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={handleProfileDoctorSettingsPress}
         >
+          <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
           <Text style={styles.actionButtonText}>
             {t("profile_doctor_settings")}
           </Text>
@@ -967,12 +995,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     marginHorizontal: 20,
+    flexDirection: "row", // Додайте це для горизонтального вирівнювання іконки та тексту
+    justifyContent: "center", // Центрування вмісту
   },
   actionButtonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
+    marginLeft: 5, // Додайте відступ між іконкою та текстом
+  },
+  buttonIcon: {
   },
   sectionTitleLink: {
     fontSize: 18,
@@ -1087,7 +1120,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
-    fontFamily: "Mont-Bold",
   },
 });
 

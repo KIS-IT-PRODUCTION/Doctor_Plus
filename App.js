@@ -21,7 +21,7 @@ import Patsient_Home from "./app/Patsient_Home";
 import RegisterScreen from "./app/RegisterScreen";
 import HomeScreen from "./app/HomeScreen";
 import Search from "./app/Search";
-import Messege from "./app/Messege";
+import Messege from "./app/doctor/Messege";
 import Faq from "./app/Faq";
 import Support from "./app/Support";
 import Review from "./app/Rewiew";

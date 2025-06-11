@@ -12,14 +12,17 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Alert,
+  SafeAreaView, // Added SafeAreaView for consistent padding
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
-
+import Icon from "../assets/icon.svg";
 // Reusable component for displaying values in a styled box
-const ValueBox = ({ children }) => {
+// Updated ValueBox to apply styling for displayValueContainer
+const ValueBox = ({ children, isTextValue = true }) => {
   const isEmpty =
     !children ||
     (typeof children === "string" && children.trim() === "") ||
@@ -27,12 +30,16 @@ const ValueBox = ({ children }) => {
 
   if (isEmpty) {
     return (
-      <Text style={[styles.value, styles.noValueText]}>Not specified</Text>
+      <View style={styles.displayValueContainer}>
+        <Text style={[styles.valueText, styles.noValueText]}>
+          Not specified
+        </Text>
+      </View>
     );
   }
   return (
-    <View style={styles.valueBox}>
-      {typeof children === "string" ? (
+    <View style={styles.displayValueContainer}>
+      {isTextValue && typeof children === "string" ? (
         <Text style={styles.valueText}>{children}</Text>
       ) : (
         children
@@ -84,7 +91,9 @@ const Profile = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
 
-  const doctorId = route.params?.doctorId ? String(route.params.doctorId) : null;
+  const doctorId = route.params?.doctorId
+    ? String(route.params.doctorId)
+    : null;
 
   const [doctor, setDoctor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,12 +107,33 @@ const Profile = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
-  const formatYearsText = useCallback((years) => {
-    if (years === null || years === undefined || isNaN(years) || years < 0) {
-      return t("not_specified");
-    }
-    return t("years_experience", { count: years });
-  }, [t]);
+  // State for image modal
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+
+  const formatYearsText = useCallback(
+    (years) => {
+      if (years === null || years === undefined || isNaN(years) || years < 0) {
+        return t("not_specified");
+      }
+      // Assuming t("years_experience") handles pluralization correctly
+      // based on count. If not, you'd need a more complex logic as in Anketa_Settings.
+      const lastDigit = years % 10;
+      const lastTwoDigits = years % 100;
+
+      if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+        return `${years} ${t("years_plural_genitive")}`;
+      }
+      if (lastDigit === 1) {
+        return `${years} ${t("year_singular")}`;
+      }
+      if (lastDigit >= 2 && lastDigit <= 4) {
+        return `${years} ${t("years_plural_nominative")}`;
+      }
+      return `${years} ${t("years_plural_genitive")}`;
+    },
+    [t]
+  );
 
   const fetchDoctorData = useCallback(async () => {
     setLoading(true);
@@ -120,16 +150,20 @@ const Profile = ({ route }) => {
     try {
       const { data, error: fetchError } = await supabase
         .from("anketa_doctor")
-        .select("*, diploma_url, certificate_photo_url, consultation_cost, experience_years")
+        .select(
+          "*, diploma_url, certificate_photo_url, consultation_cost, experience_years"
+        )
         .eq("user_id", doctorId)
         .single();
 
       if (fetchError) {
         console.error("Error fetching doctor data from Supabase:", fetchError);
         if (fetchError.code === "PGRST116") {
-             setError(t("doctor_not_found"));
+          setError(t("doctor_not_found"));
         } else {
-             setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
+          setError(
+            `${t("error_fetching_doctor_data")}: ${fetchError.message}`
+          );
         }
       } else {
         setDoctor(data);
@@ -173,26 +207,50 @@ const Profile = ({ route }) => {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      console.warn("Warning: Invalid JSON format for array (expected array or parsable JSON string):", value, e);
+      console.warn(
+        "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
+        value,
+        e
+      );
       return [];
     }
   }, []);
 
-  const getLanguages = useCallback((languagesData) => {
-    return getParsedArray(languagesData).map((lang) => String(lang).toUpperCase());
-  }, [getParsedArray]);
+  const getLanguages = useCallback(
+    (languagesData) => {
+      const parsedLanguages = getParsedArray(languagesData);
+      return consultationLanguages
+        .filter((lang) => parsedLanguages.includes(lang.code))
+        .map((lang) => t(lang.nameKey))
+        .join(", ");
+    },
+    [getParsedArray, t]
+  );
 
-  const getSpecializations = useCallback((specializationData) => {
-    const parsedSpecs = getParsedArray(specializationData);
-    if (parsedSpecs.length > 0) {
-      if (typeof parsedSpecs[0] === 'string') {
-        return parsedSpecs.map(specValue => t(`categories.${specValue}`)).join(", ");
-      } else if (typeof parsedSpecs[0] === 'object' && parsedSpecs[0].nameKey) {
-        return parsedSpecs.map(specObj => t(`categories.${specObj.nameKey}`)).join(", ");
+  const getSpecializations = useCallback(
+    (specializationData) => {
+      const parsedSpecs = getParsedArray(specializationData);
+      if (parsedSpecs.length > 0) {
+        // Assume specializations array contains { value: "key", nameKey: "translation_key" }
+        const mappedSpecs = specializations
+          .filter((spec) => parsedSpecs.includes(spec.value))
+          .map((spec) => t(spec.nameKey));
+        return mappedSpecs.join(", ");
       }
-    }
-    return t("not_specified");
-  }, [getParsedArray, t]);
+      return t("not_specified");
+    },
+    [getParsedArray, t]
+  );
+
+  const openImageModal = (uri) => {
+    setSelectedImageUri(uri);
+    setIsImageModalVisible(true);
+  };
+
+  const closeImageModal = () => {
+    setSelectedImageUri(null);
+    setIsImageModalVisible(false);
+  };
 
   if (loading) {
     return (
@@ -249,22 +307,20 @@ const Profile = ({ route }) => {
     achievements,
     certificate_photo_url,
     diploma_url,
+    country, // Added country
   } = doctor;
 
   return (
-    <View style={styles.container}>
-      {/* Header for patient view */}
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleBackPress}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>{t("profile")}</Text>
-
-        <View style={{ width: 48 }} />
+       <View style={styles.logoContainer}>
+                      <Icon width={50} height={50} />
+                    </View>
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
@@ -292,51 +348,46 @@ const Profile = ({ route }) => {
               </>
             ) : (
               <View style={styles.emptyAvatar}>
-                <Ionicons name="person-circle-outline" size={80} color="#3498DB" />
+                <Ionicons
+                  name="person-circle-outline"
+                  size={80}
+                  color="#3498DB"
+                />
                 <Text style={styles.emptyAvatarText}>{t("no_photo")}</Text>
               </View>
             )}
           </View>
 
-          <View style={styles.doctorDetails}>
-            <Text style={styles.doctorName}>{full_name || t("not_specified")}</Text>
+          <Text style={styles.doctorName}>
+            {full_name || t("not_specified")}
+          </Text>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("rating")}:</Text>
-              <ValueBox>🌟🌟</ValueBox>
-            </View>
+          {/* New layout for information fields */}
+          <Text style={styles.inputLabel}>{t("country")}</Text>
+          <ValueBox>{country || t("not_specified")}</ValueBox>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("communication_language")}:</Text>
-              <ValueBox>
-                <LanguageFlags languages={getLanguages(communication_languages)} />
-              </ValueBox>
-            </View>
+          <Text style={styles.inputLabel}>{t("communication_language")}</Text>
+          <ValueBox>{getLanguages(communication_languages)}</ValueBox>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("specialization")}:</Text>
-              <ValueBox>{getSpecializations(specialization)}</ValueBox>
-            </View>
+          <Text style={styles.inputLabel}>{t("specialization")}</Text>
+          <ValueBox>{getSpecializations(specialization)}</ValueBox>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("work_experience")}:</Text>
-              <ValueBox>
-                {formatYearsText(experience_years)}
-              </ValueBox>
-            </View>
+          <Text style={styles.inputLabel}>{t("work_experience")}</Text>
+          <ValueBox>{formatYearsText(experience_years)}</ValueBox>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("work_location")}:</Text>
-              <ValueBox>{work_location || t("not_specified")}</ValueBox>
-            </View>
+          <Text style={styles.inputLabel}>{t("work_location")}</Text>
+          <ValueBox>{work_location || t("not_specified")}</ValueBox>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("consultation_cost")}:</Text>
-              <ValueBox>
-                {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
-              </ValueBox>
-            </View>
-          </View>
+          <Text style={styles.inputLabel}>{t("consultation_cost")}</Text>
+          <ValueBox>
+            {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
+          </ValueBox>
+
+          {/* Removed Rating for now as it's not in Anketa_Settings, can add later */}
+          {/*
+          <Text style={styles.inputLabel}>{t("rating")}</Text>
+          <ValueBox>🌟🌟</ValueBox>
+          */}
         </View>
 
         <TouchableOpacity
@@ -348,6 +399,7 @@ const Profile = ({ route }) => {
           </Text>
         </TouchableOpacity>
 
+        {/* --- More About Doctor Section --- */}
         <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
 
         <View style={styles.sectionContainer}>
@@ -356,6 +408,7 @@ const Profile = ({ route }) => {
             {about_me || t("not_specified")}
           </Text>
         </View>
+
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("achievements")}</Text>
           <Text style={styles.sectionContent}>
@@ -373,7 +426,10 @@ const Profile = ({ route }) => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
           {certificate_photo_url && !certificateError ? (
-            <View style={styles.imageWrapper}>
+            <TouchableOpacity
+              style={styles.imageWrapper}
+              onPress={() => openImageModal(certificate_photo_url)}
+            >
               {loadingCertificate && (
                 <ActivityIndicator
                   size="small"
@@ -388,14 +444,19 @@ const Profile = ({ route }) => {
                 onError={() => {
                   setLoadingCertificate(false);
                   setCertificateError(true);
-                  console.error("Error loading certificate image:", certificate_photo_url);
+                  console.error(
+                    "Error loading certificate image:",
+                    certificate_photo_url
+                  );
                 }}
               />
-            </View>
+            </TouchableOpacity>
           ) : (
             <View style={styles.emptyImage}>
               <Ionicons name="image-outline" size={60} color="#A7D9EE" />
-              <Text style={styles.emptyImageText}>{t("no_certificate_photo")}</Text>
+              <Text style={styles.emptyImageText}>
+                {t("no_certificate_photo")}
+              </Text>
             </View>
           )}
         </View>
@@ -403,7 +464,10 @@ const Profile = ({ route }) => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
           {diploma_url && !diplomaError ? (
-            <View style={styles.imageWrapper}>
+            <TouchableOpacity
+              style={styles.imageWrapper}
+              onPress={() => openImageModal(diploma_url)}
+            >
               {loadingDiploma && (
                 <ActivityIndicator
                   size="small"
@@ -421,7 +485,7 @@ const Profile = ({ route }) => {
                   console.error("Error loading diploma image:", diploma_url);
                 }}
               />
-            </View>
+            </TouchableOpacity>
           ) : (
             <View style={styles.emptyImage}>
               <Ionicons name="image-outline" size={60} color="#A7D9EE" />
@@ -430,11 +494,68 @@ const Profile = ({ route }) => {
           )}
         </View>
       </ScrollView>
-    </View>
+
+      {/* Image Modal for fullscreen view */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isImageModalVisible}
+        onRequestClose={closeImageModal}
+      >
+        <TouchableWithoutFeedback onPress={closeImageModal}>
+          <View style={styles.fullScreenImageModalOverlay}>
+            <TouchableWithoutFeedback>
+              {selectedImageUri && (
+                <Image
+                  source={{ uri: selectedImageUri }}
+                  style={styles.fullScreenImage}
+                  resizeMode="contain"
+                />
+              )}
+            </TouchableWithoutFeedback>
+            <TouchableOpacity
+              style={styles.closeImageModalButton}
+              onPress={closeImageModal}
+            >
+              <Ionicons name="close-circle" size={40} color="white" />
+            </TouchableOpacity>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
+const consultationLanguages = [
+  { nameKey: "english", code: "en", emoji: "" },
+  { nameKey: "ukrainian", code: "uk", emoji: "" },
+  { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
+  { nameKey: "german", code: "de", emoji: "🇩🇪" },
+];
+
+const specializations = [
+  { nameKey: "general_practitioner", value: "general_practitioner" },
+  { nameKey: "pediatrician", value: "pediatrician" },
+  { nameKey: "cardiologist", value: "cardiologist" },
+  { nameKey: "dermatologist", value: "dermatologist" },
+  { nameKey: "neurologist", value: "neurologist" },
+  { nameKey: "surgeon", value: "surgeon" },
+  { nameKey: "psychiatrist", value: "psychiatrist" },
+  { nameKey: "dentist", value: "dentist" },
+  { nameKey: "ophthalmologist", value: "ophthalmologist" },
+  { nameKey: "ent_specialist", value: "ent_specialist" },
+  { nameKey: "gastroenterologist", value: "gastroenterologist" },
+  { nameKey: "endocrinologist", value: "endocrinologist" },
+  { nameKey: "oncologist", value: "oncologist" },
+  { nameKey: "allergist", value: "allergist" },
+  { nameKey: "physiotherapist", value: "physiotherapist" },
+];
+
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "white",
+  },
   container: {
     flex: 1,
     backgroundColor: "white",
@@ -501,7 +622,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
-    paddingTop: 50,
+    paddingTop: Platform.OS === "android" ? 30 : 0, // Adjust for Android status bar
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
@@ -529,39 +650,39 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   doctorMainInfo: {
-    backgroundColor: "#E3F2FD",
+    backgroundColor: "#E3F2FD", // Light blue background
     borderRadius: 15,
     padding: 20,
     marginTop: 20,
     alignItems: "center",
-    elevation: 3,
-    shadowColor: "#000",
+    elevation: 3, // Android shadow
+    shadowColor: "#000", // iOS shadow
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     position: "relative",
   },
   avatarContainer: {
-    width: 115,
-    height: 115,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     marginBottom: 15,
     position: "relative",
     justifyContent: "center",
     alignItems: "center",
-    overflow: 'hidden', // Ensures content stays within bounds
+    overflow: "hidden", // Ensures content stays within bounds
+    borderWidth: 1, // Added border for consistency
+    borderColor: "#0EB3EB", // Border color from doctor profile
   },
   avatar: {
-    width: 115,
-    height: 115,
-    borderRadius: 50,
-    borderWidth: 0.5,
-    borderColor: "#3498DB",
+    width: "100%",
+    height: "100%",
+    borderRadius: 60, // Use 60 for 120x120 to make it perfectly round
   },
   emptyAvatar: {
-    width: 115,
-    height: 115,
-    borderRadius: 50,
+    width: "100%",
+    height: "100%",
+    borderRadius: 60,
     borderWidth: 1,
     borderColor: "#ccc",
     backgroundColor: "#f0f0f0",
@@ -582,42 +703,41 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#000000",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 20, // Increased margin for better separation
     fontFamily: "Mont-Bold",
   },
-  infoRowDynamic: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#CFD8DC",
-    paddingBottom: 8,
-  },
-  label: {
-    fontSize: 15,
-    color: "#000000",
-    fontWeight: "500",
-    fontFamily: "Mont-Regular",
+  // New styles for consistent display
+  inputLabel: {
+    fontSize: 14,
+    alignSelf: "flex-start", // Align to left like doctor's profile
+    color: "#2A2A2A",
+    fontFamily: "Mont-Medium",
+    paddingHorizontal: 15, // Adjusted padding
+    marginTop: 10,
     marginBottom: 5,
+    width: "100%", // Take full width
   },
-  valueBox: {
-    backgroundColor: "#D1E8F6",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: "stretch",
+  displayValueContainer: {
+    backgroundColor: "rgba(14, 179, 235, 0.2)", // Background from doctor's profile inputs
+    borderRadius: 20, // Rounded corners
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    width: "100%", // Take full width
+    minHeight: 52, // Min height like doctor's inputs
+    justifyContent: "center",
+    alignItems: "flex-start", // Align text to start
+    marginBottom: 14, // Spacing
   },
   valueText: {
-    fontSize: 15,
-    color: "#000000",
+    color: "black",
+    fontSize: 16,
     fontFamily: "Mont-Medium",
-    textAlign: "left",
+    flexWrap: "wrap", // Allow text to wrap
   },
   noValueText: {
     color: "#777",
     fontStyle: "italic",
     fontFamily: "Mont-Regular",
-    paddingTop: 0,
   },
   flagsContainer: {
     flexDirection: "row",
@@ -695,19 +815,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
+    borderWidth: 1, // Added border for consistency
+    borderColor: "#0EB3EB", // Border color from doctor profile
   },
   certificateImage: {
     width: "100%",
     height: "100%",
     resizeMode: "contain",
     borderRadius: 10,
-  },
-  noImageText: {
-    textAlign: "center",
-    marginTop: 10,
-    fontStyle: "italic",
-    fontFamily: "Mont-Regular",
-    color: "#000000",
   },
   emptyImage: {
     width: "100%",
@@ -748,7 +863,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 1,
     backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 50,
+    borderRadius: 60, // Half of 120 width/height
+  },
+  fullScreenImageModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullScreenImage: {
+    width: "95%",
+    height: "95%",
+  },
+  closeImageModalButton: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 50 : 20,
+    right: 20,
+    zIndex: 1,
   },
 });
 
