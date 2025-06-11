@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -12,20 +12,17 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Alert,
-  Platform, // <-- ДОДАНО
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../providers/supabaseClient";
-import * as Notifications from 'expo-notifications'; // <-- ДОДАНО
-import * as Device from 'expo-device';     // <-- ДОДАНО
-
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
 
 const { width } = Dimensions.get("window");
 
-// ДОДАНО: Конфігурація обробника сповіщень для Expo
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -34,72 +31,88 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// ДОДАНО: Функція для реєстрації push-сповіщень
+/**
+ * Реєструє пристрій для push-сповіщень Expo та зберігає токен у Supabase.
+ * @param {string} userId ID користувача лікаря, для якого потрібно зберегти токен.
+ * @returns {Promise<string|undefined>} Токен Expo Push або undefined у разі помилки.
+ */
 async function registerForPushNotificationsAsync(userId) {
   let token;
 
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
+  if (Platform.OS === "android") {
+    Notifications.setNotificationChannelAsync("default", {
+      name: "default",
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
+      lightColor: "#FF231F7C",
     });
   }
 
   if (Device.isDevice) {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
+    if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
-    if (finalStatus !== 'granted') {
-      Alert.alert('Помилка', 'Не вдалося отримати токен для push-сповіщень! Перевірте дозволи в налаштуваннях вашого пристрою.');
-      console.error('Failed to get push token for push notification!');
+    if (finalStatus !== "granted") {
+      Alert.alert(
+        "Помилка",
+        "Не вдалося отримати токен для push-сповіщень! Перевірте дозволи в налаштуваннях вашого пристрою."
+      );
+      console.error("Failed to get push token for push notification: Permissions not granted!");
       return;
     }
 
     try {
-      // !!! ВАЖЛИВО: Замініть 'your-expo-project-id' на реальний ID вашого Expo проекту.
-      // Його можна знайти в файлі app.json у полі 'extra.eas.projectId' або просто 'projectId'.
-      // Якщо ви не використовуєте EAS build, то може бути і без projectId.
-      token = (await Notifications.getExpoPushTokenAsync({ projectId: 'your-expo-project-id' })).data;
-      console.log("Expo Push Token:", token);
+      // !!! ВАЖЛИВО: Переконайтеся, що projectId відповідає вашому expo.projectId в app.json/app.config.js
+      token = (
+        await Notifications.getExpoPushTokenAsync({
+          projectId: "e2619b61-6ef5-4958-90bc-a400bbc8c50a", // ПЕРЕВІРТЕ ЦЕЙ ID!
+        })
+      ).data;
+      console.log("Expo Push Token obtained:", token);
     } catch (e) {
-      console.error("Error getting Expo push token:", e);
-      Alert.alert('Помилка', 'Не вдалося отримати токен сповіщень. Перевірте підключення.');
+      let errorMessage = 'Unknown error';
+      if (e instanceof Error) {
+        errorMessage = e.message;
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      } else if (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string') {
+        errorMessage = e.message;
+      }
+      console.error("Error getting Expo push token:", errorMessage, e);
+      Alert.alert("Помилка", `Не вдалося отримати токен сповіщень: ${errorMessage}. Перевірте підключення.`);
       return;
     }
-
   } else {
-    // Це повідомлення з'явиться, якщо ви запускаєте на емуляторі/симуляторі
-    Alert.alert('Помилка', 'Push-сповіщення працюють лише на фізичних пристроях!');
-    console.log('Must use physical device for Push Notifications');
-    return; // Немає сенсу продовжувати, якщо не фізичний пристрій
+    Alert.alert("Помилка", "Push-сповіщення працюють лише на фізичних пристроях!");
+    console.log("Must use physical device for Push Notifications");
+    return;
   }
 
-  // Зберігаємо токен у Supabase
   if (token && userId) {
     const { data, error } = await supabase
-      .from('profile_doctor') // Ваша таблиця для профілів лікарів
+      .from("profile_doctor") // Переконайтеся, що це правильна таблиця для профілів лікарів
       .update({ notification_token: token })
-      .eq('user_id', userId); // Припускаємо, що у вас є 'user_id' як ідентифікатор користувача в цій таблиці.
+      .eq("user_id", userId); // І що user_id - це коректний стовпець для ідентифікації користувача
 
     if (error) {
       console.error("Error saving notification token to Supabase:", error.message);
-      // Можна відобразити Alert, але, можливо, це не критично для користувача, якщо токен не зберігся
-      // Alert.alert('Помилка', `Не вдалося зберегти токен сповіщень: ${error.message}`);
+      Alert.alert('Помилка', `Не вдалося зберегти токен сповіщень: ${error.message}`);
     } else {
       console.log("Notification token saved successfully for doctor user_id:", userId);
+      console.log("Saved token:", token);
     }
   }
 
   return token;
 }
 
-
-// Reusable component for displaying values in a styled box
+/**
+ * Компонент-обгортка для відображення значень.
+ * Показує "Not specified", якщо значення відсутнє або порожнє.
+ */
 const ValueBox = ({ children }) => {
   const isEmpty =
     !children ||
@@ -122,6 +135,9 @@ const ValueBox = ({ children }) => {
   );
 };
 
+/**
+ * Компонент для відображення прапорців мов.
+ */
 const LanguageFlags = ({ languages }) => {
   const getFlag = (code) => {
     switch (String(code).toUpperCase()) {
@@ -160,11 +176,15 @@ const LanguageFlags = ({ languages }) => {
   );
 };
 
+/**
+ * Головний компонент профілю лікаря.
+ */
 const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
 
-  // Забезпечте, що doctorId є числовим або рядковим і не undefined
+  // ID лікаря, переданий з маршруту (для перегляду профілю іншого лікаря)
+  // або null, якщо це профіль поточного залогіненого лікаря.
   const doctorId = route.params?.doctorId ? String(route.params.doctorId) : null;
 
   const [doctor, setDoctor] = useState(null);
@@ -175,61 +195,109 @@ const Profile_doctor = ({ route }) => {
     i18n.language.toUpperCase()
   );
 
-  // СТАНІ ДЛЯ ЗАВАНТАЖЕННЯ ЗОБРАЖЕНЬ
+  // Стан для індикаторів завантаження зображень та помилок завантаження
   const [loadingAvatar, setLoadingAvatar] = useState(true);
   const [loadingCertificate, setLoadingCertificate] = useState(true);
   const [loadingDiploma, setLoadingDiploma] = useState(true);
 
-  // Стан для відстеження помилок завантаження зображень
   const [avatarError, setAvatarError] = useState(false);
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
-  // !!! ДОДАНО: Стан для зберігання user_id поточного лікаря
+  // ID поточного залогіненого користувача (якщо це лікар, що переглядає свій профіль)
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
+  // Ефект для оновлення коду відображення мови при зміні мови i18n
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-
-  // ДОДАНО: useEffect для отримання user_id поточного лікаря
+  // Ефект для отримання ID поточного залогіненого користувача.
+  // Виконується один раз при монтуванні компонента.
   useEffect(() => {
     const getDoctorSession = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error("Error getting doctor user session:", error.message);
-        // Можливо, перенаправити на екран входу, якщо сесія не дійсна
-        // navigation.replace('Auth');
+      const {
+        data: { user },
+        error: sessionError,
+      } = await supabase.auth.getUser();
+      if (sessionError) {
+        console.error("Error getting doctor user session:", sessionError.message);
         return;
       }
       if (user) {
         setCurrentDoctorUserId(user.id);
+        console.log("Profile_doctor: Current logged-in user ID:", user.id);
       } else {
-        // Якщо користувача немає, можливо, він не увійшов як лікар
-        console.log("No doctor user session found.");
+        console.log("Profile_doctor: No doctor user session found.");
       }
     };
     getDoctorSession();
-  }, []); // Пустий масив залежностей означає, що цей ефект запускається один раз при монтажі
+  }, []);
 
-
-  // ДОДАНО: useEffect для реєстрації push-токенів, коли user_id лікаря доступний
+  // Ефект для реєстрації push-сповіщень, коли currentDoctorUserId стає доступним.
   useEffect(() => {
     if (currentDoctorUserId) {
+      console.log("Profile_doctor: Registering for push notifications...");
       registerForPushNotificationsAsync(currentDoctorUserId);
     }
-    // Зауваження: Слухачі сповіщень (addNotificationReceivedListener, addNotificationResponseReceivedListener)
-    // тепер розміщені у файлі Messege.js, тому тут їх додавати не потрібно,
-    // якщо Messege.js є постійно активним або викликається при старті додатку.
-    // Якщо Messege.js викликається тільки тоді, коли користувач переходить на екран повідомлень,
-    // то вам потрібно буде переконатися, що Messege.js монтується і слухачі активуються
-    // при запуску додатку або що слухачі для фонового режиму/закритого додатку налаштовані в App.js.
-    // Для простоти, ми вважаємо, що Messege.js достатньо активний, коли лікар відкриває додаток.
+  }, [currentDoctorUserId]);
 
-  }, [currentDoctorUserId]); // Цей ефект спрацює, коли currentDoctorUserId буде встановлено
+  /**
+   * Завантажує кількість непрочитаних сповіщень для поточного лікаря.
+   */
+  const fetchUnreadNotificationsCount = useCallback(async () => {
+    if (!currentDoctorUserId) {
+      setUnreadNotificationsCount(0);
+      return;
+    }
 
-  // Функція для форматування досвіду роботи (як у ChooseSpecial)
+    try {
+      const { count, error: countError } = await supabase
+        .from("doctor_notifications")
+        .select("id", { count: "exact" })
+        .eq("doctor_id", currentDoctorUserId)
+        .eq("is_read", false);
+
+      if (countError) {
+        console.error(
+          "Error fetching unread notifications count:",
+          countError.message
+        );
+        setUnreadNotificationsCount(0);
+      } else {
+        setUnreadNotificationsCount(count || 0);
+        console.log(`Unread notifications count for ${currentDoctorUserId}: ${count}`);
+      }
+    } catch (err) {
+      let errorMessage = 'Unknown error';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string') {
+        errorMessage = err.message;
+      }
+      console.error(
+        "Unexpected error fetching unread notifications count:",
+        errorMessage, err
+      );
+      setUnreadNotificationsCount(0);
+    }
+  }, [currentDoctorUserId]);
+
+  // Ефект для отримання кількості непрочитаних сповіщень.
+  // Тепер це не Realtime, а просто одноразовий запит при завантаженні або зміні ID.
+  useEffect(() => {
+    fetchUnreadNotificationsCount();
+  }, [currentDoctorUserId, fetchUnreadNotificationsCount]);
+
+
+  /**
+   * Форматує текст для відображення досвіду роботи.
+   * @param {number|null|undefined} years Кількість років досвіду.
+   * @returns {string} Відформатований текст або "Not specified".
+   */
   const formatYearsText = useCallback((years) => {
     if (years === null || years === undefined || isNaN(years) || years < 0) {
       return t("not_specified");
@@ -237,19 +305,17 @@ const Profile_doctor = ({ route }) => {
     return t("years_experience", { count: years });
   }, [t]);
 
+  /**
+   * Завантажує дані лікаря з Supabase.
+   */
   const fetchDoctorData = useCallback(async () => {
     setLoading(true);
     setError(null);
     setDoctor(null);
 
-    // ВАЖЛИВО: Використовуйте `currentDoctorUserId`, якщо це профіль *поточного* увійшовшого лікаря
-    // Якщо цей компонент використовується для перегляду профілю *будь-якого* лікаря (наприклад, з пошуку пацієнтом),
-    // то використовуйте `doctorId` з `route.params`.
-    // Якщо це профіль лікаря, який дивиться *свій власний* профіль, то `doctorId` з `route.params` може бути null,
-    // і тоді треба використовувати `currentDoctorUserId`.
-    // Я припускаю, що цей екран може бути як для перегляду власного профілю, так і чужого.
-    // Тож, ID для запиту:
-    const idToFetch = doctorId || currentDoctorUserId; // Спершу беремо з параметрів, потім з сесії
+    // ID для вибірки може бути переданий через route.params (для перегляду чужого профілю)
+    // або це ID поточного залогіненого лікаря (для перегляду свого профілю).
+    const idToFetch = doctorId || currentDoctorUserId;
 
     if (!idToFetch) {
       console.warn("Profile_doctor: No doctor ID available to fetch data.");
@@ -268,12 +334,13 @@ const Profile_doctor = ({ route }) => {
       if (fetchError) {
         console.error("Error fetching doctor data from Supabase:", fetchError);
         if (fetchError.code === "PGRST116") {
-           setError(t("doctor_not_found"));
+          setError(t("doctor_not_found"));
         } else {
-           setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
+          setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
         }
       } else {
         setDoctor(data);
+        // Скидаємо стан завантаження зображень та помилок при успішному завантаженні даних
         setLoadingAvatar(true);
         setLoadingCertificate(true);
         setLoadingDiploma(true);
@@ -282,37 +349,44 @@ const Profile_doctor = ({ route }) => {
         setDiplomaError(false);
       }
     } catch (err) {
-      console.error("Unexpected error during data fetch:", err);
-      setError(`${t("unexpected_error")}: ${err.message}`);
+      let errorMessage = 'Unknown error';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string') {
+        errorMessage = err.message;
+      }
+      console.error("Unexpected error during data fetch:", errorMessage, err);
+      setError(`${t("unexpected_error")}: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
-  }, [doctorId, currentDoctorUserId, t]); // Додаємо currentDoctorUserId до залежностей
+  }, [doctorId, currentDoctorUserId, t]);
 
-  // Важливо: перевірте, чи `fetchDoctorData` не викликається безкінечно
-  // Якщо `doctorId` не змінюється, а `currentDoctorUserId` встановлюється тільки один раз,
-  // то це повинно бути нормально. Якщо `fetchDoctorData` залежить від `doctor` або іншого стану,
-  // це може створити циклічну залежність.
+  // Ефект для виклику fetchDoctorData при зміні залежностей.
   useEffect(() => {
     fetchDoctorData();
   }, [fetchDoctorData]);
 
+  // Функції для керування модальним вікном вибору мови
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
 
+  // Обробник вибору мови
   const handleLanguageSelect = (langCode) => {
     i18n.changeLanguage(langCode);
     closeLanguageModal();
   };
 
+  // Навігація до налаштувань профілю лікаря
   const handleProfileDoctorSettingsPress = () => {
     navigation.navigate("Anketa_Settings");
   };
 
+  // Навігація до вибору часу консультації
   const handleChooseConsultationTime = () => {
-    // Якщо це власний профіль лікаря (тобто doctorId з route.params може бути null),
-    // то для навігації в ConsultationTime потрібен user_id поточного лікаря.
-    // Якщо це чужий профіль, використовуємо doctorId з route.params.
+    // Використовуємо ID, який є актуальним для перегляду профілю
     const targetDoctorId = doctorId || currentDoctorUserId;
 
     if (targetDoctorId) {
@@ -322,11 +396,17 @@ const Profile_doctor = ({ route }) => {
     }
   };
 
+  // Дані для модального вікна вибору мови
   const languagesForModal = [
     { nameKey: "english", code: "en", emoji: "" },
     { nameKey: "ukrainian", code: "uk", emoji: "" },
   ];
 
+  /**
+   * Безпечно парсить JSON-рядок, який, як очікується, містить масив.
+   * @param {any} value Вхідне значення.
+   * @returns {Array} Розпарсений масив або порожній масив у разі помилки.
+   */
   const getParsedArray = useCallback((value) => {
     if (!value) return [];
     if (Array.isArray(value)) {
@@ -335,16 +415,30 @@ const Profile_doctor = ({ route }) => {
     try {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.warn("Warning: Invalid JSON format for array (expected array or parsable JSON string):", value, e);
+    } catch (err) {
+      let errorMessage = 'Invalid JSON format';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string') {
+        errorMessage = err.message;
+      }
+      console.warn("Warning: Invalid JSON format for array (expected array or parsable JSON string):", value, errorMessage, err);
       return [];
     }
   }, []);
 
+  /**
+   * Отримує список мов для відображення, використовуючи getParsedArray.
+   */
   const getLanguages = useCallback((languagesData) => {
     return getParsedArray(languagesData).map((lang) => String(lang).toUpperCase());
   }, [getParsedArray]);
 
+  /**
+   * Отримує список спеціалізацій для відображення, використовуючи getParsedArray та i18n.
+   */
   const getSpecializations = useCallback((specializationData) => {
     const parsedSpecs = getParsedArray(specializationData);
     if (parsedSpecs.length > 0) {
@@ -358,6 +452,7 @@ const Profile_doctor = ({ route }) => {
   }, [getParsedArray, t]);
 
 
+  // --- Умовний рендеринг: Завантаження, Помилка, Відсутність доктора ---
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -401,6 +496,7 @@ const Profile_doctor = ({ route }) => {
     );
   }
 
+  // Деструктуризація даних лікаря для зручності
   const {
     full_name,
     avatar_url,
@@ -415,6 +511,7 @@ const Profile_doctor = ({ route }) => {
     diploma_url,
   } = doctor;
 
+  // --- Основний рендеринг компонента ---
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -441,10 +538,12 @@ const Profile_doctor = ({ route }) => {
             size={24}
             color="white"
           />
-          {/* Цей бейдж "5" статичний, його потрібно буде оновити динамічно */}
-          <View style={styles.notificationBadge}>
-            <Text style={styles.notificationNumber}>5</Text>
-          </View>
+          {/* Динамічний бейдж з кількістю непрочитаних сповіщень */}
+          {unreadNotificationsCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationNumber}>{unreadNotificationsCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -756,7 +855,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 15,
   },
-    notificationButton: {
+  notificationButton: {
     width: width * 0.12,
     height: width * 0.12,
     backgroundColor: "rgba(14, 179, 235, 0.69)",
@@ -780,198 +879,155 @@ const styles = StyleSheet.create({
   notificationNumber: {
     color: "white",
     fontSize: 10,
+    fontFamily: "Mont-Bold",
   },
   scrollViewContent: {
-    paddingHorizontal: 15,
-    paddingBottom: 20,
+    flex: 1,
+    paddingHorizontal: 20,
   },
   doctorMainInfo: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: 15,
-    padding: 20,
-    marginTop: 20,
     alignItems: "center",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    position: "relative",
+    marginBottom: 20,
+    paddingTop: 20,
   },
   avatarContainer: {
-    width: 115,
-    height: 115,
+    width: 100,
+    height: 100,
     borderRadius: 50,
-    marginBottom: 15,
-    position: "relative",
+    overflow: "hidden",
+    marginBottom: 10,
+    backgroundColor: "#E3F2FD",
     justifyContent: "center",
     alignItems: "center",
   },
   avatar: {
-    width: 115,
-    height: 115,
-    borderRadius: 50,
-    borderWidth: 0.5,
-    borderColor: "#3498DB",
+    width: "100%",
+    height: "100%",
+  },
+  avatarLoadingIndicator: {
+    position: "absolute",
   },
   doctorDetails: {
     width: "100%",
+    paddingHorizontal: 10,
   },
   doctorName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#000000",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 15,
+    color: "#000000",
     fontFamily: "Mont-Bold",
   },
   infoRowDynamic: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#CFD8DC",
-    paddingBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: "#f9f9f9",
+    borderWidth: 1,
+    borderColor: "#eee",
   },
   label: {
-    fontSize: 15,
-    color: "#000000",
-    fontWeight: "500",
-    fontFamily: "Mont-Regular",
-    marginBottom: 5,
+    fontSize: 16,
+    color: "#555",
+    fontFamily: "Mont-SemiBold",
   },
   valueBox: {
-    backgroundColor: "#D1E8F6",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: "stretch",
+    flexShrink: 1,
   },
   valueText: {
-    fontSize: 15,
-    color: "#000000",
-    fontFamily: "Mont-Medium",
-    textAlign: "left",
+    fontSize: 16,
+    color: "#333",
+    textAlign: "right",
+    fontFamily: "Mont-Regular",
   },
   noValueText: {
-    color: "#777",
+    color: "#999",
     fontStyle: "italic",
+    textAlign: "right",
     fontFamily: "Mont-Regular",
-    paddingTop: 0,
   },
   flagsContainer: {
     flexDirection: "row",
-    alignItems: "center",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    justifyContent: "flex-end",
   },
   flagText: {
     fontSize: 18,
-    marginRight: 5,
+    marginLeft: 5,
   },
   actionButton: {
     backgroundColor: "#0EB3EB",
     paddingVertical: 15,
-    borderRadius: 25,
+    borderRadius: 10,
     alignItems: "center",
-    marginTop: 20,
-    marginHorizontal: 15,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    marginBottom: 10,
+    marginHorizontal: 20,
   },
   actionButtonText: {
-    color: "#FFF",
-    fontSize: 16,
+    color: "white",
+    fontSize: 18,
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
   sectionTitleLink: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#000000",
+    color: "#0EB3EB",
     textAlign: "center",
-    marginTop: 25,
+    marginTop: 20,
     marginBottom: 15,
-    textDecorationLine: "underline",
     fontFamily: "Mont-Bold",
   },
   sectionContainer: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: 15,
+    backgroundColor: "#fff",
+    borderRadius: 10,
     padding: 15,
     marginBottom: 15,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    position: "relative",
+    borderWidth: 1,
+    borderColor: "#eee",
+    marginHorizontal: 20,
   },
   sectionHeader: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#000000",
     marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#CFD8DC",
-    paddingBottom: 5,
-    fontFamily: "Mont-Bold",
+    color: "#333",
+    fontFamily: "Mont-SemiBold",
   },
   sectionContent: {
-    fontSize: 14,
-    color: "#000000",
-    lineHeight: 20,
+    fontSize: 16,
+    color: "#555",
+    lineHeight: 24,
     fontFamily: "Mont-Regular",
   },
   imageWrapper: {
     width: "100%",
     height: 200,
-    borderRadius: 10,
-    marginTop: 10,
-    position: "relative",
+    backgroundColor: "#E3F2FD",
+    borderRadius: 8,
+    overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
   },
   certificateImage: {
     width: "100%",
     height: "100%",
     resizeMode: "contain",
-    borderRadius: 10,
-  },
-  noImageText: {
-    textAlign: "center",
-    marginTop: 10,
-    fontStyle: "italic",
-    fontFamily: "Mont-Regular",
-    color: "#000000",
   },
   imageLoadingIndicator: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 10,
   },
-  avatarLoadingIndicator: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 50,
+  noImageText: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    fontStyle: "italic",
+    fontFamily: "Mont-Regular",
   },
   modalOverlay: {
     flex: 1,
@@ -982,9 +1038,8 @@ const styles = StyleSheet.create({
   languageModalContent: {
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 20,
+    padding: 25,
     alignItems: "center",
-    width: Dimensions.get("window").width * 0.8,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -993,38 +1048,41 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    width: "80%",
+    maxHeight: "60%",
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 15,
+    marginBottom: 20,
     color: "#000000",
     fontFamily: "Mont-Bold",
   },
   modalScrollView: {
-    maxHeight: Dimensions.get("window").height * 0.5,
+    maxHeight: 200,
     width: "100%",
   },
   languageOption: {
-    paddingVertical: 15,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
     width: "100%",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ECECEC",
   },
   languageOptionText: {
     fontSize: 18,
+    color: "#333",
     fontFamily: "Mont-Regular",
-    color: "#000000",
   },
   button: {
     borderRadius: 20,
     padding: 10,
     elevation: 2,
-    marginTop: 15,
-    backgroundColor: "#2196F3",
+    marginTop: 20,
   },
-  buttonClose: {},
+  buttonClose: {
+    backgroundColor: "#0EB3EB",
+  },
   textStyle: {
     color: "white",
     fontWeight: "bold",
