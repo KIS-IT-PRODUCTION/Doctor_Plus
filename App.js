@@ -33,7 +33,7 @@ import Anketa_Settings from "./app/doctor/Anketa_Settings";
 import Profile_doctor from "./app/doctor/Profile_doctor";
 import ConsultationTime from "./app/doctor/ConsultationTime";
 import ConsultationTimePatient from "./app/ConsultationTimePatient";
-// Запобігаємо автоматичному прихованню Splash Screen, доки програма не буде готова
+import PatientMessages from "./app/PatientMessages";
 SplashScreen.preventAutoHideAsync();
 
 // Створюємо навігаційний стек
@@ -102,6 +102,7 @@ function InitialNavigator() {
       <Stack.Screen name="WriteReview" component={WriteReview} />
       <Stack.Screen name="Profile" component={Profile} />
       <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
+      <Stack.Screen name="PatientMessages" component={PatientMessages} />
       <Stack.Screen
         name="Profile_doctor"
         component={Profile_doctor}

@@ -161,15 +161,15 @@ const RegisterScreen = () => {
         console.log("Supabase user registered. User ID:", data.user.id);
 
         // Збереження додаткових даних профілю в таблицю "profiles"
-        const { error: profileError } = await supabase.from("profiles").insert([
-          {
-            id: data.user.id, // ID користувача з Supabase Auth
-            full_name: fullName.trim(), // Повне ім'я з поля вводу
-            phone: phone.trim() || null, // Номер телефону (або null, якщо поле пусте)
-            country: country?.name || null, // Назва обраної країни (зберігаємо англійську назву, яку потім перекладемо при відображенні)
-            language: i18n.language || null, // Поточна мова інтерфейсу
-          },
-        ]);
+      const { error: profileError } = await supabase.from("profiles").insert([
+  {
+    user_id: data.user.id, // ID користувача з Supabase Auth (виправлено)
+    full_name: fullName.trim(),
+    phone: phone.trim() || null,
+    country: country?.name || null,
+    language: i18n.language || null,
+  },
+]);
 
         if (profileError) {
           console.error(

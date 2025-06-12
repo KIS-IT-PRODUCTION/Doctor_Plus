@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -10,35 +10,46 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg";
+import Icon from "../../assets/icon.svg"; // ПЕРЕВІРТЕ: Переконайтеся, що шлях до іконки правильний
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
-import { supabase } from '../../providers/supabaseClient';
+import { supabase } from '../../providers/supabaseClient'; // ПЕРЕВІРТЕ: Переконайтеся, що шлях до Supabase клієнта правильний
 
-export default function Messege() {
+export default function Message() {
   const navigation = useNavigation();
   const { t } = useTranslation();
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentDoctorId, setCurrentDoctorId] = useState(null);
+  const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null); // Змінено на currentDoctorUserId
+  const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
+
+  // Використання useRef для підписок Expo Notifications
+  const notificationReceivedListener = useRef(null);
+  const notificationResponseListener = useRef(null);
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
+  /**
+   * Додає нове повідомлення до стану, перевіряючи на дублікати.
+   * @param {object} notificationContent Вміст сповіщення з Expo (notification.request.content)
+   */
   const addNewMessage = useCallback((notificationContent) => {
     const { title, body, data } = notificationContent;
     const now = new Date();
-    const messageDate = new Intl.DateTimeFormat(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(now);
-    const messageTime = new Intl.DateTimeFormat(t('locale'), { hour: '2-digit', minute: '2-digit' }).format(now);
+    // Використання Locale для Intl.DateTimeFormat (наприклад, 'uk-UA')
+    const locale = t('locale') || 'uk-UA'; // Використовуємо 'uk-UA' як запасний варіант
+    const messageDate = new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(now);
+    const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(now);
 
     setMessages(prevMessages => {
-      // Check for duplicates based on db_id (if available) or a unique combination
+      // Перевірка на дублікати за db_id (якщо є) або унікальною комбінацією полів
       const isDuplicate = prevMessages.some(msg =>
-        (data.db_id && msg.db_id === data.db_id) ||
-        (msg.title === title && msg.body === body && msg.date === messageDate && msg.time === messageTime)
+        (data && data.db_id && msg.db_id === data.db_id) ||
+        (msg.title === title && msg.body === body && msg.date === messageDate && msg.time === messageTime && msg.type === (data.type || 'general'))
       );
 
       if (isDuplicate) {
@@ -46,37 +57,44 @@ export default function Messege() {
         return prevMessages;
       }
 
+      // Припускаємо, що статус зберігається у data.status або default 'pending'
+      const messageStatus = (data && data.status) ? String(data.status).toLowerCase() : 'pending';
+
       return [
         {
-          id: data.db_id || (Date.now().toString() + Math.random().toString(36).substring(2, 9)), // Use db_id if present
-          db_id: data.db_id || null, // Store db_id for updates
+          id: data && data.db_id ? data.db_id : (Date.now().toString() + Math.random().toString(36).substring(2, 9)),
+          db_id: data && data.db_id ? data.db_id : null,
           title: title,
           body: body,
           date: messageDate,
           time: messageTime,
-          is_read: data.is_read || false,
-          type: data.type || 'general',
-          rawData: data || {}, // Ensure rawData is an object
+          is_read: (data && data.is_read) || false, // Припускаємо, що is_read може прийти з даних
+          type: (data && data.type) || 'general',
+          rawData: { ...data, status: messageStatus } || {},
         },
         ...prevMessages,
       ];
     });
   }, [t]);
 
-  const fetchMessagesFromSupabase = useCallback(async (doctorId) => {
-    if (!doctorId) {
-      console.warn("Doctor ID is missing, cannot fetch notifications.");
+  /**
+   * Завантажує сповіщення лікаря з Supabase.
+   * @param {string} doctorUserId ID користувача лікаря з auth.uid()
+   */
+  const fetchMessagesFromSupabase = useCallback(async (doctorUserId) => {
+    if (!doctorUserId) {
+      console.warn("Doctor user ID is missing, cannot fetch notifications.");
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    console.log("Fetching notifications for doctor:", doctorId);
+    console.log("Fetching notifications for doctor (user ID):", doctorUserId);
     try {
       const { data, error } = await supabase
         .from('doctor_notifications')
         .select('*')
-        .eq('doctor_id', doctorId)
+        .eq('doctor_id', doctorUserId) // ВИПРАВЛЕНО: Використовуємо doctor_id, який є user_id лікаря
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -85,17 +103,25 @@ export default function Messege() {
 
       console.log("Fetched notifications:", data);
 
-      const formattedMessages = data.map(notif => ({
-        id: notif.id,
-        db_id: notif.id,
-        title: notif.title,
-        body: notif.body,
-        date: new Intl.DateTimeFormat(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at)),
-        time: new Intl.DateTimeFormat(t('locale'), { hour: '2-digit', minute: '2-digit' }).format(new Date(notif.created_at)),
-        is_read: notif.is_read,
-        type: (notif.data && notif.data.type) || 'general',
-        rawData: notif.data || {}, // Ensure rawData is an object
-      }));
+      const locale = t('locale') || 'uk-UA';
+
+      const formattedMessages = data.map(notif => {
+        // Переконайтеся, що notif.data існує перед доступом до нього
+        const rawData = notif.data || {};
+        const messageStatus = (rawData.status) ? String(rawData.status).toLowerCase() : 'pending';
+
+        return {
+          id: notif.id,
+          db_id: notif.id,
+          title: notif.title,
+          body: notif.body,
+          date: new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at)),
+          time: new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(notif.created_at)),
+          is_read: notif.is_read,
+          type: rawData.type || 'general',
+          rawData: { ...rawData, status: messageStatus },
+        };
+      });
 
       setMessages(formattedMessages);
 
@@ -107,30 +133,55 @@ export default function Messege() {
     }
   }, [t]);
 
+  // Отримання ID користувача лікаря та його повного імені при завантаженні компонента
   useEffect(() => {
-    const getDoctorId = async () => {
+    const getDoctorData = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
         console.error("Error getting user session for doctor:", error.message);
         return;
       }
       if (user) {
-        setCurrentDoctorId(user.id);
-        console.log("Current doctor ID:", user.id);
+        setCurrentDoctorUserId(user.id); // Встановлюємо user.id
+        console.log("Current doctor user ID:", user.id);
+
+        try {
+            const { data: doctorProfile, error: profileError } = await supabase
+                .from('profile_doctor')
+                .select('full_name')
+                .eq('user_id', user.id) // ВИПРАВЛЕНО: Використовуємо user_id з таблиці profile_doctor
+                .single();
+
+            if (profileError) {
+                console.warn("Error fetching doctor full name from profile_doctor:", profileError.message);
+            }
+
+            if (doctorProfile && doctorProfile.full_name) {
+                setDoctorFullName(doctorProfile.full_name);
+            } else {
+                console.log("Doctor profile (full_name) not found in profile_doctor for user ID:", user.id);
+                setDoctorFullName(t('doctor'));
+            }
+        } catch (e) {
+            console.error("Unexpected error in fetching doctor full name:", e.message);
+            setDoctorFullName(t('doctor'));
+        }
       }
     };
-    getDoctorId();
-  }, []);
+    getDoctorData();
+  }, [t]);
 
+  // Використання useFocusEffect для завантаження повідомлень при фокусі на екрані
   useFocusEffect(
     useCallback(() => {
-      if (currentDoctorId) {
-        fetchMessagesFromSupabase(currentDoctorId);
+      if (currentDoctorUserId) {
+        fetchMessagesFromSupabase(currentDoctorUserId);
       }
-      return () => {};
-    }, [currentDoctorId, fetchMessagesFromSupabase])
+      return () => {}; // Функція очищення
+    }, [currentDoctorUserId, fetchMessagesFromSupabase])
   );
 
+  // Обробка push-сповіщень Expo
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -140,25 +191,25 @@ export default function Messege() {
       }),
     });
 
-    const notificationReceivedListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Сповіщення отримано на передньому плані (Messege.js):', notification);
+    notificationReceivedListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Сповіщення отримано на передньому плані (Message.js):', notification);
       addNewMessage(notification.request.content);
     });
 
-    const notificationResponseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Користувач натиснув на сповіщення (Messege.js):', response);
+    notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Користувач натиснув на сповіщення (Message.js):', response);
       const { title, body, data } = response.notification.request.content;
 
-      // When user interacts with notification, ensure it's added/updated in the list
-      addNewMessage(response.notification.request.content);
+      addNewMessage(response.notification.request.content); // Додаємо сповіщення до UI, якщо його ще немає
 
       if (data && data.type === 'new_booking' && data.patient_name && data.booking_date && data.booking_time_slot) {
         Alert.alert(
           t('new_booking_notification_title'),
-          `${t('patient')}: ${data.patient_name}\n${t('date')}: ${data.booking_date}\n${t('time')}: ${data.booking_time_slot}.`,
+          `${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || t('not_specified')}.`,
           [{ text: t('view_details'), onPress: () => {
-              // Add navigation to booking details screen here if needed
-              console.log("Navigate to booking details");
+              // Навігація до екрану деталей бронювання, якщо необхідно
+              console.log("Navigate to booking details for booking_id:", data.booking_id);
+              // navigation.navigate('BookingDetails', { bookingId: data.booking_id, patientId: data.patient_id });
             }
           }]
         );
@@ -168,11 +219,19 @@ export default function Messege() {
     });
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationReceivedListener);
-      Notifications.removeNotificationSubscription(notificationResponseListener);
+      if (notificationReceivedListener.current) {
+        notificationReceivedListener.current.remove();
+      }
+      if (notificationResponseListener.current) {
+        notificationResponseListener.current.remove();
+      }
     };
   }, [t, addNewMessage]);
 
+  /**
+   * Позначає сповіщення як прочитане в Supabase та оновлює UI.
+   * @param {string} messageId ID сповіщення (з doctor_notifications.id)
+   */
   const markAsRead = useCallback(async (messageId) => {
     setMessages(prevMessages =>
       prevMessages.map(msg =>
@@ -197,15 +256,150 @@ export default function Messege() {
     }
   }, [t]);
 
+  /**
+   * Оновлює статус бронювання в patient_bookings та надсилає сповіщення пацієнту.
+   * @param {object} message Об'єкт повідомлення, що містить rawData з booking_id та patient_id.
+   * @param {string} newStatus Новий статус для бронювання ('confirmed' або 'rejected').
+   */
+  const updateBookingStatusAndNotify = useCallback(async (message, newStatus) => {
+      // Перевірка на наявність усіх необхідних даних
+      if (!message || !message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId) {
+          console.error("Missing essential data for updateBookingStatusAndNotify (initial check):", {
+              message: message ? "present" : "missing",
+              rawData: message && message.rawData ? "present" : "missing",
+              booking_id: message && message.rawData && message.rawData.booking_id ? message.rawData.booking_id : "missing",
+              patient_id: message && message.rawData && message.rawData.patient_id ? message.rawData.patient_id : "missing",
+              currentDoctorUserId: currentDoctorUserId ? currentDoctorUserId : "missing",
+          });
+          Alert.alert(t('error'), t('invalid_booking_data_for_update'));
+          return;
+      }
+
+      const bookingId = message.rawData.booking_id;
+      const patientId = message.rawData.patient_id;
+      // ВИПРАВЛЕНО: Отримуємо booking_date та booking_time_slot з message.rawData.date та message.rawData.time
+      const bookingDate = message.rawData.date;
+      const bookingTimeSlot = message.rawData.time;
+      const doctorFinalName = doctorFullName || t('doctor'); // Запасне значення, якщо ім'я не завантажилось
+
+      // Повторна перевірка після отримання конкретних полів
+      if (!bookingDate || !bookingTimeSlot) {
+          console.error("Missing booking date or time slot in rawData:", {
+              booking_date: bookingDate ? bookingDate : "missing",
+              booking_time_slot: bookingTimeSlot ? bookingTimeSlot : "missing",
+          });
+          Alert.alert(t('error'), t('invalid_booking_data_for_update_date_time'));
+          return;
+      }
+
+      try {
+          // Крок 1: Оновлення статусу бронювання в таблиці patient_bookings
+          console.log(`Оновлення бронювання ${bookingId} на статус: ${newStatus} для пацієнта ${patientId}`);
+          const { error: updateError } = await supabase
+              .from('patient_bookings')
+              .update({ status: newStatus })
+              .eq('id', bookingId); // Змінено на .eq('id', bookingId)
+
+          if (updateError) {
+              console.error("Помилка оновлення статусу бронювання в Supabase:", updateError.message);
+              throw updateError;
+          }
+
+          console.log(`Бронювання ${bookingId} успішно оновлено до ${newStatus}`);
+
+          // Крок 2: Виклик Supabase Edge Function для надсилання сповіщення пацієнту
+          // ПЕРЕВІРТЕ: Замініть на реальний URL вашої Edge Function
+         const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
+
+          const { data: { session } } = await supabase.auth.getSession();
+          const accessToken = session?.access_token;
+
+          if (!accessToken) {
+            console.error("No access token available for Edge Function call.");
+            Alert.alert(t('error'), t('user_not_authenticated_please_login_again'));
+            return;
+          }
+
+          const payload = {
+              booking: {
+                  id: bookingId,
+                  patient_id: patientId,
+                  doctor_id: currentDoctorUserId, // Передаємо user.id лікаря
+                  status: newStatus,
+                  // ВИПРАВЛЕНО: Передаємо дату та час з нових змінних
+                  booking_date: bookingDate,
+                  booking_time_slot: bookingTimeSlot,
+              },
+              doctor_name: doctorFinalName, // Передаємо повне ім'я лікаря
+          };
+
+          console.log("Виклик Edge Function handle-booking-status-update з даними:", payload);
+
+          const response = await fetch(edgeFunctionUrl, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+              let errorText = `HTTP Error: ${response.status} ${response.statusText}`;
+              try {
+                  const errorData = await response.json();
+                  if (errorData && errorData.error) {
+                      errorText = errorData.error;
+                  } else {
+                      errorText = JSON.stringify(errorData);
+                  }
+              } catch (parseError) {
+                  console.warn("Не вдалося розпарсити відповідь помилки від Edge Function (можливо, не JSON):", parseError);
+              }
+              console.error('Помилка виклику Edge Function (відповідь не ОК):', errorText);
+              Alert.alert(t('error'), `${t('failed_to_send_notification')}: ${errorText}`);
+              return;
+          }
+
+          console.log('Edge Function викликана успішно. Відповідь:', await response.json());
+          Alert.alert(t('success'), newStatus === 'confirmed' ? t('booking_confirmed_successfully_message') : t('booking_rejected_successfully_message'));
+
+          // Оновлюємо стан повідомлень: позначаємо поточне як прочитане та перезавантажуємо весь список
+          // щоб відобразити оновлений статус бронювання.
+          if (message.db_id) {
+            await markAsRead(message.db_id);
+          }
+          // Дуже важливо: перезавантажуємо повідомлення для відображення актуального статусу бронювання
+          await fetchMessagesFromSupabase(currentDoctorUserId);
+
+      } catch (error) {
+          console.error("Помилка обробки бронювання (загальна помилка fetch або DB update):", error.message);
+          Alert.alert(t('error'), `${t('failed_to_process_booking')}: ${error.message}`);
+      }
+  }, [t, currentDoctorUserId, doctorFullName, markAsRead, fetchMessagesFromSupabase]);
+
+
   const handleConfirmBooking = useCallback(async (message) => {
-    await markAsRead(message.db_id); // Mark as read immediately
+      Alert.alert(
+          t('confirm_booking_title'),
+          t('confirm_booking_message_doctor'),
+          [
+              { text: t('cancel'), style: 'cancel' },
+              { text: t('confirm'), onPress: () => updateBookingStatusAndNotify(message, 'confirmed') }
+          ]
+      );
+  }, [t, updateBookingStatusAndNotify]);
 
-    // You can add additional logic here for actually "confirming" the booking
-    // For example, updating a 'status' column in 'patient_bookings'
-    // For now, it just marks the notification as read.
-    Alert.alert(t('success'), t('booking_confirmed_successfully_message'));
-
-  }, [t, markAsRead]);
+  const handleRejectBooking = useCallback(async (message) => {
+      Alert.alert(
+          t('reject_booking_title'),
+          t('reject_booking_message_doctor'),
+          [
+              { text: t('cancel'), style: 'cancel' },
+              { text: t('reject'), onPress: () => updateBookingStatusAndNotify(message, 'rejected') }
+          ]
+      );
+  }, [t, updateBookingStatusAndNotify]);
 
 
   if (loading) {
@@ -244,44 +438,63 @@ export default function Messege() {
                 <Text style={styles.dateText}>{message.date}</Text>
                 <Text style={styles.timestampText}>{message.time}</Text>
               </View>
+              {/* Стиль повідомлення залежить від того, прочитане воно чи ні */}
               <View style={[styles.messageCard, message.is_read && styles.messageCardRead]}>
                 <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                 <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
-                
-                {message.type === 'new_booking' && (
-                    <View>
-                        {/* <Text style={styles.bookingDetailsText}>
-                            {t('patient')}: {(message.body) || t('not_specified')}
-                        </Text>
-                        <Text style={styles.bookingDetailsText}>
-                            {t('date')}: {(message.date) || t('not_specified')}
-                        </Text>
-                        <Text style={styles.bookingDetailsText}>
-                            {t('time')}: {(message.time) || t('not_specified')}
-                        </Text> */}
 
-                        {!message.is_read ? (
+                {/* {message.type === 'new_booking' && message.rawData && (
+                    <View style={styles.bookingInfo}>
+                        <Text style={styles.bookingDetailsText}>
+                            {t('patient')}: {(message.rawData && message.rawData.patient_name) || t('not_specified')}
+                        </Text>
+                        <Text style={styles.bookingDetailsText}>
+                            {t('date')}: {(message.rawData && message.rawData.date) || t('not_specified')} 
+                        </Text>
+                        <Text style={styles.bookingDetailsText}>
+                            {t('time')}: {(message.rawData && message.rawData.time) || t('not_specified')} 
+                        </Text>
+                    </View>
+                )} */}
+
+                {/* Логіка відображення кнопок дій або статусу */}
+                {message.type === 'new_booking' ? (
+                    // Якщо це нове бронювання і воно очікує підтвердження
+                    message.rawData.status === 'pending' && !message.is_read ? (
+                        <View style={styles.bookingActionButtons}>
                             <TouchableOpacity
                                 style={styles.confirmBookingButton}
                                 onPress={() => handleConfirmBooking(message)}
                             >
                                 <Text style={styles.confirmBookingButtonText}>{t('confirm_booking')}</Text>
                             </TouchableOpacity>
-                        ) : (
-                            <Text style={styles.confirmedText}>{t('confirmed_read')}</Text>
-                        )}
-                    </View>
-                )}
-                {message.type !== 'new_booking' && !message.is_read && (
-                    <TouchableOpacity
-                        style={styles.markAsReadButton}
-                        onPress={() => markAsRead(message.db_id)}
-                    >
-                        <Text style={styles.markAsReadButtonText}>{t('mark_as_read')}</Text>
-                    </TouchableOpacity>
-                )}
-                {message.type !== 'new_booking' && message.is_read && (
-                    <Text style={styles.confirmedText}>{t('read')}</Text>
+                            <TouchableOpacity
+                                style={styles.rejectBookingButton}
+                                onPress={() => handleRejectBooking(message)}
+                            >
+                                <Text style={styles.rejectBookingButtonText}>{t('reject_booking')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        // Якщо бронювання вже оброблено (підтверджено/відхилено)
+                        <Text style={[
+                            styles.statusText,
+                            message.rawData.status === 'confirmed' ? styles.confirmedText : styles.rejectedText
+                        ]}>
+                            {message.rawData.status === 'confirmed' ? t('confirmed_read') : t('rejected_read')}
+                        </Text>
+                    )
+                ) : ( // Якщо це не 'new_booking' тип повідомлення
+                    !message.is_read ? (
+                        <TouchableOpacity
+                            style={styles.markAsReadButton}
+                            onPress={() => message.db_id && markAsRead(message.db_id)} // Перевіряємо db_id перед викликом
+                        >
+                            <Text style={styles.markAsReadButtonText}>{t('mark_as_read')}</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <Text style={styles.confirmedText}>{t('read')}</Text>
+                    )
                 )}
               </View>
             </View>
@@ -381,19 +594,33 @@ const styles = StyleSheet.create({
     color: "#555",
     marginBottom: 10,
   },
+  bookingInfo: {
+    marginTop: 5,
+    marginBottom: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0EB3EB',
+  },
   bookingDetailsText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Mont-Regular",
     color: "#444",
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  bookingActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginTop: 10,
+    gap: 10, // Використання gap для кращого контролю відступу
   },
   confirmBookingButton: {
     backgroundColor: '#4CAF50',
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 25,
-    alignSelf: 'flex-start',
-    marginTop: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -401,6 +628,22 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   confirmBookingButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: "Mont-SemiBold",
+  },
+  rejectBookingButton: {
+    backgroundColor: '#D32F2F',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  rejectBookingButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: "Mont-SemiBold",
@@ -419,16 +662,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Mont-SemiBold",
   },
-  confirmedText: {
+  statusText: {
     fontSize: 14,
     fontFamily: "Mont-SemiBold",
-    color: '#2E7D32',
     marginTop: 10,
     alignSelf: 'flex-start',
     paddingVertical: 5,
     paddingHorizontal: 10,
-    backgroundColor: '#E8F5E9',
     borderRadius: 10,
+  },
+  confirmedText: {
+    color: '#2E7D32',
+    backgroundColor: '#E8F5E9',
+  },
+  rejectedText: {
+    backgroundColor: '#FFEBEE',
+    color: '#D32F2F',
   },
   emptyMessagesContainer: {
     flex: 1,

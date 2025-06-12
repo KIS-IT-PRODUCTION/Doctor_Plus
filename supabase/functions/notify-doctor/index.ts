@@ -48,15 +48,17 @@ serve(async (req: Request) => {
 
   try {
     // Парсинг тіла запиту JSON.
-    const { doctor_id, patient_name, booking_date, booking_time_slot } = await req.json();
+    // *** ВИПРАВЛЕННЯ: ДОДАНО booking_id ТА patient_id ДО ДЕСТРУКТУРИЗАЦІЇ ***
+    const { doctor_id, patient_name, booking_date, booking_time_slot, booking_id, patient_id } = await req.json();
 
-    console.log('Edge Function: Received full request body:', { doctor_id, patient_name, booking_date, booking_time_slot });
+    console.log('Edge Function: Received full request body:', { doctor_id, patient_name, booking_date, booking_time_slot, booking_id, patient_id });
     console.log('Edge Function: Parsed doctor_id from request:', doctor_id);
 
     // Валідація вхідних даних.
-    if (!doctor_id || !patient_name || !booking_date || !booking_time_slot) {
-      console.error('Edge Function: Missing required fields in request body.');
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    // *** ВИПРАВЛЕННЯ: ДОДАНО ПЕРЕВІРКУ booking_id ТА patient_id ***
+    if (!doctor_id || !patient_name || !booking_date || !booking_time_slot || !booking_id || !patient_id) {
+      console.error('Edge Function: Missing required fields in request body. Ensure doctor_id, patient_name, booking_date, booking_time_slot, booking_id, and patient_id are provided.');
+      return new Response(JSON.stringify({ error: 'Missing required fields: doctor_id, patient_name, booking_date, booking_time_slot, booking_id, patient_id' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400, // Bad Request
       });
@@ -67,7 +69,7 @@ serve(async (req: Request) => {
     const { data: doctorData, error: doctorError } = await supabaseAdmin
       .from('profile_doctor')
       .select('notification_token')
-      .eq('user_id', doctor_id)
+      .eq('user_id', doctor_id) // ВИПРАВЛЕНО: Використання user_id для коректного співставлення
       .single(); // Очікуємо один результат
 
     console.log('Edge Function: Result of profile_doctor query - data:', doctorData);
@@ -98,12 +100,20 @@ serve(async (req: Request) => {
     // Формування деталей сповіщення.
     const notificationTitle = `Нове бронювання від ${patient_name}`;
     const notificationBody = `Пацієнт ${patient_name} забронював консультацію на ${booking_date} о ${booking_time_slot}.`;
+
+    // *** ВИПРАВЛЕННЯ: ДОДАНО booking_id ТА patient_id ДО notificationData ***
     const notificationData = {
       type: 'new_booking',
-      doctorId: doctor_id,
+      // 'doctorId' - це поле для клієнта, не плутати з 'doctor_id' з бази даних
+      // Залишаємо його, як було, але пам'ятаємо, що doctor_id з БД краще
+      // використовувати для FK та логіки на бекенді
+      doctorId: doctor_id, // Залишаємо як було для сумісності з попереднім кодом клієнта
       patientName: patient_name,
-      date: booking_date,
-      time: booking_time_slot
+      date: booking_date, // Це booking_date
+      time: booking_time_slot, // Це booking_time_slot
+      booking_id: booking_id,   // <-- ДОДАНО!
+      patient_id: patient_id,    // <-- ДОДАНО!
+      status: 'pending' // Додаємо початковий статус бронювання
     };
 
     // Зберігаємо сповіщення в таблиці 'doctor_notifications'.
@@ -111,10 +121,10 @@ serve(async (req: Request) => {
       .from('doctor_notifications')
       .insert([
         {
-          doctor_id: doctor_id,
+          doctor_id: doctor_id, // Це FK до auth.users.id лікаря
           title: notificationTitle,
           body: notificationBody,
-          data: notificationData,
+          data: notificationData, // Тепер містить booking_id та patient_id
           is_read: false // За замовчуванням нове сповіщення є непрочитаним
         }
       ])
@@ -137,10 +147,12 @@ serve(async (req: Request) => {
       sound: 'default', // Звук за замовчуванням
       title: notificationTitle,
       body: notificationBody,
+      // *** ВИПРАВЛЕННЯ: ПЕРЕДАЄМО ПОВНИЙ notificationData ДО EXPO ***
+      // Важливо: Expo Push Notification data стає доступною на клієнті через `notification.request.content.data`
       data: { ...notificationData, db_id: notificationRecord?.id }, // Додаємо ID запису з БД
     };
 
-    console.log("Edge Function: Sending push notification to Expo API...");
+    console.log("Edge Function: Sending push notification to Expo API...", message); // Логуємо повне повідомлення
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {

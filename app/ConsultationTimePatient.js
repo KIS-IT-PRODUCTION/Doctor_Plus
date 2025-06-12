@@ -69,12 +69,12 @@ const ConsultationTimePatient = ({ route }) => {
         console.log("Current patientId:", session.user.id);
 
         // Отримання профілю пацієнта для його повного імені (full_name)
+       console.log("DEBUG: Fetching patient profile for user_id:", session.user.id); // Додано лог
         const { data: profileData, error: profileError } = await supabase
-          .from('profiles') // Змініть на 'profile_patient', якщо так називається ваша таблиця
-          .select('full_name') // Важливо: переконайтеся, що це правильне поле з ім'ям
-          .eq('id', session.user.id) 
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', session.user.id) // <--- ВИПРАВЛЕНО: Змінено 'id' на 'user_id'
           .single();
-
         if (profileError) {
           throw profileError; // Викидаємо помилку, якщо є проблема з отриманням профілю
         }
@@ -260,8 +260,9 @@ const ConsultationTimePatient = ({ route }) => {
   };
 
   // --- ФУНКЦІЯ: Виклик Edge Function для надсилання сповіщення лікарю ---
-  const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot) => {
-    console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot });
+  // *** ВИПРАВЛЕНО: Додано bookingId та patientId як параметри
+  const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId) => {
+    console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId });
     try {
       const { data: { session } } = await supabase.auth.getSession(); // Отримуємо поточну сесію
       const accessToken = session?.access_token || ''; // Отримуємо access_token
@@ -280,6 +281,8 @@ const ConsultationTimePatient = ({ route }) => {
           patient_name: patientFullName,
           booking_date: bookingDate,
           booking_time_slot: bookingTimeSlot,
+          booking_id: bookingId, // <-- ДОДАНО! Передача booking_id
+          patient_id: patientId  // <-- ДОДАНО! Передача patient_id
         }),
       });
 
@@ -360,7 +363,7 @@ const ConsultationTimePatient = ({ route }) => {
       // 2. Перевірка, чи не заброньовано слот кимось іншим, поки пацієнт його вибирав
       const { data: currentBookings, error: bookingCheckError } = await supabase
         .from('patient_bookings')
-        .select('id, patient_id')
+        .select('id, patient_id') // Отримуємо ID бронювання та ID пацієнта
         .eq('doctor_id', doctorId)
         .eq('booking_date', selectedSlot.date)
         .eq('booking_time_slot', selectedSlot.rawTime)
@@ -398,16 +401,22 @@ const ConsultationTimePatient = ({ route }) => {
       }
 
       // 4. Вставка нового бронювання
-      const { error: insertError } = await supabase
+      const { data: newBookingData, error: insertError } = await supabase // Змінено для отримання data
         .from('patient_bookings')
         .insert({
           patient_id: patientId,
           doctor_id: doctorId,
           booking_date: selectedSlot.date,
           booking_time_slot: selectedSlot.rawTime,
-        });
+        })
+        .select() // Важливо: повертаємо вставлений запис
+        .single(); // Очікуємо один вставлений запис
 
       if (insertError) throw insertError; // Викидаємо помилку, якщо вставка не вдалася
+
+      // *** ВИПРАВЛЕННЯ: Отримання booking_id з нового бронювання ***
+      const newBookingId = newBookingData.id;
+      console.log("New booking successfully created with ID:", newBookingId);
 
       Alert.alert(t('success'), t('slot_booked_successfully'));
 
@@ -416,7 +425,9 @@ const ConsultationTimePatient = ({ route }) => {
         doctorId,
         patientProfile.full_name, // Використовуємо отримане ім'я пацієнта
         selectedSlot.date,
-        selectedSlot.rawTime
+        selectedSlot.rawTime,
+        newBookingId,             // <-- ДОДАНО! Передача ID нового бронювання
+        patientId                 // <-- ДОДАНО! Передача ID пацієнта
       );
 
       if (notificationSent) {

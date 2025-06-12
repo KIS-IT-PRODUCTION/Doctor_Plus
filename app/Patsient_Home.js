@@ -1,4 +1,3 @@
-// Patsient_Home.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -14,6 +13,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   ActivityIndicator,
+  RefreshControl, // Імпортуємо RefreshControl
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,6 +25,17 @@ import { useAuth } from "../providers/AuthProvider";
 import TabBar from "../components/TopBar.js";
 
 import { useTranslation } from "react-i18next";
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+
+// Встановіть обробник для сповіщень, коли додаток активний
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const { width } = Dimensions.get("window");
 const containerWidth = width * 0.9;
@@ -80,15 +91,178 @@ const Patsient_Home = () => {
   const [loadingSpecializations, setLoadingSpecializations] = useState(true);
   const [specializationsError, setSpecializationsError] = useState(null);
 
+  // Додаємо стан для кількості непрочитаних повідомлень
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  // Додаємо стан для Pull-to-Refresh
+  const [refreshing, setRefreshing] = useState(false);
+
+
+  // Функція для отримання кількості непрочитаних повідомлень
+  const fetchUnreadMessagesCount = useCallback(async () => {
+    // Перевіряємо наявність сесії користувача перед виконанням запиту
+    if (!session?.user) {
+      console.log("No user session found, cannot fetch unread messages.");
+      setUnreadMessagesCount(0); // Скидаємо лічильник, якщо немає користувача
+      return;
+    }
+
+    try {
+      // Виправлено назву таблиці з 'messages' на 'patient_notifications'
+      // Видалено 'head: false', оскільки для count: 'exact' це не потрібно
+      const { count, error } = await supabase
+        .from('patient_notifications') // <--- ВИПРАВЛЕНО ТУТ!
+        .select('*', { count: 'exact' }) // Запитуємо точну кількість
+        .eq('patient_id', session.user.id) // Повідомлення для поточного пацієнта
+        .eq('is_read', false); // Тільки непрочитані
+
+      if (error) {
+        console.error("Error fetching unread messages count:", error.message);
+        setUnreadMessagesCount(0);
+      } else {
+        setUnreadMessagesCount(count);
+        console.log("Unread messages count fetched:", count);
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching unread messages count:", err);
+      setUnreadMessagesCount(0);
+    }
+  }, [session?.user]); // Залежить від зміни сесії користувача
+
+
+  // Функція для реєстрації та збереження push-токену
+  const registerForPushNotificationsAsync = useCallback(async (userId) => {
+    console.log("--- START registerForPushNotificationsAsync ---");
+    console.log("Input userId:", userId);
+    let token = null;
+
+    if (!userId) {
+      console.error("DEBUG: userId is null or undefined at the start of registerForPushNotificationsAsync. Aborting.");
+      Alert.alert(t("error"), t("user_id_not_available_for_notifications"));
+      return null;
+    }
+
+    if (Platform.OS === "android") {
+      try {
+        console.log("DEBUG: Setting up notification channel for Android...");
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+        });
+        console.log("DEBUG: Android notification channel set successfully.");
+      } catch (e) {
+        console.error("DEBUG ERROR: Failed to set notification channel for Android:", e);
+      }
+    }
+
+    if (Device.isDevice) {
+      console.log("DEBUG: Running on a physical device. Proceeding with permissions check.");
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      console.log("DEBUG: Existing notification permissions status:", existingStatus);
+
+      if (existingStatus !== "granted") {
+        console.log("DEBUG: Permissions not granted yet. Requesting permissions...");
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+        console.log("DEBUG: New permission request status:", finalStatus);
+      }
+
+      if (finalStatus !== "granted") {
+        console.error("DEBUG ERROR: Final notification permissions status is NOT granted:", finalStatus);
+        Alert.alert(
+          t("error"),
+          t("failed_to_get_push_token_permissions")
+        );
+        console.error("Failed to get push token for push notification: Permissions not granted!");
+        return null;
+      }
+      console.log("DEBUG: Notification permissions GRANTED. Attempting to get Expo Push Token.");
+
+      try {
+        const expoProjectId = "e2619b61-6ef5-4958-90bc-a400bbc8c50a";
+        console.log("DEBUG: Using Expo Project ID for token generation:", expoProjectId);
+        token = (
+          await Notifications.getExpoPushTokenAsync({
+            projectId: expoProjectId,
+          })
+        ).data;
+        console.log("SUCCESS: Expo Push Token obtained:", token);
+        if (!token) {
+          console.warn("DEBUG WARNING: Expo Push Token is UNDEFINED or NULL after getExpoPushTokenAsync.");
+        }
+      } catch (e) {
+        let errorMessage = 'Unknown error';
+        if (e instanceof Error) {
+          errorMessage = e.message;
+        } else if (typeof e === 'string') {
+          errorMessage = e;
+        } else if (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string') {
+          errorMessage = e.message;
+        }
+        console.error("DEBUG ERROR: Error getting Expo push token. Details:", e, "Message:", errorMessage);
+        Alert.alert(t("error"), `${t("error_getting_push_token")}: ${errorMessage}. ${t("check_connection")}`);
+        return null;
+      }
+    } else {
+      console.log("DEBUG: Not a physical device. Skipping push notification registration.");
+      Alert.alert(t("error"), t("push_notifications_only_on_physical_devices"));
+      console.log("Must use physical device for Push Notifications");
+      return null;
+    }
+
+    console.log("DEBUG: Attempting to save token to Supabase.");
+    console.log("DEBUG: Token to be saved:", token, "for userId:", userId);
+
+    if (token && userId) {
+      console.log(`DEBUG: Saving token '<span class="math-inline">\{token\}' for user\_id '</span>{userId}' to 'profiles' table.`);
+      const { data: updateData, error } = await supabase
+        .from('profiles')
+        .update({ notification_token: token })
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error("DEBUG ERROR: Помилка збереження push-токену в Supabase:", error.message, "Details:", error);
+        Alert.alert(t('error'), `${t('failed_to_save_notification_token')}: ${error.message}`);
+      } else {
+        console.log("SUCCESS: Expo Push Token збережено в Supabase для користувача:", userId);
+        console.log("DEBUG: Supabase update data:", updateData);
+      }
+    } else {
+      console.warn("DEBUG WARNING: Відсутній токен або ID користувача, push-токен не збережено. Token:", token, "UserId:", userId);
+    }
+    console.log("--- END registerForPushNotificationsAsync ---");
+    return token;
+  }, [t]);
+
   useFocusEffect(
     useCallback(() => {
       setActiveTab("Home");
-    }, [])
+      // Викликаємо функцію для отримання непрочитаних повідомлень лише якщо сесія є
+      if (session?.user) {
+        fetchUnreadMessagesCount();
+      }
+      return () => {
+        // Опціонально, якщо потрібно щось очистити при втраті фокусу
+      };
+    }, [fetchUnreadMessagesCount, session?.user]) // Додаємо fetchUnreadMessagesCount та session?.user в залежності
   );
 
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
+
+  // Виклик registerForPushNotificationsAsync та fetchUnreadMessagesCount при завантаженні та зміні сесії
+  useEffect(() => {
+    // Викликаємо ці функції лише якщо сесія завантажена і користувач авторизований
+    if (!authLoading && session?.user) {
+      console.log("Attempting to register for push notifications for user:", session.user.id);
+      registerForPushNotificationsAsync(session.user.id);
+      fetchUnreadMessagesCount(); // Завантажуємо лічильник при успішній автентифікації
+    }
+  }, [session, authLoading, registerForPushNotificationsAsync, fetchUnreadMessagesCount]);
+
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -112,67 +286,67 @@ const Patsient_Home = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const fetchAvailableSpecializations = async () => {
-      setLoadingSpecializations(true);
-      setSpecializationsError(null);
-      try {
-        const { data, error } = await supabase
-          .from("anketa_doctor")
-          .select("specialization");
+  const fetchAvailableSpecializations = useCallback(async () => {
+    setLoadingSpecializations(true);
+    setSpecializationsError(null);
+    try {
+      const { data, error } = await supabase
+        .from("anketa_doctor")
+        .select("specialization");
 
-        if (error) {
-          console.error("Error fetching doctor specializations:", error);
-          setSpecializationsError(
-            t("error_fetching_specializations") + ": " + error.message
-          );
-          setAvailableSpecializations([]);
-          return;
-        }
-
-        const uniqueSpecs = new Set();
-        data.forEach((doctor) => {
-          if (doctor.specialization) {
-            const currentSpecializations = Array.isArray(doctor.specialization)
-              ? doctor.specialization
-              : (() => {
-                  try {
-                    return JSON.parse(doctor.specialization);
-                  } catch (e) {
-                    console.warn(
-                      "Warning: Invalid specialization format for doctor (expected array or parsable JSON string):",
-                      doctor.user_id,
-                      doctor.specialization,
-                      e
-                    );
-                    return [];
-                  }
-                })();
-
-            currentSpecializations.forEach((spec) => {
-              const matchingSpec = allDoctorSpecializations.find(
-                (s) => s.key === spec
-              );
-              if (matchingSpec) {
-                uniqueSpecs.add(matchingSpec);
-              }
-            });
-          }
-        });
-        setAvailableSpecializations(Array.from(uniqueSpecs));
-      } catch (err) {
-        console.error("Unexpected error fetching specializations:", err);
+      if (error) {
+        console.error("Error fetching doctor specializations:", error);
         setSpecializationsError(
-          t("unexpected_error_fetching_specializations") + ": " + err.message
+          t("error_fetching_specializations") + ": " + error.message
         );
         setAvailableSpecializations([]);
-      } finally {
-        setLoadingSpecializations(false);
+        return;
       }
-    };
 
+      const uniqueSpecs = new Set();
+      data.forEach((doctor) => {
+        if (doctor.specialization) {
+          const currentSpecializations = Array.isArray(doctor.specialization)
+            ? doctor.specialization
+            : (() => {
+                try {
+                  return JSON.parse(doctor.specialization);
+                } catch (e) {
+                  console.warn(
+                    "Warning: Invalid specialization format for doctor (expected array or parsable JSON string):",
+                    doctor.user_id,
+                    doctor.specialization,
+                    e
+                  );
+                  return [];
+                }
+              })();
+
+          currentSpecializations.forEach((spec) => {
+            const matchingSpec = allDoctorSpecializations.find(
+              (s) => s.key === spec
+            );
+            if (matchingSpec) {
+              uniqueSpecs.add(matchingSpec);
+            }
+          });
+        }
+      });
+      setAvailableSpecializations(Array.from(uniqueSpecs));
+    } catch (err) {
+      console.error("Unexpected error fetching specializations:", err);
+      setSpecializationsError(
+        t("unexpected_error_fetching_specializations") + ": " + err.message
+      );
+      setAvailableSpecializations([]);
+    } finally {
+      setLoadingSpecializations(false);
+    }
+  }, [t]); // Додаємо t в залежності, оскільки воно використовується всередині
+
+  useEffect(() => {
     fetchAvailableSpecializations();
-  }, [t]);
+  }, [fetchAvailableSpecializations]); // Залежить від fetchAvailableSpecializations
 
   const handleSaveInfo = async () => {
     if (!personalInfoText.trim()) {
@@ -276,10 +450,31 @@ const Patsient_Home = () => {
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
   ];
 
+  // Функція, яка викликається при "потягни, щоб оновити"
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // Викликаємо функції, які потрібно оновити
+    await fetchUnreadMessagesCount();
+    await fetchAvailableSpecializations();
+    // Додайте сюди інші функції, які ви хочете оновити
+    setRefreshing(false);
+  }, [fetchUnreadMessagesCount, fetchAvailableSpecializations]);
+
+
   return (
     <View style={styles.fullScreenContainer}>
       <SafeAreaView style={styles.safeAreaContent}>
-        <ScrollView contentContainerStyle={styles.scrollContentContainer}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContentContainer}
+          refreshControl={ // Додаємо RefreshControl
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#0EB3EB"]} // Колір індикатора оновлення
+              tintColor="#0EB3EB" // Колір індикатора оновлення для iOS
+            />
+          }
+        >
           <View style={styles.container}>
             <View style={styles.header}>
               <View style={styles.logoContainer}>
@@ -302,16 +497,18 @@ const Patsient_Home = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.notificationButton}
-                onPress={() => navigation.navigate("Messege")}
+                onPress={() => navigation.navigate("PatientMessages")}
               >
                 <Ionicons
                   name="notifications-outline"
                   size={24}
                   color="white"
                 />
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationNumber}>5</Text>
-                </View>
+                {unreadMessagesCount > 0 && ( // Відображаємо бейдж тільки якщо є непрочитані
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationNumber}>{unreadMessagesCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
 
