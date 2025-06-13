@@ -8,90 +8,122 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Alert, // Додано Alert для сповіщень користувачу
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../providers/AuthProvider"; // Використовуємо функції з AuthProvider
 import { useTranslation } from "react-i18next";
+import { supabase } from "../../providers/supabaseClient"; // Імпортуємо supabase напряму для функції resetPasswordForEmail
 
 const Login = () => {
   const navigation = useNavigation();
-  // Отримуємо session, loading, userRole, signIn, signOut, authError з AuthProvider
-  const { session, loading: authLoading, userRole, signIn, signOut, authError } = useAuth();
+  const {
+    session,
+    loading: authLoading,
+    userRole,
+    signIn,
+    signOut,
+    authError,
+  } = useAuth();
   const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false); // Новий стан для індикатора скидання пароля
+
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
-  // Перевірка, чи користувач вже увійшов, і перенаправлення (або блокування)
-  // Цей useEffect спрацює ТІЛЬКИ після успішного входу та визначення ролі.
-  // Якщо дані введені неправильно, сесія не буде встановлена, і цей блок не виконається.
   useEffect(() => {
-    // Чекаємо, поки AuthProvider завершить своє початкове завантаження
     if (!authLoading && session && session.user) {
       if (userRole === "doctor") {
-        // Якщо користувач - лікар, перенаправляємо на Profile_doctor
         console.log("Login: User is a doctor, navigating to Profile_doctor.");
         navigation.replace("Profile_doctor");
       } else if (userRole === "patient") {
-        // Якщо користувач - пацієнт, виходимо з системи та показуємо помилку
         console.log("Login: User is a patient. Logging out and showing error.");
-        signOut(); // Виходимо з системи
-        setLoginError(t("error_doctors_only_login")); // Повідомлення про помилку
-        setEmail(""); // Очищуємо поля
+        signOut();
+        setLoginError(t("error_doctors_only_login"));
+        setEmail("");
         setPassword("");
       }
-      // Якщо userRole === null (ще не визначено), чекаємо, useEffect знову спрацює після визначення ролі
     }
-  }, [session, navigation, authLoading, userRole, signOut, t]); // Додано signOut та t до залежностей
+  }, [session, navigation, authLoading, userRole, signOut, t]);
 
-  // Слідкуємо за помилками з AuthProvider
-  // Цей useEffect відобразить будь-які помилки, що виникли під час аутентифікації.
   useEffect(() => {
     if (authError) {
       console.error("Login: AuthProvider error:", authError.message);
       setLoginError(t("error_login_failed", { error: authError.message }));
-      setIsLoggingIn(false); // Завершуємо індикатор завантаження
+      setIsLoggingIn(false);
     }
   }, [authError, t]);
 
-
   const handleLogin = async () => {
-    setLoginError(""); // Очистити попередні помилки
+    setLoginError("");
 
-    // Валідація полів: Якщо поля порожні, встановлюємо помилку і НЕ ПРОДОВЖУЄМО.
     if (!email.trim()) {
       setLoginError(t("error_empty_email"));
-      return; // Зупиняє виконання функції, запобігаючи спробі входу
+      return;
     }
     if (!password.trim()) {
       setLoginError(t("error_empty_password"));
-      return; // Зупиняє виконання функції, запобігаючи спробі входу
+      return;
     }
 
-    setIsLoggingIn(true); // Встановити стан входу в true (для індикатора завантаження)
+    setIsLoggingIn(true);
 
-    // Використовуємо функцію signIn з AuthProvider
     const { success, error } = await signIn(email, password);
 
-    // Якщо signIn повертає помилку, відображаємо її. Навігації не відбувається.
     if (error) {
       console.error("Login: Помилка входу:", error.message);
       setLoginError(t("error_login_failed", { error: error.message }));
     } else if (success) {
       console.log("Login: Вхід успішний. AuthProvider тепер відповідає за навігацію.");
-      // Сесія оновиться в AuthProvider, і useEffect вище спрацює для навігації.
-      // Поля вводу очистяться після успішного входу, якщо перенаправлення відбудеться
       setEmail("");
       setPassword("");
     }
-    setIsLoggingIn(false); // Завжди повертати стан входу в false
+    setIsLoggingIn(false);
   };
+
+  // Нова функція для обробки скидання пароля
+ // Нова функція для обробки скидання пароля
+const handleForgotPassword = async () => {
+  setLoginError(""); // Очищаємо попередні помилки
+
+  if (!email.trim()) {
+    Alert.alert(t("forgot_password_title"), t("forgot_password_enter_email"));
+    return;
+  }
+
+  setIsResettingPassword(true); // Встановлюємо стан для індикатора завантаження
+
+  try {
+   const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  redirectTo: 'doctor://reset-password', // <<<< ПЕРЕВІРТЕ ЦЕЙ ШЛЯХ
+});
+
+    if (error) {
+      console.error("Forgot password error:", error.message);
+      Alert.alert(
+        t("error_title"),
+        t("forgot_password_error", { error: error.message })
+      );
+    } else {
+      Alert.alert(
+        t("success_title"),
+        t("forgot_password_success", { email: email })
+      );
+    }
+  } catch (err) {
+    console.error("Unexpected error during password reset:", err);
+    Alert.alert(t("error_title"), t("error_general_forgot_password"));
+  } finally {
+    setIsResettingPassword(false); // Завершуємо індикатор завантаження
+  }
+};
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -137,18 +169,32 @@ const Login = () => {
           />
         </View>
 
-        {/* Цей блок відображає помилку, якщо loginError містить текст */}
         {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
 
         <TouchableOpacity
           style={styles.loginButton(width)}
           onPress={handleLogin}
-          disabled={isLoggingIn} // Деактивуємо кнопку під час входу
+          disabled={isLoggingIn || isResettingPassword} // Деактивуємо кнопку, якщо відбувається скидання пароля
         >
           {isLoggingIn ? (
-            <ActivityIndicator color="#fff" /> // Показуємо індикатор під час входу
+            <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.loginButtonText}>{t("login_button")}</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Кнопка "Забули пароль?" */}
+        <TouchableOpacity
+          style={styles.forgotPasswordLink}
+          onPress={handleForgotPassword}
+          disabled={isLoggingIn || isResettingPassword} // Деактивуємо, якщо відбувається вхід або скидання
+        >
+          {isResettingPassword ? (
+            <ActivityIndicator color="#0EB3EB" /> // Індикатор для скидання пароля
+          ) : (
+            <Text style={styles.forgotPasswordText}>
+              {t("forgot_password_link")}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -183,14 +229,14 @@ const styles = StyleSheet.create({
   title: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 36 : 32,
     marginBottom: 9,
-    fontFamily: "Mont-Bold", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Bold",
     color: "#212121",
     textAlign: "center",
   }),
   subtitle: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 18 : 16,
     color: "#757575",
-    fontFamily: "Mont-Regular", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Regular",
     marginBottom: 24,
     textAlign: "center",
   }),
@@ -198,7 +244,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     alignSelf: "flex-start",
     color: "#2A2A2A",
-    fontFamily: "Mont-Medium", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Medium",
     paddingHorizontal: 35,
     marginBottom: 8,
   },
@@ -216,7 +262,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    fontFamily: "Mont-Regular", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Regular",
   },
   loginButton: (width) => ({
     backgroundColor: "#0EB3EB",
@@ -226,12 +272,12 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: "center",
     marginTop: 16,
-    justifyContent: "center", // Щоб текст або індикатор був по центру
+    justifyContent: "center",
   }),
   loginButtonText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "bold", // Якщо використовується Mont-Bold, можна замінити
+    fontWeight: "bold",
     textAlign: "center",
   },
   errorText: {
@@ -239,13 +285,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
+  // Нові стилі для посилання "Забули пароль?"
+  forgotPasswordLink: {
+    marginTop: 10,
+    marginBottom: 10, // Додаємо відступ, щоб не зливався з кнопкою
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: "#757575",
+    fontFamily: "Mont-Regular",
+    textDecorationLine: "underline",
+  },
   registerLink: {
     marginTop: 24,
   },
   registerLinkText: {
     fontSize: 16,
     color: "#757575",
-    fontFamily: "Mont-Regular", // Переконайтеся, що ці шрифти завантажені
+    fontFamily: "Mont-Regular",
   },
 });
 

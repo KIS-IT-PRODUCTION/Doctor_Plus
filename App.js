@@ -11,6 +11,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
+import * as Linking from "expo-linking"; // <<<<<<<< ДОДАНО: Імпорт Linking
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import "./i18n";
 
@@ -34,10 +35,16 @@ import Profile_doctor from "./app/doctor/Profile_doctor";
 import ConsultationTime from "./app/doctor/ConsultationTime";
 import ConsultationTimePatient from "./app/ConsultationTimePatient";
 import PatientMessages from "./app/PatientMessages";
+import ResetPasswordScreen from "./app/ResetPasswordScreen";
+
 SplashScreen.preventAutoHideAsync();
 
 // Створюємо навігаційний стек
 const Stack = createNativeStackNavigator();
+
+// <<<<<<<< ДОДАНО: Визначення префіксу для Deep Linking
+// Цей префікс має відповідати вашій схемі в app.json (наприклад, "doctor")
+const prefix = Linking.createURL("doctor://");
 
 /**
  * InitialNavigator визначає, який екран відображати першим,
@@ -103,15 +110,14 @@ function InitialNavigator() {
       <Stack.Screen name="Profile" component={Profile} />
       <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
       <Stack.Screen name="PatientMessages" component={PatientMessages} />
+      <Stack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
+      {/* Екран для лікаря, який може бути доступний лише для лікарів */}
       <Stack.Screen
         name="Profile_doctor"
         component={Profile_doctor}
         // Передача initialParams, якщо поточний екран є Profile_doctor
         initialParams={initialRouteName === "Profile_doctor" ? initialRouteParams : undefined}
       />
-      {/* Для екрану ConsultationTime, doctorId також може бути потрібен,
-          але зазвичай він передається з Profile_doctor або іншого екрану,
-          а не як initialParam для всього додатку. */}
       <Stack.Screen name="ConsultationTime" component={ConsultationTime} />
     </Stack.Navigator>
   );
@@ -127,42 +133,57 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Завантаження користувацьких шрифтів
         await Font.loadAsync({
           "Mont-Regular": require("./assets/Font/static/Montserrat-Regular.ttf"),
           "Mont-Medium": require("./assets/Font/static/Montserrat-Medium.ttf"),
           "Mont-Bold": require("./assets/Font/static/Montserrat-Bold.ttf"),
           "Mont-SemiBold": require("./assets/Font/static/Montserrat-SemiBold.ttf"),
         });
-        // Можливо, ігнорування всіх попереджень не є найкращою практикою для виробництва
-        // LogBox.ignoreAllLogs();
+        // LogBox.ignoreAllLogs(); // Знов нагадую, подумайте, чи потрібне це у продакшені
       } catch (e) {
-        console.warn(e); // Виводимо попередження, якщо завантаження шрифтів не вдалося
+        console.warn(e);
       } finally {
-        setAppIsReady(true); // Встановлюємо appIsReady в true після завершення підготовки
+        setAppIsReady(true);
       }
     }
 
     prepare();
   }, []);
 
-  // Коллбек для приховування Splash Screen після готовності програми
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
       await SplashScreen.hideAsync();
     }
   }, [appIsReady]);
 
-  // Якщо програма ще не готова, не відображаємо нічого (або Splash Screen)
   if (!appIsReady) {
     return null;
   }
 
+  // <<<<<<<< ДОДАНО: Конфігурація Linking для навігаційного контейнера
+  const linking = {
+    prefixes: [prefix], // Використовуємо наш раніше визначений префікс
+    config: {
+      // Тут ми зіставляємо шляхи Deep Link (які приходять з URL)
+      // з назвами екранів у вашому Stack.Navigator
+      screens: {
+        // 'ResetPasswordScreen' - це назва екрану у вашому Stack.Navigator
+        // 'reset-password' - це частина шляху у Deep Link (наприклад, doctor://reset-password)
+        ResetPasswordScreen: "reset-password",
+        // Ви можете додати інші екрани, якщо плануєте використовувати Deep Links для них
+        Login: "doctor-login",
+        LoginScreen: "patient-login",
+        HomeScreen: "home",
+        Profile_doctor: "profile-doctor",
+      },
+    },
+  };
+
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      {/* Обгортаємо всю навігацію в AuthProvider для доступу до контексту автентифікації */}
       <AuthProvider>
-        <NavigationContainer>
+        {/* <<<<<<<< ЗМІНЕНО: Передача linking об'єкта до NavigationContainer */}
+        <NavigationContainer linking={linking}>
           <InitialNavigator />
         </NavigationContainer>
       </AuthProvider>

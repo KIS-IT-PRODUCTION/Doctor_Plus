@@ -21,45 +21,199 @@ import { supabase } from "../../providers/supabaseClient";
 import { useTranslation } from "react-i18next";
 
 const countries = [
-  { name: "Ukraine", code: "UA", emoji: "🇺🇦" },
-  { name: "United Kingdom", code: "GB", emoji: "🇬🇧" },
-  { name: "United States", code: "US", emoji: "🇺🇸" },
-  { name: "Canada", code: "CA", emoji: "🇨🇦" },
-  { name: "Germany", code: "DE", emoji: "🇩🇪" },
-  { name: "France", code: "FR", emoji: "🇫🇷" },
-  { name: "Poland", code: "PL", emoji: "🇵🇱" },
-  { name: "Italy", code: "IT", emoji: "🇮🇹" },
-  { name: "Spain", code: "ES", emoji: "🇪🇸" },
-  { name: "Japan", code: "JP", emoji: "🇯🇵" },
-  { name: "China", code: "CN", emoji: "🇨🇳" },
-  { name: "India", code: "IN", emoji: "🇮🇳" },
-  { name: "Australia", code: "AU", emoji: "🇦🇺" },
-  { name: "Brazil", code: "BR", emoji: "🇧🇷" },
-  { name: "Turkey", code: "TR", emoji: "🇹🇷" },
-  { name: "Sweden", code: "SE", emoji: "🇸🇪" },
-  { name: "Switzerland", code: "CH", emoji: "🇨🇭" },
-  { name: "Netherlands", code: "NL", emoji: "🇳🇱" },
-  { name: "Norway", code: "NO", emoji: "🇳🇴" },
-  { name: "Denmark", code: "DK", emoji: "🇩🇰" },
-  { name: "Finland", code: "FI", emoji: "🇫🇮" },
-  { name: "South Africa", code: "ZA", emoji: "🇿🇦" },
-  { name: "Mexico", code: "MX", emoji: "🇲🇽" },
-  { name: "South Korea", code: "KR", emoji: "🇰🇷" },
-  { name: "Argentina", code: "AR", emoji: "🇦🇷" },
-  { name: "Ireland", code: "IE", emoji: "🇮🇪" },
-  { name: "New Zealand", code: "NZ", emoji: "🇳🇿" },
-  { name: "Singapore", code: "SG", emoji: "🇸🇬" },
-  { name: "Israel", code: "IL", emoji: "🇮🇱" },
-  { name: "Malaysia", code: "MY", emoji: "🇲🇾" },
-  { name: "Thailand", code: "TH", emoji: "🇹🇭" },
-  { name: "Vietnam", code: "VN", emoji: "🇻🇳" },
-  { name: "Indonesia", code: "ID", emoji: "🇮🇩" },
-  { name: "Egypt", code: "EG", emoji: "🇪🇬" },
-  { name: "Nigeria", code: "NG", emoji: "🇳🇬" },
-  { name: "Saudi Arabia", code: "SA", emoji: "🇸🇦" },
-  { name: "United Arab Emirates", code: "AE", emoji: "🇦🇪" },
-  { name: "Kuwait", code: "KW", emoji: "🇰🇼" },
-  { name: "Qatar", code: "QA", emoji: "🇶🇦" },
+  { name: "Ukraine", code: "UA", emoji: "🇺🇦", timezone: "UTC+2" },
+  { name: "United Kingdom", code: "GB", emoji: "🇬🇧", timezone: "UTC+0" },
+  { name: "United States", code: "US", emoji: "🇺🇸", timezone: "UTC-5" }, // Приклад: Східний час
+  { name: "Canada", code: "CA", emoji: "🇨🇦", timezone: "UTC-6" }, // Приклад: Центральний час
+  { name: "Germany", code: "DE", emoji: "🇩🇪", timezone: "UTC+1" },
+  { name: "France", code: "FR", emoji: "🇫🇷", timezone: "UTC+1" },
+  { name: "Poland", code: "PL", emoji: "🇵🇱", timezone: "UTC+1" },
+  { name: "Italy", code: "IT", emoji: "🇮🇹", timezone: "UTC+1" },
+  { name: "Spain", code: "ES", emoji: "🇪🇸", timezone: "UTC+1" },
+  { name: "Japan", code: "JP", emoji: "🇯🇵", timezone: "UTC+9" },
+  { name: "China", code: "CN", emoji: "🇨🇳", timezone: "UTC+8" },
+  { name: "India", code: "IN", emoji: "🇮🇳", timezone: "UTC+5:30" },
+  { name: "Australia", code: "AU", emoji: "🇦🇺", timezone: "UTC+10" },
+  { name: "Brazil", code: "BR", emoji: "🇧🇷", timezone: "UTC-3" },
+  { name: "Turkey", code: "TR", emoji: "🇹🇷", timezone: "UTC+3" },
+  { name: "Sweden", code: "SE", emoji: "🇸🇪", timezone: "UTC+1" },
+  { name: "Switzerland", code: "CH", emoji: "🇨🇭", timezone: "UTC+1" },
+  { name: "Netherlands", code: "NL", emoji: "🇳🇱", timezone: "UTC+1" },
+  { name: "Norway", code: "NO", emoji: "🇳🇴", timezone: "UTC+1" },
+  { name: "Denmark", code: "DK", emoji: "🇩🇰", timezone: "UTC+1" },
+  { name: "Finland", code: "FI", emoji: "🇫🇮", timezone: "UTC+2" },
+  { name: "South Africa", code: "ZA", emoji: "🇿🇦", timezone: "UTC+2" },
+  { name: "Mexico", code: "MX", emoji: "🇲🇽", timezone: "UTC-6" },
+  { name: "South Korea", code: "KR", emoji: "🇰🇷", timezone: "UTC+9" },
+  { name: "Argentina", code: "AR", emoji: "🇦🇷", timezone: "UTC-3" },
+  { name: "Ireland", code: "IE", emoji: "🇮🇪", timezone: "UTC+0" },
+  { name: "New Zealand", code: "NZ", emoji: "🇳🇿", timezone: "UTC+12" },
+  { name: "Singapore", code: "SG", emoji: "🇸🇬", timezone: "UTC+8" },
+  { name: "Israel", code: "IL", emoji: "🇮🇱", timezone: "UTC+2" },
+  { name: "Malaysia", code: "MY", emoji: "🇲🇾", timezone: "UTC+8" },
+  { name: "Thailand", code: "TH", emoji: "🇹🇭", timezone: "UTC+7" },
+  { name: "Vietnam", code: "VN", emoji: "🇻🇳", timezone: "UTC+7" },
+  { name: "Indonesia", code: "ID", emoji: "🇮🇩", timezone: "UTC+8" },
+  { name: "Egypt", code: "EG", emoji: "🇪🇬", timezone: "UTC+2" },
+  { name: "Nigeria", code: "NG", emoji: "🇳🇬", timezone: "UTC+1" },
+  { name: "Saudi Arabia", code: "SA", emoji: "🇸🇦", timezone: "UTC+3" },
+  { name: "United Arab Emirates", code: "AE", emoji: "🇦🇪", timezone: "UTC+4" },
+  { name: "Kuwait", code: "KW", emoji: "🇰🇼", timezone: "UTC+3" },
+  { name: "Qatar", code: "QA", emoji: "🇶🇦", timezone: "UTC+3" },
+  { name: "Austria", code: "AT", emoji: "🇦🇹", timezone: "UTC+1" },
+  { name: "Azerbaijan", code: "AZ", emoji: "🇦🇿", timezone: "UTC+4" },
+  { name: "Albania", code: "AL", emoji: "🇦🇱", timezone: "UTC+1" },
+  { name: "Algeria", code: "DZ", emoji: "🇩🇿", timezone: "UTC+1" },
+  { name: "Angola", code: "AO", emoji: "🇦🇴", timezone: "UTC+1" },
+  { name: "Andorra", code: "AD", emoji: "🇦🇩", timezone: "UTC+1" },
+  { name: "Antigua and Barbuda", code: "AG", emoji: "🇦🇬", timezone: "UTC-4" },
+  { name: "Afghanistan", code: "AF", emoji: "🇦🇫", timezone: "UTC+4:30" },
+  { name: "Bahamas", code: "BS", emoji: "🇧🇸", timezone: "UTC-5" },
+  { name: "Bangladesh", code: "BD", emoji: "🇧🇩", timezone: "UTC+6" },
+  { name: "Barbados", code: "BB", emoji: "🇧🇧", timezone: "UTC-4" },
+  { name: "Bahrain", code: "BH", emoji: "🇧🇭", timezone: "UTC+3" },
+  { name: "Belize", code: "BZ", emoji: "🇧🇿", timezone: "UTC-6" },
+  { name: "Belgium", code: "BE", emoji: "🇧🇪", timezone: "UTC+1" },
+  { name: "Benin", code: "BJ", emoji: "🇧🇯", timezone: "UTC+1" },
+  { name: "Belarus", code: "BY", emoji: "🇧🇾", timezone: "UTC+3" },
+  { name: "Bulgaria", code: "BG", emoji: "🇧🇬", timezone: "UTC+2" },
+  { name: "Bolivia", code: "BO", emoji: "🇧🇴", timezone: "UTC-4" },
+  { name: "Bosnia and Herzegovina", code: "BA", emoji: "🇧🇦", timezone: "UTC+1" },
+  { name: "Botswana", code: "BW", emoji: "🇧🇼", timezone: "UTC+2" },
+  { name: "Brunei", code: "BN", emoji: "🇧🇳", timezone: "UTC+8" },
+  { name: "Burkina Faso", code: "BF", emoji: "🇧🇫", timezone: "UTC+0" },
+  { name: "Burundi", code: "BI", emoji: "🇧🇮", timezone: "UTC+2" },
+  { name: "Bhutan", code: "BT", emoji: "🇧🇹", timezone: "UTC+6" },
+  { name: "Vanuatu", code: "VU", emoji: "🇻🇺", timezone: "UTC+11" },
+  { name: "Venezuela", code: "VE", emoji: "🇻🇪", timezone: "UTC-4" },
+  { name: "Armenia", code: "AM", emoji: "🇦🇲", timezone: "UTC+4" },
+  { name: "Gabon", code: "GA", emoji: "🇬🇦", timezone: "UTC+1" },
+  { name: "Haiti", code: "HT", emoji: "🇭🇹", timezone: "UTC-5" },
+  { name: "Gambia", code: "GM", emoji: "🇬🇲", timezone: "UTC+0" },
+  { name: "Ghana", code: "GH", emoji: "🇬🇭", timezone: "UTC+0" },
+  { name: "Guyana", code: "GY", emoji: "🇬🇾", timezone: "UTC-4" },
+  { name: "Guatemala", code: "GT", emoji: "🇬🇹", timezone: "UTC-6" },
+  { name: "Guinea", code: "GN", emoji: "🇬🇳", timezone: "UTC+0" },
+  { name: "Guinea-Bissau", code: "GW", emoji: "🇬🇼", timezone: "UTC+0" },
+  { name: "Honduras", code: "HN", emoji: "🇭🇳", timezone: "UTC-6" },
+  { name: "Grenada", code: "GD", emoji: "🇬🇩", timezone: "UTC-4" },
+  { name: "Greece", code: "GR", emoji: "🇬🇷", timezone: "UTC+2" },
+  { name: "Georgia", code: "GE", emoji: "🇬🇪", timezone: "UTC+4" },
+  { name: "Djibouti", code: "DJ", emoji: "🇩🇯", timezone: "UTC+3" },
+  { name: "Dominica", code: "DM", emoji: "🇩🇲", timezone: "UTC-4" },
+  { name: "Dominican Republic", code: "DO", emoji: "🇩🇴", timezone: "UTC-4" },
+  { name: "DR Congo", code: "CD", emoji: "🇨🇩", timezone: "UTC+1" },
+  { name: "Ecuador", code: "EC", "emoji": "🇪🇨", timezone: "UTC-5" },
+  { name: "Equatorial Guinea", code: "GQ", emoji: "🇬🇶", timezone: "UTC+1" },
+  { name: "Eritrea", code: "ER", emoji: "🇪🇷", timezone: "UTC+3" },
+  { name: "Eswatini", code: "SZ", emoji: "🇸🇿", timezone: "UTC+2" },
+  { name: "Estonia", code: "EE", emoji: "🇪🇪", timezone: "UTC+2" },
+  { name: "Ethiopia", code: "ET", emoji: "🇪🇹", timezone: "UTC+3" },
+  { name: "Yemen", code: "YE", emoji: "🇾🇪", timezone: "UTC+3" },
+  { name: "Zambia", code: "ZM", emoji: "🇿🇲", timezone: "UTC+2" },
+  { name: "Zimbabwe", code: "ZW", emoji: "🇿🇼", timezone: "UTC+2" },
+  { name: "Iran", code: "IR", emoji: "🇮🇷", timezone: "UTC+3:30" },
+  { name: "Iceland", code: "IS", emoji: "🇮🇸", timezone: "UTC+0" },
+  { name: "Iraq", code: "IQ", emoji: "🇮🇶", timezone: "UTC+3" },
+  { name: "Jordan", code: "JO", emoji: "🇯🇴", timezone: "UTC+2" },
+  { name: "Cape Verde", code: "CV", emoji: "🇨🇻", timezone: "UTC-1" },
+  { name: "Kazakhstan", code: "KZ", emoji: "🇰🇿", timezone: "UTC+5" },
+  { name: "Cambodia", code: "KH", emoji: "🇰🇭", timezone: "UTC+7" },
+  { name: "Cameroon", code: "CM", emoji: "🇨🇲", timezone: "UTC+1" },
+  { name: "Kenya", code: "KE", emoji: "🇰🇪", timezone: "UTC+3" },
+  { name: "Kyrgyzstan", code: "KG", emoji: "🇰🇬", timezone: "UTC+6" },
+  { name: "Cyprus", code: "CY", emoji: "🇨🇾", timezone: "UTC+2" },
+  { name: "Kiribati", code: "KI", emoji: "🇰🇮", timezone: "UTC+13" },
+  { name: "Colombia", code: "CO", emoji: "🇨🇴", timezone: "UTC-5" },
+  { name: "Comoros", code: "KM", emoji: "🇰🇲", timezone: "UTC+4" },
+  { name: "Costa Rica", code: "CR", emoji: "🇨🇷", timezone: "UTC-6" },
+  { name: "Ivory Coast", code: "CI", emoji: "🇨🇮", timezone: "UTC+0" },
+  { name: "Cuba", code: "CU", emoji: "🇨🇺", timezone: "UTC-5" },
+  { name: "Laos", code: "LA", emoji: "🇱🇦", timezone: "UTC+7" },
+  { name: "Latvia", code: "LV", emoji: "🇱🇻", timezone: "UTC+2" },
+  { name: "Lesotho", code: "LS", emoji: "🇱🇸", timezone: "UTC+2" },
+  { name: "Lithuania", code: "LT", emoji: "🇱🇹", timezone: "UTC+2" },
+  { name: "Liberia", code: "LR", emoji: "🇱🇷", timezone: "UTC+0" },
+  { name: "Lebanon", code: "LB", emoji: "🇱🇧", timezone: "UTC+2" },
+  { name: "Libya", code: "LY", emoji: "🇱🇾", timezone: "UTC+1" },
+  { name: "Liechtenstein", code: "LI", emoji: "🇱🇮", timezone: "UTC+1" },
+  { name: "Luxembourg", code: "LU", emoji: "🇱🇺", timezone: "UTC+1" },
+  { name: "Myanmar", code: "MM", emoji: "🇲🇲", timezone: "UTC+6:30" },
+  { name: "Mauritius", code: "MU", emoji: "🇲🇺", timezone: "UTC+4" },
+  { name: "Mauritania", code: "MR", emoji: "🇲🇷", timezone: "UTC+0" },
+  { name: "Madagascar", code: "MG", emoji: "🇲🇬", timezone: "UTC+3" },
+  { name: "Malawi", code: "MW", emoji: "🇲🇼", timezone: "UTC+2" },
+  { name: "Mali", code: "ML", emoji: "🇲🇱", timezone: "UTC+0" },
+  { name: "Maldives", code: "MV", emoji: "🇲🇻", timezone: "UTC+5" },
+  { name: "Malta", code: "MT", emoji: "🇲🇹", timezone: "UTC+1" },
+  { name: "Morocco", code: "MA", emoji: "🇲🇦", timezone: "UTC+1" },
+  { name: "Marshall Islands", code: "MH", emoji: "🇲🇭", timezone: "UTC+12" },
+  { name: "Mozambique", code: "MZ", emoji: "🇲🇿", timezone: "UTC+2" },
+  { name: "Moldova", code: "MD", emoji: "🇲🇩", timezone: "UTC+2" },
+  { name: "Monaco", code: "MC", emoji: "🇲🇨", timezone: "UTC+1" },
+  { name: "Mongolia", code: "MN", emoji: "🇲🇳", timezone: "UTC+8" },
+  { name: "Namibia", code: "NA", emoji: "🇳🇦", timezone: "UTC+1" },
+  { name: "Nauru", code: "NR", emoji: "🇳🇷", timezone: "UTC+12" },
+  { name: "Nepal", code: "NP", emoji: "🇳🇵", timezone: "UTC+5:45" },
+  { name: "Niger", code: "NE", emoji: "🇳🇪", timezone: "UTC+1" },
+  { name: "Nicaragua", code: "NI", emoji: "🇳🇮", timezone: "UTC-6" },
+  { name: "Oman", code: "OM", emoji: "🇴🇲", timezone: "UTC+4" },
+  { name: "Pakistan", code: "PK", emoji: "🇵🇰", timezone: "UTC+5" },
+  { name: "Palau", code: "PW", emoji: "🇵🇼", timezone: "UTC+9" },
+  { name: "Panama", code: "PA", emoji: "🇵🇦", timezone: "UTC-5" },
+  { name: "Papua New Guinea", code: "PG", emoji: "🇵🇬", timezone: "UTC+10" },
+  { name: "Paraguay", code: "PY", emoji: "🇵🇾", timezone: "UTC-4" },
+  { name: "Peru", code: "PE", emoji: "🇵🇪", timezone: "UTC-5" },
+  { name: "South Sudan", code: "SS", emoji: "🇸🇸", timezone: "UTC+2" },
+  { name: "North Korea", code: "KP", emoji: "🇰🇵", timezone: "UTC+8:30" },
+  { name: "North Macedonia", code: "MK", emoji: "🇲🇰", timezone: "UTC+1" },
+  { name: "Portugal", code: "PT", emoji: "🇵🇹", timezone: "UTC+0" },
+  { name: "Republic of the Congo", code: "CG", emoji: "🇨🇬", timezone: "UTC+1" },
+  { name: "Russia", code: "RU", emoji: "🇷🇺", timezone: "UTC+3" }, // Московський час
+  { name: "Rwanda", code: "RW", emoji: "🇷🇼", timezone: "UTC+2" },
+  { name: "Romania", code: "RO", emoji: "🇷🇴", timezone: "UTC+2" },
+  { name: "El Salvador", code: "SV", emoji: "🇸🇻", timezone: "UTC-6" },
+  { name: "Samoa", code: "WS", emoji: "🇼🇸", timezone: "UTC+13" },
+  { name: "San Marino", code: "SM", emoji: "🇸🇲", timezone: "UTC+1" },
+  { name: "Sao Tome and Principe", code: "ST", emoji: "🇸🇹", timezone: "UTC+0" },
+  { name: "Seychelles", code: "SC", emoji: "🇸🇨", timezone: "UTC+4" },
+  { name: "Senegal", code: "SN", emoji: "🇸🇳", timezone: "UTC+0" },
+  { name: "Saint Vincent and the Grenadines", code: "VC", emoji: "🇻🇨", timezone: "UTC-4" },
+  { name: "Saint Kitts and Nevis", code: "KN", emoji: "🇰🇳", timezone: "UTC-4" },
+  { name: "Saint Lucia", code: "LC", emoji: "🇱🇨", timezone: "UTC-4" },
+  { name: "Serbia", code: "RS", emoji: "🇷🇸", timezone: "UTC+1" },
+  { name: "Syria", code: "SY", emoji: "🇸🇾", timezone: "UTC+2" },
+  { name: "Slovakia", code: "SK", emoji: "🇸🇰", timezone: "UTC+1" },
+  { name: "Slovenia", code: "SI", emoji: "🇸🇮", timezone: "UTC+1" },
+  { name: "Solomon Islands", code: "SB", emoji: "🇸🇧", timezone: "UTC+11" },
+  { name: "Somalia", code: "SO", emoji: "🇸🇴", timezone: "UTC+3" },
+  { name: "Sudan", code: "SD", emoji: "🇸🇩", timezone: "UTC+2" },
+  { name: "Suriname", code: "SR", emoji: "🇸🇷", timezone: "UTC-3" },
+  { name: "East Timor", code: "TL", emoji: "🇹🇱", timezone: "UTC+9" },
+  { name: "Sierra Leone", code: "SL", emoji: "🇸🇱", timezone: "UTC+0" },
+  { name: "Tajikistan", code: "TJ", emoji: "🇹🇯", timezone: "UTC+5" },
+  { name: "Tanzania", code: "TZ", emoji: "🇹🇿", timezone: "UTC+3" },
+  { name: "Togo", code: "TG", emoji: "🇹🇬", timezone: "UTC+0" },
+  { name: "Tonga", code: "TO", emoji: "🇹🇴", timezone: "UTC+13" },
+  { name: "Trinidad and Tobago", code: "TT", emoji: "🇹🇹", timezone: "UTC-5" },
+  { name: "Tuvalu", code: "TV", emoji: "🇹🇻", timezone: "UTC+12" },
+  { name: "Tunisia", code: "TN", emoji: "🇹🇳", timezone: "UTC+1" },
+  { name: "Turkmenistan", code: "TM", emoji: "🇹🇲", timezone: "UTC+5" },
+  { name: "Uganda", code: "UG", emoji: "🇺🇬", timezone: "UTC+3" },
+  { name: "Hungary", code: "HU", emoji: "🇭🇺", timezone: "UTC+1" },
+  { name: "Uzbekistan", code: "UZ", emoji: "🇺🇿", timezone: "UTC+5" },
+  { name: "Uruguay", code: "UY", emoji: "🇺🇾", timezone: "UTC-3" },
+  { name: "Federated States of Micronesia", code: "FM", emoji: "🇫🇲", timezone: "UTC+10" },
+  { name: "Fiji", code: "FJ", emoji: "🇫🇯", timezone: "UTC+12" },
+  { name: "Philippines", code: "PH", emoji: "🇵🇭", timezone: "UTC+8" },
+  { name: "Croatia", code: "HR", emoji: "🇭🇷", timezone: "UTC+1" },
+  { name: "Central African Republic", code: "CF", emoji: "🇨🇫", timezone: "UTC+1" },
+  { name: "Chad", code: "TD", emoji: "🇹🇩", timezone: "UTC+1" },
+  { name: "Czechia", code: "CZ", emoji: "🇨🇿", timezone: "UTC+1" },
+  { name: "Chile", code: "CL", emoji: "🇨🇱", timezone: "UTC-4" },
+  { name: "Montenegro", code: "ME", emoji: "🇲🇪", timezone: "UTC+1" },
+  { name: "Sri Lanka", code: "LK", emoji: "🇱🇰", timezone: "UTC+5:30" },
+  { name: "Jamaica", code: "JM", emoji: "🇯🇲", timezone: "UTC-5" },
 ];
 
 const Register = () => {
@@ -358,41 +512,55 @@ const Register = () => {
             <Text style={{ fontWeight: "bold" }}> {t("login_greeting")}</Text>
           </Text>
         </TouchableOpacity>
+
+        {/* Оновлене модальне вікно для вибору країни */}
         <Modal
           animationType="slide"
           transparent={true}
           visible={isCountryModalVisible}
           onRequestClose={closeCountryModal}
         >
-          <ScrollView>
+          <TouchableWithoutFeedback onPress={closeCountryModal}>
             <View style={styles.centeredView}>
-              <View style={styles.modalView(width)}>
-                <Text style={styles.modalTitle}>
-                  {t("select_country_modal_title")}
-                </Text>
-                {countries.map((item) => (
-                  <TouchableOpacity
-                    key={item.code}
-                    style={styles.countryItem}
-                    onPress={() => selectCountry(item)}
-                  >
-                    <Text style={styles.countryEmoji}>{item.emoji}</Text>
-                    <Text style={styles.countryName}>
-                      {t(`countries.${item.name}`)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={[styles.modalView(width), styles.modalBorder]}>
+                <ScrollView style={styles.modalScrollView}>
+                  {countries.map((item, index) => (
+                    <Pressable
+                      key={item.code}
+                      style={[
+                        styles.countryItem,
+                        country &&
+                          country.code === item.code &&
+                          styles.countryItemSelected,
+                      ]}
+                      onPress={() => selectCountry(item)}
+                    >
+                      <Text style={styles.countryEmoji}>{item.emoji}</Text>
+                      <Text
+                        style={[
+                          styles.countryName,
+                          country &&
+                            country.code === item.code &&
+                            styles.countryItemTextSelected,
+                        ]}
+                      >
+                        {t(`countries.${item.name}`)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
                 <Pressable
                   style={[styles.button, styles.buttonClose]}
                   onPress={closeCountryModal}
                 >
-                  <Text style={styles.textStyle}>{t("cancel")}</Text>
+                  <Text style={styles.textStyle}>{t("close")}</Text>
                 </Pressable>
               </View>
             </View>
-          </ScrollView>
+          </TouchableWithoutFeedback>
         </Modal>
 
+        {/* Модальне вікно для вибору мови (без змін) */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -538,11 +706,26 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
+  errorText: {
+    color: "red",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  loginLink: {
+    marginTop: 16,
+  },
+  loginLinkText: {
+    fontSize: 16,
+    color: "#757575",
+    fontFamily: "Mont-Regular",
+  },
+
+  // Нові та оновлені стилі для модального вікна вибору країни
   centeredView: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject, // Розтягує на весь екран
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
   },
   modalView: (width) => ({
     margin: 20,
@@ -559,17 +742,28 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     width: width * 0.9,
+    maxHeight: Dimensions.get("window").height * 0.8, // Обмеження висоти модального вікна
   }),
+  modalBorder: {
+    borderColor: "#0EB3EB", // Колір рамки
+    borderWidth: 1, // Товщина рамки
+  },
+  // modalTitle (залишається як було, але його немає в модальному вікні вибору країни в прикладі)
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 15,
+  },
+  modalScrollView: {
+    width: "100%", // ScrollView займає всю доступну ширину
   },
   countryItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     width: "100%",
+    justifyContent: "space-between", // Розносить елементи по краях
+    paddingHorizontal: 15, // Додаємо горизонтальний відступ
   },
   countryEmoji: {
     fontSize: 24,
@@ -577,44 +771,45 @@ const styles = StyleSheet.create({
   },
   countryName: {
     fontSize: 18,
+    flex: 1, // Займає весь доступний простір
+  },
+  countryItemSelected: {
+    backgroundColor: "rgba(14, 179, 235, 0.1)", // Колір фону для вибраного елемента
+    borderRadius: 10,
+  },
+  countryItemTextSelected: {
+    fontWeight: "bold",
+    color: "#0EB3EB", // Колір тексту для вибраного елемента
   },
   button: {
     borderRadius: 20,
     padding: 10,
     elevation: 2,
     marginTop: 15,
+    width: "100%", // Кнопка займає всю доступну ширину
   },
   buttonClose: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#0EB3EB", // Колір кнопки "Закрити"
   },
   textStyle: {
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
   },
-  errorText: {
-    color: "red",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  loginLink: {
-    marginTop: 16,
-  },
-  loginLinkText: {
-    fontSize: 16,
-    color: "#757575",
-    fontFamily: "Mont-Regular",
-  },
+
+  // Стилі для модального вікна вибору мови (залишаються без змін)
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
   },
   languageModalContent: {
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
+    borderColor: "#0EB3EB", // Колір рамки
+    borderWidth: 1, // Товщина рамки
     alignItems: "center",
     width: Dimensions.get("window").width * 0.8,
     shadowColor: "#000",
@@ -631,7 +826,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#ECECEC",
+    borderBottomColor: "#rgba(14, 179, 235, 0.1)",
   },
   languageOptionText: {
     fontSize: 18,
