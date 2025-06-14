@@ -8,14 +8,14 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
-  Alert, // Додано Alert для сповіщень користувачу
+  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useAuth } from "../../providers/AuthProvider"; // Використовуємо функції з AuthProvider
+import { useAuth } from "../../providers/AuthProvider";
 import { useTranslation } from "react-i18next";
-import { supabase } from "../../providers/supabaseClient"; // Імпортуємо supabase напряму для функції resetPasswordForEmail
+// import { supabase } from "../../providers/supabaseClient"; // Більше не потрібен тут для OTP логіки
 
 const Login = () => {
   const navigation = useNavigation();
@@ -32,30 +32,40 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isResettingPassword, setIsResettingPassword] = useState(false); // Новий стан для індикатора скидання пароля
+  const [isLoggingIn, setIsLoggingIn] = useState(false); // Для кнопки "Вхід"
 
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
+  // --- КЛЮЧОВИЙ useEffect ДЛЯ НАВІГАЦІЇ ---
   useEffect(() => {
-    if (!authLoading && session && session.user) {
+    console.log("LOGIN_NAV_EFFECT: Triggered.");
+    console.log("  - authLoading:", authLoading);
+    console.log("  - session:", session ? "Present" : "Null");
+    console.log("  - session.user:", session && session.user ? "Present" : "Null");
+    console.log("  - userRole:", userRole);
+
+    if (!authLoading && session && session.user) { // Прибрали forgotPasswordMode та isProcessingReset
       if (userRole === "doctor") {
-        console.log("Login: User is a doctor, navigating to Profile_doctor.");
+        console.log("LOGIN_NAV_EFFECT: User is a doctor, navigating to Profile_doctor.");
         navigation.replace("Profile_doctor");
       } else if (userRole === "patient") {
-        console.log("Login: User is a patient. Logging out and showing error.");
+        console.log("LOGIN_NAV_EFFECT: User is a patient. Logging out and showing error.");
         signOut();
         setLoginError(t("error_doctors_only_login"));
         setEmail("");
         setPassword("");
+      } else if (userRole === null) {
+        console.log("LOGIN_NAV_EFFECT: Session active, but userRole is null. Waiting for role to be set or defaulting to HomeScreen.");
       }
+    } else {
+      console.log("LOGIN_NAV_EFFECT: Navigation condition NOT met.");
     }
-  }, [session, navigation, authLoading, userRole, signOut, t]);
+  }, [session, navigation, authLoading, userRole, signOut, t]); // Прибрали forgotPasswordMode та isProcessingReset з залежностей
 
   useEffect(() => {
     if (authError) {
-      console.error("Login: AuthProvider error:", authError.message);
+      console.error("Login (useEffect - AuthError): AuthProvider error:", authError.message);
       setLoginError(t("error_login_failed", { error: authError.message }));
       setIsLoggingIn(false);
     }
@@ -74,62 +84,34 @@ const Login = () => {
     }
 
     setIsLoggingIn(true);
+    console.log("Login (handleLogin): Attempting sign in...");
 
     const { success, error } = await signIn(email, password);
 
     if (error) {
-      console.error("Login: Помилка входу:", error.message);
+      console.error("Login (handleLogin): Помилка входу:", error.message);
       setLoginError(t("error_login_failed", { error: error.message }));
     } else if (success) {
-      console.log("Login: Вхід успішний. AuthProvider тепер відповідає за навігацію.");
-      setEmail("");
-      setPassword("");
+      console.log("Login (handleLogin): Вхід успішний. AuthProvider тепер відповідає за навігацію.");
     }
     setIsLoggingIn(false);
   };
 
-  // Нова функція для обробки скидання пароля
- // Нова функція для обробки скидання пароля
-const handleForgotPassword = async () => {
-  setLoginError(""); // Очищаємо попередні помилки
+  // --- НОВА ЛОГІКА ДЛЯ "ЗАБУЛИ ПАРОЛЬ" ---
+  const handleForgotPasswordPress = () => {
+    setLoginError(""); // Очищаємо помилки логіну
+    // Перенаправляємо на новий екран скидання пароля, передаючи email
+    navigation.navigate("ResetPasswordScreen", { email: email });
+  };
 
-  if (!email.trim()) {
-    Alert.alert(t("forgot_password_title"), t("forgot_password_enter_email"));
-    return;
-  }
-
-  setIsResettingPassword(true); // Встановлюємо стан для індикатора завантаження
-
-  try {
-   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-  redirectTo: 'doctor://reset-password', // <<<< ПЕРЕВІРТЕ ЦЕЙ ШЛЯХ
-});
-
-    if (error) {
-      console.error("Forgot password error:", error.message);
-      Alert.alert(
-        t("error_title"),
-        t("forgot_password_error", { error: error.message })
-      );
-    } else {
-      Alert.alert(
-        t("success_title"),
-        t("forgot_password_success", { email: email })
-      );
-    }
-  } catch (err) {
-    console.error("Unexpected error during password reset:", err);
-    Alert.alert(t("error_title"), t("error_general_forgot_password"));
-  } finally {
-    setIsResettingPassword(false); // Завершуємо індикатор завантаження
-  }
-};
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container(width)}>
         <StatusBar style="auto" />
-        <Text style={styles.title(isLargeScreen)}>{t("login_greeting")}</Text>
+        <Text style={styles.title(isLargeScreen)}>
+          {t("login_greeting")}
+        </Text>
         <Text style={styles.subtitle(isLargeScreen)}>
           {t("login_subtitle")}
         </Text>
@@ -152,61 +134,59 @@ const handleForgotPassword = async () => {
           />
         </View>
 
-        <Text style={styles.subtitle2}>{t("password")}</Text>
-        <View style={styles.inputContainer(width)}>
-          <Ionicons
-            name="lock-closed-outline"
-            size={20}
-            color="#B0BEC5"
-            style={styles.icon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder={t("placeholder_password")}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={true}
-          />
-        </View>
+        <> {/* Більше не потрібна умова forgotPasswordMode, оскільки логіка перенесена */}
+            <Text style={styles.subtitle2}>{t("password")}</Text>
+            <View style={styles.inputContainer(width)}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color="#B0BEC5"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder={t("placeholder_password")}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={true}
+              />
+            </View>
+          </>
+
 
         {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
 
-        <TouchableOpacity
-          style={styles.loginButton(width)}
-          onPress={handleLogin}
-          disabled={isLoggingIn || isResettingPassword} // Деактивуємо кнопку, якщо відбувається скидання пароля
-        >
-          {isLoggingIn ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.loginButtonText}>{t("login_button")}</Text>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.loginButton(width)}
+            onPress={handleLogin}
+            disabled={isLoggingIn}
+          >
+            {isLoggingIn ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>{t("login_button")}</Text>
+            )}
+          </TouchableOpacity>
 
-        {/* Кнопка "Забули пароль?" */}
         <TouchableOpacity
           style={styles.forgotPasswordLink}
-          onPress={handleForgotPassword}
-          disabled={isLoggingIn || isResettingPassword} // Деактивуємо, якщо відбувається вхід або скидання
+          onPress={handleForgotPasswordPress} // Викликаємо нову функцію навігації
+          disabled={isLoggingIn} // Тільки якщо не відбувається логін
         >
-          {isResettingPassword ? (
-            <ActivityIndicator color="#0EB3EB" /> // Індикатор для скидання пароля
-          ) : (
-            <Text style={styles.forgotPasswordText}>
-              {t("forgot_password_link")}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.registerLink}
-          onPress={() => navigation.navigate("RegisterScreen")}
-        >
-          <Text style={styles.registerLinkText}>
-            {t("not_registered")}
-            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
+          <Text style={styles.forgotPasswordText}>
+            {t("forgot_password_link")}
           </Text>
         </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={() => navigation.navigate("RegisterScreen")}
+          >
+            <Text style={styles.registerLinkText}>
+              {t("not_registered")}
+              <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
+            </Text>
+          </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -285,15 +265,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
-  // Нові стилі для посилання "Забули пароль?"
   forgotPasswordLink: {
     marginTop: 10,
-    marginBottom: 10, // Додаємо відступ, щоб не зливався з кнопкою
+    marginBottom: 10,
   },
   forgotPasswordText: {
     fontSize: 14,
     color: "#757575",
-    fontFamily: "Mont-Regular",
     textDecorationLine: "underline",
   },
   registerLink: {

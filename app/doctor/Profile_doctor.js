@@ -15,7 +15,7 @@ import {
   Platform,
   RefreshControl,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native"; // Додано useFocusEffect
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../providers/supabaseClient";
@@ -168,10 +168,10 @@ const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
 
-  const doctorId = route.params?.doctorId ? String(route.params.doctorId) : null;
+  const doctorIdRef = useRef(route.params?.doctorId ? String(route.params.doctorId) : null);
 
   const [doctor, setDoctor] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingInitial, setLoadingInitial] = useState(true);
   const [error, setError] = useState(null);
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
@@ -191,29 +191,66 @@ const Profile_doctor = ({ route }) => {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // Для відстеження, чи була вже спроба завантаження даних для поточного ID сесії
+  // Це допоможе уникнути повторних викликів fetchDoctorData одразу після встановлення currentDoctorUserId
+  const hasFetchedDataForSessionId = useRef(false); 
+
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-  useEffect(() => {
-    const getDoctorSession = async () => {
-      const {
-        data: { user },
-        error: sessionError,
-      } = await supabase.auth.getUser();
-      if (sessionError) {
-        console.error("Error getting doctor user session:", sessionError.message);
-        return;
-      }
-      if (user) {
-        setCurrentDoctorUserId(user.id);
-        console.log("Profile_doctor: Current logged-in user ID:", user.id);
-      } else {
-        console.log("Profile_doctor: No doctor user session found.");
-      }
-    };
-    getDoctorSession();
-  }, []);
+  // Отримуємо user session один раз при монтуванні або при фокусі екрану,
+  // щоб оновити currentDoctorUserId, якщо сесія змінилася (наприклад, після входу).
+  // Використовуємо useFocusEffect для кращої реакції на навігацію.
+  useFocusEffect(
+    useCallback(() => {
+      console.log("Profile_doctor: useFocusEffect triggered. Fetching user session.");
+      const getDoctorSession = async () => {
+        const {
+          data: { user },
+          error: sessionError,
+        } = await supabase.auth.getUser();
+
+        if (sessionError) {
+          console.error("Error getting doctor user session:", sessionError.message);
+          setError(t("session_error") + sessionError.message);
+          setLoadingInitial(false);
+          setCurrentDoctorUserId(null); // Важливо: очистити, якщо є помилка
+          return;
+        }
+
+        if (user) {
+          console.log("Profile_doctor: Current logged-in user ID:", user.id);
+          // Оновлюємо currentDoctorUserId, тільки якщо він дійсно змінився
+          if (currentDoctorUserId !== user.id) {
+            setCurrentDoctorUserId(user.id);
+            hasFetchedDataForSessionId.current = false; // Скидаємо прапор, якщо ID змінився
+          }
+          // Якщо doctorId не був переданий через params, використовуємо user.id
+          if (!doctorIdRef.current) {
+            doctorIdRef.current = user.id;
+          }
+        } else {
+          console.log("Profile_doctor: No doctor user session found.");
+          // Якщо немає user session і doctorId не був переданий, тоді не можемо завантажити
+          if (!doctorIdRef.current) {
+            setError(t("doctor_id_missing"));
+            setLoadingInitial(false);
+            setCurrentDoctorUserId(null); // Важливо: очистити
+          }
+        }
+      };
+      getDoctorSession();
+      // Очистка при розфокусуванні або демонтажі, якщо потрібно
+      return () => {
+        // Можливо, очистити state, якщо екран має повністю "перезавантажуватися"
+        // setDoctor(null); 
+        // setLoadingInitial(true); 
+        // setError(null);
+        // hasFetchedDataForSessionId.current = false; // Це може бути зайвим, якщо screen re-mounts
+      };
+    }, [t, currentDoctorUserId]) // Залежності
+  );
 
   useEffect(() => {
     if (currentDoctorUserId) {
@@ -273,19 +310,29 @@ const Profile_doctor = ({ route }) => {
     return t("years_experience", { count: years });
   }, [t]);
 
-  const fetchDoctorData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setDoctor(null);
-
-    const idToFetch = doctorId || currentDoctorUserId;
-
+  // Функція для завантаження даних доктора, використовується для початкового завантаження та оновлення
+  const fetchDoctorData = useCallback(async (idToFetch) => {
     if (!idToFetch) {
-      console.warn("Profile_doctor: No doctor ID available to fetch data.");
+      console.warn("Profile_doctor: No doctor ID available to fetch data in fetchDoctorData.");
       setError(t("doctor_id_missing"));
-      setLoading(false);
+      setLoadingInitial(false);
       return;
     }
+
+    setDoctor(null); // Очищаємо попередні дані, щоб показати індикатор для нових
+    setLoadingAvatar(true);
+    setLoadingCertificate(true);
+    setLoadingDiploma(true);
+    setAvatarError(false);
+    setCertificateError(false);
+    setDiplomaError(false);
+    setError(null);
+
+    // Встановлюємо loadingInitial на TRUE ПЕРЕД початком запиту
+    console.log(`Profile_doctor: Setting loadingInitial to TRUE for ID: ${idToFetch}`);
+    setLoadingInitial(true); 
+    
+    console.log(`Profile_doctor: Fetching data for doctor ID: ${idToFetch}`);
 
     try {
       const { data, error: fetchError } = await supabase
@@ -301,14 +348,10 @@ const Profile_doctor = ({ route }) => {
         } else {
           setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
         }
+        setDoctor(null);
       } else {
         setDoctor(data);
-        setLoadingAvatar(true);
-        setLoadingCertificate(true);
-        setLoadingDiploma(true);
-        setAvatarError(false);
-        setCertificateError(false);
-        setDiplomaError(false);
+        console.log("Profile_doctor: Doctor data fetched successfully.");
       }
     } catch (err) {
       let errorMessage = 'Unknown error';
@@ -321,14 +364,41 @@ const Profile_doctor = ({ route }) => {
       }
       console.error("Unexpected error during data fetch:", errorMessage, err);
       setError(`${t("unexpected_error")}: ${errorMessage}`);
+      setDoctor(null);
     } finally {
-      setLoading(false);
+      console.log(`Profile_doctor: Setting loadingInitial to FALSE for ID: ${idToFetch}`);
+      setLoadingInitial(false); // Завжди зупиняємо індикатор початкового завантаження
     }
-  }, [doctorId, currentDoctorUserId, t]);
+  }, [t]);
 
+  // Цей useEffect буде викликати fetchDoctorData, коли doctorIdRef.current або currentDoctorUserId зміниться
   useEffect(() => {
-    fetchDoctorData();
-  }, [fetchDoctorData]);
+    const finalIdToFetch = doctorIdRef.current || currentDoctorUserId;
+    console.log("Profile_doctor: Main data fetch useEffect triggered. finalIdToFetch:", finalIdToFetch);
+    
+    if (finalIdToFetch && !hasFetchedDataForSessionId.current) {
+        console.log(`Profile_doctor: Initiating fetchDoctorData for finalIdToFetch: ${finalIdToFetch}`);
+        fetchDoctorData(finalIdToFetch);
+        hasFetchedDataForSessionId.current = true; // Встановлюємо, що завантаження почалося
+    } else if (!finalIdToFetch) {
+        setLoadingInitial(false); // Якщо немає ID для завантаження, переконайтеся, що loadingInitial false
+    } else if (finalIdToFetch && hasFetchedDataForSessionId.current) {
+        console.log("Profile_doctor: Data already fetched for this session ID, skipping re-fetch.");
+        // Якщо дані вже були завантажені для цього ID сесії,
+        // ми не встановлюємо loadingInitial в true, щоб уникнути блимання.
+        // Це важливо після зміни пароля, коли екран просто "оновлюється" через AuthProvider.
+        // Але ми все ще хочемо, щоб loadingInitial було false, якщо дані вже є.
+        if (doctor && doctor.user_id === finalIdToFetch) {
+             setLoadingInitial(false);
+        } else {
+            // Якщо doctor порожній або ID не збігається, але hasFetchedDataForSessionId.current true
+            // Це може бути, якщо попередній fetchDoctorData був неуспішним.
+            // В такому випадку, ми можемо або спробувати повторно завантажити, або залишити як є.
+            // Для простоти, якщо hasFetchedDataForSessionId.current true, значить ми вже намагалися.
+            // Логіка errorContainer обробить показ помилки.
+        }
+    }
+  }, [currentDoctorUserId, fetchDoctorData]);
 
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
@@ -343,7 +413,7 @@ const Profile_doctor = ({ route }) => {
   };
 
   const handleChooseConsultationTime = () => {
-    const targetDoctorId = doctorId || currentDoctorUserId;
+    const targetDoctorId = doctorIdRef.current || currentDoctorUserId;
 
     if (targetDoctorId) {
       navigation.navigate("ConsultationTime", { doctorId: targetDoctorId });
@@ -397,12 +467,15 @@ const Profile_doctor = ({ route }) => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchDoctorData();
+    // При оновленні, примусово встановлюємо hasFetchedDataForSessionId.current в false,
+    // щоб гарантувати перезавантаження даних.
+    hasFetchedDataForSessionId.current = false; 
+    await fetchDoctorData(doctorIdRef.current || currentDoctorUserId);
     await fetchUnreadNotificationsCount();
     setRefreshing(false);
-  }, [fetchDoctorData, fetchUnreadNotificationsCount]);
+  }, [fetchDoctorData, fetchUnreadNotificationsCount, doctorIdRef, currentDoctorUserId]);
 
-  if (loading) {
+  if (loadingInitial) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0EB3EB" />
@@ -417,7 +490,17 @@ const Profile_doctor = ({ route }) => {
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
-          onPress={() => fetchDoctorData()}
+          onPress={() => {
+            hasFetchedDataForSessionId.current = false; // Примусове перезавантаження
+            const idToRetry = doctorIdRef.current || currentDoctorUserId;
+            if (idToRetry) {
+                fetchDoctorData(idToRetry);
+            } else {
+                // Якщо ID все ще немає, можливо, треба перенаправити або показати іншу помилку
+                setError(t("doctor_id_missing_after_retry"));
+                setLoadingInitial(false); // Забезпечуємо, що індикатор не висить
+            }
+          }}
         >
           <Text style={styles.retryButtonText}>{t("retry")}</Text>
         </TouchableOpacity>
@@ -516,6 +599,7 @@ const Profile_doctor = ({ route }) => {
               <Image
                 source={{ uri: avatar_url }}
                 style={styles.avatar}
+                onLoadStart={() => setLoadingAvatar(true)}
                 onLoad={() => setLoadingAvatar(false)}
                 onError={() => {
                   setLoadingAvatar(false);
@@ -630,6 +714,7 @@ const Profile_doctor = ({ route }) => {
               <Image
                 source={{ uri: certificate_photo_url }}
                 style={styles.certificateImage}
+                onLoadStart={() => setLoadingCertificate(true)}
                 onLoad={() => setLoadingCertificate(false)}
                 onError={() => {
                   setLoadingCertificate(false);
@@ -657,6 +742,7 @@ const Profile_doctor = ({ route }) => {
               <Image
                 source={{ uri: diploma_url }}
                 style={styles.certificateImage}
+                onLoadStart={() => setLoadingDiploma(true)}
                 onLoad={() => setLoadingDiploma(false)}
                 onError={() => {
                   setLoadingDiploma(false);
@@ -707,6 +793,7 @@ const Profile_doctor = ({ route }) => {
     </View>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -923,15 +1010,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     marginHorizontal: 20,
-    flexDirection: "row", // Додайте це для горизонтального вирівнювання іконки та тексту
-    justifyContent: "center", // Центрування вмісту
+    flexDirection: "row",
+    justifyContent: "center",
   },
   actionButtonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
-    marginLeft: 5, // Додайте відступ між іконкою та текстом
+    marginLeft: 5,
   },
   buttonIcon: {
   },
