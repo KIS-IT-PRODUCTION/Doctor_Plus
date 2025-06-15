@@ -1,5 +1,3 @@
-// ConsultationTimePatient.js
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -14,72 +12,66 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../providers/supabaseClient'; // Переконайтеся, що шлях правильний
+import { supabase } from '../providers/supabaseClient';
 
 // --- КОНСТАНТИ ТА НАЛАШТУВАННЯ ---
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3; // Ширина елемента для гнучкого розміщення
 
 // !!! ВАЖЛИВО: Замініть цей URL на URL вашої Supabase Edge Function
-// Ви знайдете його в панелі керування Supabase -> Edge Functions -> Ваша функція 'notify-doctor'
 const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor';
-// Якщо ви тестуєте локально з `supabase functions serve`, URL буде щось на зразок:
-// const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'http://localhost:54321/functions/v1/notify-doctor';
-
 
 // --- ОСНОВНИЙ КОМПОНЕНТ ---
 const ConsultationTimePatient = ({ route }) => {
   const navigation = useNavigation();
-  const { t, i18n } = useTranslation(); // t для перекладів, i18n для доступу до мови
-  const doctorId = route.params?.doctorId; // ID лікаря, переданий з попереднього екрану
+  const { t, i18n } = useTranslation();
+  const doctorId = route.params?.doctorId;
   console.log("Booking screen: doctorId:", doctorId);
 
   // Стейт для даних, що завантажуються/змінюються
-  const [patientId, setPatientId] = useState(null); // ID поточного пацієнта
-  const [patientProfile, setPatientProfile] = useState(null); // Для зберігання профілю пацієнта (ім'я)
-  const [scheduleData, setScheduleData] = useState([]); // Дані розкладу для відображення
-  const [loading, setLoading] = useState(true); // Індикатор завантаження даних
+  const [patientId, setPatientId] = useState(null);
+  const [patientProfile, setPatientProfile] = useState(null);
+  const [scheduleData, setScheduleData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false); // Індикатор завантаження під час бронювання
 
   // Словники для швидкого доступу до статусу слотів
-  const [doctorAvailableSlotsMap, setDoctorAvailableSlotsMap] = useState({}); // Слоти, доступні лікарем
-  const [allBookedSlotsMap, setAllBookedSlotsMap] = useState({}); // Всі слоти, заброньовані іншими пацієнтами
-  const [myBookingsMap, setMyBookingsMap] = useState({}); // Мої особисті бронювання з цим лікарем
+  const [doctorAvailableSlotsMap, setDoctorAvailableSlotsMap] = useState({});
+  const [allBookedSlotsMap, setAllBookedSlotsMap] = useState({});
+  const [myBookingsMap, setMyBookingsMap] = useState({});
 
-  const [selectedSlot, setSelectedSlot] = useState(null); // Слот, який пацієнт щойно вибрав (для бронювання)
+  // ЗМІНА: Тепер це масив для множинного вибору
+  const [selectedSlots, setSelectedSlots] = useState([]);
 
   // --- ЕФЕКТ: Отримання ID та профілю поточного пацієнта ---
-  // Цей useEffect запускається один раз при завантаженні компонента для отримання інформації про користувача.
   useEffect(() => {
     const getPatientSessionAndProfile = async () => {
-      setLoading(true); // Починаємо завантаження
+      setLoading(true);
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession(); // Отримуємо активну сесію
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
-          throw sessionError; // Викидаємо помилку, якщо є проблема з отриманням сесії
+          throw sessionError;
         }
 
-        if (!session?.user) { // Якщо користувач не залогінений
+        if (!session?.user) {
           Alert.alert(t('error'), t('user_not_logged_in_please_login'));
-          navigation.goBack(); // Повертаємося назад
+          navigation.goBack();
           return;
         }
 
-        setPatientId(session.user.id); // Встановлюємо ID пацієнта
+        setPatientId(session.user.id);
         console.log("Current patientId:", session.user.id);
 
-        // Отримання профілю пацієнта для його повного імені (full_name)
-       console.log("DEBUG: Fetching patient profile for user_id:", session.user.id); // Додано лог
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('full_name')
-          .eq('user_id', session.user.id) // <--- ВИПРАВЛЕНО: Змінено 'id' на 'user_id'
+          .eq('user_id', session.user.id)
           .single();
         if (profileError) {
-          throw profileError; // Викидаємо помилку, якщо є проблема з отриманням профілю
+          throw profileError;
         }
         if (profileData) {
-          setPatientProfile(profileData); // Встановлюємо дані профілю
+          setPatientProfile(profileData);
           console.log("Patient profile:", profileData);
         } else {
           console.warn("Patient profile not found for ID:", session.user.id);
@@ -91,45 +83,42 @@ const ConsultationTimePatient = ({ route }) => {
         Alert.alert(t('error'), t('failed_to_get_user_info_or_profile'));
         navigation.goBack();
       } finally {
-        setLoading(false); // Завершуємо завантаження в будь-якому випадку
+        setLoading(false);
       }
     };
     getPatientSessionAndProfile();
-  }, [t, navigation]); // Залежності: t для перекладів, navigation для навігації
+  }, [t, navigation]);
 
   // --- КОЛБЕК: Генерація структури розкладу ---
-  // Цей колбек генерує 14 днів з годинними слотами.
   const generateSchedule = useCallback(() => {
     const today = new Date();
     const days = [];
-    for (let i = 0; i < 14; i++) { // Генеруємо розклад на 14 днів
+    for (let i = 0; i < 14; i++) {
       const currentDay = new Date(today);
       currentDay.setDate(today.getDate() + i);
 
-      // Форматування дати для відображення на різних мовах
       const options = { weekday: 'long', day: 'numeric', month: 'long' };
       const displayDate = new Intl.DateTimeFormat(i18n.language, options).format(currentDay);
-      const dateString = currentDay.toISOString().split('T')[0]; // Формат 'YYYY-MM-DD'
+      const dateString = currentDay.toISOString().split('T')[0];
 
       const slots = [];
-      for (let hour = 9; hour <= 17; hour++) { // Годинні слоти з 9:00 до 17:00
+      for (let hour = 9; hour <= 17; hour++) {
         const startHour = String(hour).padStart(2, '0');
-        const slotId = `${dateString}-${startHour}:00`; // Унікальний ID слота
+        const slotId = `${dateString}-${startHour}:00`;
         slots.push({
-          time: `${startHour}:00-${String(hour + 1).padStart(2, '0')}:00`, // Часовий проміжок для відображення
+          time: `${startHour}:00-${String(hour + 1).padStart(2, '0')}:00`,
           id: slotId,
-          date: dateString, // Дата слота
-          rawTime: `${startHour}:00`, // Час початку слота у форматі HH:MM
+          date: dateString,
+          rawTime: `${startHour}:00`,
         });
       }
       days.push({
         date: currentDay,
-        displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1), // Перша літера велика
+        displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
         slots: slots,
       });
     }
 
-    // Додаткове логування для діагностики проблеми з унікальністю ID слотів
     const allGeneratedSlotIds = days.flatMap(day => day.slots.map(slot => slot.id));
     const uniqueGeneratedSlotIds = new Set(allGeneratedSlotIds);
     if (allGeneratedSlotIds.length !== uniqueGeneratedSlotIds.size) {
@@ -141,18 +130,17 @@ const ConsultationTimePatient = ({ route }) => {
 
     console.log("Schedule generated for patient:", days);
     return days;
-  }, [i18n.language]); // Залежність: мова для форматування дати
+  }, [i18n.language]);
 
   // --- КОЛБЕК: Завантаження доступних та заброньованих слотів ---
   const fetchAvailableSlotsAndBookings = useCallback(async () => {
-    // Перевірка наявності необхідних ID перед виконанням запитів.
     if (!doctorId || !patientId) {
       console.warn("Missing doctorId or patientId. Cannot fetch slots for booking.");
       setLoading(false);
-      setScheduleData(generateSchedule()); // Генеруємо розклад, навіть якщо не можемо завантажити дані
+      setScheduleData(generateSchedule());
       return;
     }
-    setLoading(true); // Починаємо завантаження
+    setLoading(true);
     console.log(`Fetching available and booked slots for doctorId: ${doctorId} and patientId: ${patientId}`);
     try {
       // 1. Завантажуємо слоти, які лікар зробив доступними ('doctor_availability')
@@ -160,14 +148,14 @@ const ConsultationTimePatient = ({ route }) => {
         .from('doctor_availability')
         .select('date, time_slot')
         .eq('doctor_id', doctorId)
-        .gte('date', new Date().toISOString().split('T')[0]); // Тільки майбутні дати
+        .gte('date', new Date().toISOString().split('T')[0]);
 
-      if (doctorAvailError) throw doctorAvailError; // Викидаємо помилку для обробки в catch
+      if (doctorAvailError) throw doctorAvailError;
 
       const availMap = {};
       if (Array.isArray(doctorAvailData)) {
         doctorAvailData.forEach(item => {
-          const formattedTimeSlot = item.time_slot.substring(0, 5); // Приводимо до HH:MM
+          const formattedTimeSlot = item.time_slot.substring(0, 5);
           const slotId = `${item.date}-${formattedTimeSlot}`;
           availMap[slotId] = true;
         });
@@ -180,19 +168,19 @@ const ConsultationTimePatient = ({ route }) => {
         .from('patient_bookings')
         .select('booking_date, booking_time_slot, patient_id')
         .eq('doctor_id', doctorId)
-        .gte('booking_date', new Date().toISOString().split('T')[0]); // Тільки майбутні дати
+        .gte('booking_date', new Date().toISOString().split('T')[0]);
 
       if (bookedError) throw bookedError;
 
-      const allBookedMap = {}; // Карта всіх заброньованих слотів
-      const myBookings = {}; // Карта слотів, заброньованих поточним пацієнтом
+      const allBookedMap = {};
+      const myBookings = {};
       if (Array.isArray(bookedData)) {
         bookedData.forEach(item => {
           const formattedTimeSlot = item.booking_time_slot.substring(0, 5);
           const slotId = `${item.booking_date}-${formattedTimeSlot}`;
-          allBookedMap[slotId] = true; // Позначаємо, що слот заброньовано
+          allBookedMap[slotId] = true;
           if (item.patient_id === patientId) {
-            myBookings[slotId] = true; // Позначаємо, що це моє бронювання
+            myBookings[slotId] = true;
           }
         });
       }
@@ -201,25 +189,22 @@ const ConsultationTimePatient = ({ route }) => {
       console.log("All booked slots map:", allBookedMap);
       console.log("My bookings map:", myBookings);
 
-      setScheduleData(generateSchedule()); // Оновлюємо дані розкладу
+      setScheduleData(generateSchedule());
     } catch (err) {
       console.error("Error fetching slots for booking:", err.message);
       Alert.alert(t('error'), t('failed_to_load_slots_for_booking'));
-      setScheduleData(generateSchedule()); // Все одно генеруємо розклад, щоб уникнути порожнього екрану
+      setScheduleData(generateSchedule());
     } finally {
-      setLoading(false); // Завершуємо завантаження
+      setLoading(false);
     }
-  }, [doctorId, patientId, t, generateSchedule]); // Залежності: ID лікаря/пацієнта, переклади, функція генерації розкладу
+  }, [doctorId, patientId, t, generateSchedule]);
 
   // --- ЕФЕКТ: Виклик функції завантаження даних, коли доступні ID ---
   useEffect(() => {
-    // Цей ефект спрацьовує, коли doctorId, patientId та patientProfile.full_name стають доступними.
-    // patientProfile.full_name важливий для надсилання сповіщення.
     if (doctorId && patientId && patientProfile?.full_name) {
       fetchAvailableSlotsAndBookings();
     }
   }, [doctorId, patientId, patientProfile, fetchAvailableSlotsAndBookings]);
-
 
   // --- ФУНКЦІЯ: Обробка натискання на слот ---
   const handleSlotPress = (slot) => {
@@ -237,67 +222,54 @@ const ConsultationTimePatient = ({ route }) => {
       return;
     }
 
-    // 3. Якщо це моє вже заброньоване бронювання, дозволяємо його "обрати" для можливого скасування чи перебронювання.
-    if (myBookingsMap[slot.id]) {
-      if (selectedSlot && selectedSlot.id === slot.id) {
-        setSelectedSlot(null); // Знімаємо вибір, якщо це моє вже вибране бронювання
-        console.log(`Slot ${slot.id} (my booking) deselected.`);
-      } else {
-        setSelectedSlot(slot); // Вибираємо моє бронювання
-        console.log(`Slot ${slot.id} (my booking) selected.`);
-      }
-      return;
-    }
+    // 3. Логіка для множинного вибору
+    setSelectedSlots(prevSelectedSlots => {
+      const isAlreadySelected = prevSelectedSlots.some(s => s.id === slot.id);
 
-    // 4. Звичайний доступний слот (не заброньований ніким)
-    if (selectedSlot && selectedSlot.id === slot.id) {
-      setSelectedSlot(null); // Знімаємо вибір
-      console.log(`Slot ${slot.id} deselected.`);
-    } else {
-      setSelectedSlot(slot); // Вибираємо новий слот
-      console.log(`Slot ${slot.id} selected for booking.`);
-    }
+      if (isAlreadySelected) {
+        // Якщо вже вибрано, знімаємо вибір
+        return prevSelectedSlots.filter(s => s.id !== slot.id);
+      } else {
+        // Якщо не вибрано, додаємо до списку
+        return [...prevSelectedSlots, slot];
+      }
+    });
+    console.log(`Slot ${slot.id} selection toggled. Current selectedSlots:`, selectedSlots.map(s => s.id));
   };
 
+
   // --- ФУНКЦІЯ: Виклик Edge Function для надсилання сповіщення лікарю ---
-  // *** ВИПРАВЛЕНО: Додано bookingId та patientId як параметри
   const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId) => {
     console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId });
     try {
-      const { data: { session } } = await supabase.auth.getSession(); // Отримуємо поточну сесію
-      const accessToken = session?.access_token || ''; // Отримуємо access_token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token || '';
 
       const response = await fetch(SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Додаємо авторизаційний заголовок, якщо ваша Edge Function захищена
-          // Якщо функція викликається з SERVICE_ROLE_KEY (як у файлі Edge Function), цей заголовок може бути необов'язковим,
-          // але його наявність не завадить і є хорошою практикою для ідентифікації клієнта.
-          'Authorization': `Bearer ${accessToken}`, 
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           doctor_id: doctorId,
           patient_name: patientFullName,
           booking_date: bookingDate,
           booking_time_slot: bookingTimeSlot,
-          booking_id: bookingId, // <-- ДОДАНО! Передача booking_id
-          patient_id: patientId  // <-- ДОДАНО! Передача patient_id
+          booking_id: bookingId,
+          patient_id: patientId
         }),
       });
 
-      const data = await response.json(); // Намагаємося завжди розпарсити JSON
+      const data = await response.json();
 
-      if (!response.ok) { // Якщо відповідь не ОК (наприклад, статус 4xx або 5xx)
+      if (!response.ok) {
         console.error('Edge Function returned an error (HTTP status not OK):', response.status, data.error || data.message || data);
-        Alert.alert(t('error'), `${t('failed_to_send_notification')}: ${data.error || data.message || 'Невідома помилка Edge Function'}`);
         return false;
       }
 
-      // Перевірка на помилки, повернені самою функцією у тілі відповіді (якщо status 200, але є поле 'error')
       if (data.error) {
         console.error('Edge Function returned an error in JSON body:', data.error);
-        Alert.alert(t('error'), `${t('failed_to_send_notification')}: ${data.error || 'Невідома помилка Edge Function'}`);
         return false;
       }
 
@@ -305,7 +277,6 @@ const ConsultationTimePatient = ({ route }) => {
       return true;
 
     } catch (error) {
-      // Обробка мережевих помилок або помилок парсингу JSON
       let errorMessage = 'Unknown error';
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -318,10 +289,9 @@ const ConsultationTimePatient = ({ route }) => {
     }
   };
 
-
-  // --- ФУНКЦІЯ: Бронювання обраного слота ---
-  const bookSelectedSlot = async () => {
-    if (!selectedSlot) {
+  // --- ФУНКЦІЯ: Бронювання обраних слотів ---
+  const bookSelectedSlots = async () => {
+    if (selectedSlots.length === 0) {
       Alert.alert(t('no_slot_selected'), t('please_select_a_slot_to_book'));
       return;
     }
@@ -333,124 +303,122 @@ const ConsultationTimePatient = ({ route }) => {
       Alert.alert(t('error'), t('doctor_id_missing_cannot_book'));
       return;
     }
-    // Обов'язкова перевірка наявності імені пацієнта для сповіщення лікаря
     if (!patientProfile || !patientProfile.full_name) {
       Alert.alert(t('error'), t('failed_to_get_patient_name'));
       console.error("Patient full_name is missing from profile. Cannot send notification.");
       return;
     }
 
-    setBooking(true); // Встановлюємо індикатор завантаження
-    console.log(`Attempting to book slot ${selectedSlot.id} for doctorId: ${doctorId}, patientId: ${patientId}`);
-    try {
-      // 1. Перевірка доступності слота в останній момент (для уникнення конфліктів)
-      const { data: currentAvail, error: availCheckError } = await supabase
-        .from('doctor_availability')
-        .select('id')
-        .eq('doctor_id', doctorId)
-        .eq('date', selectedSlot.date)
-        .eq('time_slot', selectedSlot.rawTime)
-        .single(); // Використовуємо .single() для більш точної перевірки, очікуючи 0 або 1 результат
+    setBooking(true);
+    let successfulBookingsCount = 0;
+    const errors = [];
+    const patientFullName = patientProfile.full_name;
 
-      if (availCheckError || !currentAvail) { // Якщо error або data порожній, значить слот недоступний
-        // Якщо error.code === 'PGRST116' це означає No rows found
-        if (availCheckError?.code === 'PGRST116') { // No rows found
-            throw new Error(t('slot_no_longer_available_by_doctor'));
+    for (const slot of selectedSlots) {
+      try {
+        console.log(`Attempting to book slot ${slot.id} for doctorId: ${doctorId}, patientId: ${patientId}`);
+
+        // 1. Перевірка доступності слота в останній момент
+        const { data: currentAvail, error: availCheckError } = await supabase
+          .from('doctor_availability')
+          .select('id')
+          .eq('doctor_id', doctorId)
+          .eq('date', slot.date)
+          .eq('time_slot', slot.rawTime)
+          .single();
+
+        if (availCheckError || !currentAvail) {
+          if (availCheckError?.code === 'PGRST116') {
+            errors.push(`${t('failed_to_book')} ${slot.time} ${slot.date}: ${t('slot_no_longer_available_by_doctor')}`);
+            continue; // Переходимо до наступного слота
+          }
+          throw availCheckError || new Error(t('slot_no_longer_available_by_doctor'));
         }
-        throw availCheckError || new Error(t('slot_no_longer_available_by_doctor'));
-      }
 
-      // 2. Перевірка, чи не заброньовано слот кимось іншим, поки пацієнт його вибирав
-      const { data: currentBookings, error: bookingCheckError } = await supabase
-        .from('patient_bookings')
-        .select('id, patient_id') // Отримуємо ID бронювання та ID пацієнта
-        .eq('doctor_id', doctorId)
-        .eq('booking_date', selectedSlot.date)
-        .eq('booking_time_slot', selectedSlot.rawTime)
-        .single(); // Очікуємо 0 або 1 результат
+        // 2. Перевірка, чи не заброньовано слот кимось іншим
+        const { data: currentBookings, error: bookingCheckError } = await supabase
+          .from('patient_bookings')
+          .select('id, patient_id')
+          .eq('doctor_id', doctorId)
+          .eq('booking_date', slot.date)
+          .eq('booking_time_slot', slot.rawTime)
+          .single();
 
-      if (bookingCheckError && bookingCheckError.code !== 'PGRST116') { // PGRST116 = No rows found (це нормально)
-        throw bookingCheckError;
-      }
-      
-      if (currentBookings) { // Якщо currentBookings не null, значить слот вже заброньовано
-        if (currentBookings.patient_id !== patientId) {
-          // Слот заброньовано іншим пацієнтом
-          throw new Error(t('slot_just_booked_by_another_patient'));
+        if (bookingCheckError && bookingCheckError.code !== 'PGRST116') {
+          throw bookingCheckError;
+        }
+
+        if (currentBookings) {
+          if (currentBookings.patient_id !== patientId) {
+            errors.push(`${t('failed_to_book')} ${slot.time} ${slot.date}: ${t('slot_just_booked_by_another_patient')}`);
+            continue; // Переходимо до наступного слота
+          } else {
+            console.log(`Slot ${slot.id} is already booked by current patient. Skipping.`);
+            successfulBookingsCount++; // Вважаємо, що "заброньовано", якщо це моє існуюче бронювання
+            continue; // Переходимо до наступного слота
+          }
+        }
+
+        // 3. Вставка нового бронювання
+        const { data: newBookingData, error: insertError } = await supabase
+          .from('patient_bookings')
+          .insert({
+            patient_id: patientId,
+            doctor_id: doctorId,
+            booking_date: slot.date,
+            booking_time_slot: slot.rawTime,
+            status: 'pending', // Встановлюємо початковий статус
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        const newBookingId = newBookingData.id;
+        console.log("New booking successfully created with ID:", newBookingId);
+
+        // 4. Виклик Edge Function для надсилання сповіщення
+        const notificationSent = await sendNotificationViaEdgeFunction(
+          doctorId,
+          patientFullName,
+          slot.date,
+          slot.rawTime,
+          newBookingId,
+          patientId
+        );
+
+        if (notificationSent) {
+          console.log(`Notification for slot ${slot.id} successfully triggered.`);
+          successfulBookingsCount++;
         } else {
-          // Слот вже заброньовано поточним пацієнтом (дублікат або оновлення)
-          console.log("Slot is already booked by current patient. Refreshing UI.");
-          Alert.alert(t('info'), t('slot_already_your_booking'));
-          setSelectedSlot(null); // Очищаємо вибір
-          fetchAvailableSlotsAndBookings(); // Оновлюємо UI
-          return; // Виходимо, бронювати не потрібно
+          errors.push(`${t('failed_to_send_notification_for_slot')} ${slot.time} ${slot.date}`);
+          // Не збільшуємо successfulBookingsCount, якщо сповіщення не надіслано
         }
+      } catch (err) {
+        let errorMessage = 'Failed to book slot.';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (typeof err === 'string') {
+          errorMessage = err;
+        }
+        errors.push(`${t('failed_to_book_slot_error')} ${slot.time} ${slot.date}: ${errorMessage}`);
+        console.error(`Error booking slot ${slot.id}:`, errorMessage, err);
       }
+    } // End of for loop
 
-      // 3. Видалення попередніх бронювань цього пацієнта для цього лікаря
-      // Цей крок гарантує, що у пацієнта є лише одне активне бронювання для цього лікаря.
-      // Якщо ви хочете дозволити кілька бронювань, видаліть цей блок.
-      const { error: deletePrevError } = await supabase
-        .from('patient_bookings')
-        .delete()
-        .eq('patient_id', patientId)
-        .eq('doctor_id', doctorId);
-      if (deletePrevError) {
-        console.warn("Warning: Could not delete previous booking (if any):", deletePrevError.message);
-        // Не кидаємо помилку, якщо видалення попереднього не вдалося, бо це може бути не критично для нового бронювання.
-      }
-
-      // 4. Вставка нового бронювання
-      const { data: newBookingData, error: insertError } = await supabase // Змінено для отримання data
-        .from('patient_bookings')
-        .insert({
-          patient_id: patientId,
-          doctor_id: doctorId,
-          booking_date: selectedSlot.date,
-          booking_time_slot: selectedSlot.rawTime,
-        })
-        .select() // Важливо: повертаємо вставлений запис
-        .single(); // Очікуємо один вставлений запис
-
-      if (insertError) throw insertError; // Викидаємо помилку, якщо вставка не вдалася
-
-      // *** ВИПРАВЛЕННЯ: Отримання booking_id з нового бронювання ***
-      const newBookingId = newBookingData.id;
-      console.log("New booking successfully created with ID:", newBookingId);
-
-      Alert.alert(t('success'), t('slot_booked_successfully'));
-
-      // 5. Виклик Edge Function для надсилання сповіщення
-      const notificationSent = await sendNotificationViaEdgeFunction(
-        doctorId,
-        patientProfile.full_name, // Використовуємо отримане ім'я пацієнта
-        selectedSlot.date,
-        selectedSlot.rawTime,
-        newBookingId,             // <-- ДОДАНО! Передача ID нового бронювання
-        patientId                 // <-- ДОДАНО! Передача ID пацієнта
+    if (successfulBookingsCount > 0) {
+      Alert.alert(
+        t('booking_summary'),
+        `${t('successfully_booked_slots')}: ${successfulBookingsCount}\n${t('failed_slots')}: ${errors.length}\n${errors.join('\n')}`
       );
-
-      if (notificationSent) {
-        console.log("Notification successfully triggered via Edge Function.");
-      } else {
-        console.warn("Failed to trigger notification via Edge Function. Check Edge Function logs for details.");
-      }
-
-      setSelectedSlot(null); // Очищаємо вибір після успішного бронювання
-      fetchAvailableSlotsAndBookings(); // Перезавантажуємо слоти, щоб оновити UI (підсвітити нове бронювання)
-
-    } catch (err) { // Типізуємо помилку як 'unknown'
-      let errorMessage = 'Failed to book slot.';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      }
-      console.error("Error booking slot:", errorMessage, err);
-      Alert.alert(t('error'), `${t('failed_to_book_slot')}: ${errorMessage}`);
-    } finally {
-      setBooking(false); // Завершуємо індикатор завантаження
+    } else {
+      Alert.alert(t('error'), t('no_slots_could_be_booked') + (errors.length > 0 ? `\n${errors.join('\n')}` : ''));
     }
+
+    setSelectedSlots([]); // Очищаємо вибір після спроби бронювання
+    fetchAvailableSlotsAndBookings(); // Перезавантажуємо слоти, щоб оновити UI
+
+    setBooking(false);
   };
 
   // --- Обробник натискання кнопки "Назад" ---
@@ -477,19 +445,18 @@ const ConsultationTimePatient = ({ route }) => {
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('book_consultation')}</Text>
-          {/* Пустий View для вирівнювання, якщо потрібно */}
           <View style={{ width: 48, height: 48 }} />
         </View>
 
         <TouchableOpacity
           style={styles.bookButton}
-          onPress={bookSelectedSlot}
-          disabled={booking || !selectedSlot} // Кнопка неактивна під час бронювання або якщо слот не обрано
+          onPress={bookSelectedSlots} // Змінено на bookSelectedSlots
+          disabled={booking || selectedSlots.length === 0} // Кнопка неактивна під час бронювання або якщо слоти не обрано
         >
-          {booking ? ( // Показуємо ActivityIndicator під час бронювання
+          {booking ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.bookButtonText}>{t('book_now')}</Text>
+            <Text style={styles.bookButtonText}>{t('book_now')} ({selectedSlots.length})</Text> // Показуємо кількість обраних слотів
           )}
         </TouchableOpacity>
       </View>
@@ -500,46 +467,45 @@ const ConsultationTimePatient = ({ route }) => {
             <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
             <View style={styles.slotsContainer}>
               {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
-                const isAvailableByDoctor = doctorAvailableSlotsMap[slot.id]; // Чи лікар зробив доступним
-                const isBookedByOther = allBookedSlotsMap[slot.id] && !myBookingsMap[slot.id]; // Заброньовано іншим (не мною)
-                const isMyBooking = myBookingsMap[slot.id]; // Заброньовано мною
-                const isSelected = selectedSlot && selectedSlot.id === slot.id; // Обрано пацієнтом (тимчасово)
+                const isAvailableByDoctor = doctorAvailableSlotsMap[slot.id];
+                const isBookedByOther = allBookedSlotsMap[slot.id] && !myBookingsMap[slot.id];
+                const isMyBooking = myBookingsMap[slot.id];
+                // ЗМІНА: Перевірка, чи поточний слот обраний в масиві selectedSlots
+                const isSelectedForBooking = selectedSlots.some(s => s.id === slot.id);
 
-                let buttonStyle = [styles.timeSlotButton]; // Базовий стиль кнопки
-                let textStyle = [styles.timeSlotText]; // Базовий стиль тексту
-                let isDisabled = true; // За замовчуванням слот неактивний
-                let slotLabel = slot.time; // Текст слота
+                let buttonStyle = [styles.timeSlotButton];
+                let textStyle = [styles.timeSlotText];
+                let isDisabled = true;
+                let slotLabel = slot.time;
 
-                if (isMyBooking) { // Найвищий пріоритет - моє бронювання
+                if (isMyBooking) {
                   buttonStyle.push(styles.timeSlotButtonBookedByMe);
                   textStyle.push(styles.timeSlotTextBookedByMe);
-                  isDisabled = false; // Можна переобрати/скасувати
-                  slotLabel = `${slot.time}\n(${t('booked')})`; // Додаємо перенос рядка для "Заброньовано"
-                } else if (isAvailableByDoctor) { // Якщо лікар зробив доступним
-                  if (isBookedByOther) { // Але заброньовано іншим
+                  isDisabled = false; // Можна "переобрати" або зняти вибір з мого вже заброньованого
+                  slotLabel = `${slot.time}\n(${t('booked')})`;
+                } else if (isAvailableByDoctor) {
+                  if (isBookedByOther) {
                     buttonStyle.push(styles.timeSlotButtonBookedByOther);
                     textStyle.push(styles.timeSlotTextBookedByOther);
                     isDisabled = true; // Не можна обрати
-                    slotLabel = `${slot.time}\n(${t('booked')})`; // Також показуємо "Заброньовано"
-                  } else { // Доступний для бронювання
+                    slotLabel = `${slot.time}\n(${t('booked_by_other')})`; // Змінено текст для чіткості
+                  } else {
                     buttonStyle.push(styles.timeSlotButtonAvailable);
                     textStyle.push(styles.timeSlotTextAvailable);
                     isDisabled = false;
                   }
-                } else { // Лікар НЕ зробив доступним
+                } else {
                   buttonStyle.push(styles.timeSlotButtonUnavailableByDoctor);
                   textStyle.push(styles.timeSlotTextUnavailableByDoctor);
                   isDisabled = true;
                   slotLabel = `${slot.time}\n(${t('unavailable')})`;
                 }
 
-                // Якщо поточний слот вибрано пацієнтом, він завжди буде синім (окрім випадку, коли це моя вже заброньована бронь)
-                if (isSelected && !isMyBooking) {
+                // Якщо слот вибраний для бронювання (але це не вже моя бронь), застосовуємо стиль вибраного
+                if (isSelectedForBooking && !isMyBooking) {
                   buttonStyle.push(styles.timeSlotButtonSelected);
                   textStyle.push(styles.timeSlotTextSelected);
-                } 
-                // Якщо це моя бронь і я її вибрав, то вона залишається зеленою, але вважається "обраною"
-                // Пропускаємо зміну стилю тут, щоб зберегти зелений колір моєї броні.
+                }
 
                 return (
                   <TouchableOpacity
@@ -581,7 +547,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#fff',
-    paddingTop: 50, // Відступ для iOS Safe Area
+    paddingTop: 50,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
@@ -673,6 +639,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
     justifyContent: 'center',
+    minHeight: 60, // Додано для вирівнювання висоти з двома рядками тексту
   },
   timeSlotText: {
     fontSize: 14,

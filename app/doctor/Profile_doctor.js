@@ -14,15 +14,27 @@ import {
   Alert,
   Platform,
   RefreshControl,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native"; // Додано useFocusEffect
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../providers/supabaseClient";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
+const isLargeScreen = width > 768;
+
+// Вмикаємо LayoutAnimation для Android
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -45,7 +57,8 @@ async function registerForPushNotificationsAsync(userId) {
   }
 
   if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
@@ -56,7 +69,9 @@ async function registerForPushNotificationsAsync(userId) {
         "Помилка",
         "Не вдалося отримати токен для push-сповіщень! Перевірте дозволи в налаштуваннях вашого пристрою."
       );
-      console.error("Failed to get push token for push notification: Permissions not granted!");
+      console.error(
+        "Failed to get push token for push notification: Permissions not granted!"
+      );
       return;
     }
 
@@ -68,20 +83,31 @@ async function registerForPushNotificationsAsync(userId) {
       ).data;
       console.log("Expo Push Token obtained:", token);
     } catch (e) {
-      let errorMessage = 'Unknown error';
+      let errorMessage = "Unknown error";
       if (e instanceof Error) {
         errorMessage = e.message;
-      } else if (typeof e === 'string') {
+      } else if (typeof e === "string") {
         errorMessage = e;
-      } else if (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string') {
+      } else if (
+        typeof e === "object" &&
+        e !== null &&
+        "message" in e &&
+        typeof e.message === "string"
+      ) {
         errorMessage = e.message;
       }
       console.error("Error getting Expo push token:", errorMessage, e);
-      Alert.alert("Помилка", `Не вдалося отримати токен сповіщень: ${errorMessage}. Перевірте підключення.`);
+      Alert.alert(
+        "Помилка",
+        `Не вдалося отримати токен сповіщень: ${errorMessage}. Перевірте підключення.`
+      );
       return;
     }
   } else {
-    Alert.alert("Помилка", "Push-сповіщення працюють лише на фізичних пристроях!");
+    Alert.alert(
+      "Помилка",
+      "Push-сповіщення працюють лише на фізичних пристроях!"
+    );
     console.log("Must use physical device for Push Notifications");
     return;
   }
@@ -93,8 +119,11 @@ async function registerForPushNotificationsAsync(userId) {
       .eq("user_id", userId);
 
     if (error) {
-      console.error("Error saving notification token to Supabase:", error.message);
-      Alert.alert('Помилка', `Не вдалося зберегти токен сповіщень: ${error.message}`);
+      console.error(
+        "Error saving notification token to Supabase:",
+        error.message
+      );
+      Alert.alert("Помилка", `Не вдалося зберегти токен сповіщень: ${error.message}`);
     } else {
       console.log("Notification token saved successfully for doctor user_id:", userId);
       console.log("Saved token:", token);
@@ -111,9 +140,7 @@ const ValueBox = ({ children }) => {
     (Array.isArray(children) && children.length === 0);
 
   if (isEmpty) {
-    return (
-      <Text style={[styles.value, styles.noValueText]}>Not specified</Text>
-    );
+    return <Text style={[styles.value, styles.noValueText]}>Not specified</Text>;
   }
   return (
     <View style={styles.valueBox}>
@@ -168,7 +195,9 @@ const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
 
-  const doctorIdRef = useRef(route.params?.doctorId ? String(route.params.doctorId) : null);
+  const doctorIdRef = useRef(
+    route.params?.doctorId ? String(route.params.doctorId) : null
+  );
 
   const [doctor, setDoctor] = useState(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -189,19 +218,16 @@ const Profile_doctor = ({ route }) => {
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // Для RefreshControl
 
   // Для відстеження, чи була вже спроба завантаження даних для поточного ID сесії
-  // Це допоможе уникнути повторних викликів fetchDoctorData одразу після встановлення currentDoctorUserId
-  const hasFetchedDataForSessionId = useRef(false); 
+  const hasFetchedDataForSessionId = useRef(false);
 
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
   // Отримуємо user session один раз при монтуванні або при фокусі екрану,
-  // щоб оновити currentDoctorUserId, якщо сесія змінилася (наприклад, після входу).
-  // Використовуємо useFocusEffect для кращої реакції на навігацію.
   useFocusEffect(
     useCallback(() => {
       console.log("Profile_doctor: useFocusEffect triggered. Fetching user session.");
@@ -215,41 +241,30 @@ const Profile_doctor = ({ route }) => {
           console.error("Error getting doctor user session:", sessionError.message);
           setError(t("session_error") + sessionError.message);
           setLoadingInitial(false);
-          setCurrentDoctorUserId(null); // Важливо: очистити, якщо є помилка
+          setCurrentDoctorUserId(null);
           return;
         }
 
         if (user) {
           console.log("Profile_doctor: Current logged-in user ID:", user.id);
-          // Оновлюємо currentDoctorUserId, тільки якщо він дійсно змінився
           if (currentDoctorUserId !== user.id) {
             setCurrentDoctorUserId(user.id);
-            hasFetchedDataForSessionId.current = false; // Скидаємо прапор, якщо ID змінився
+            hasFetchedDataForSessionId.current = false;
           }
-          // Якщо doctorId не був переданий через params, використовуємо user.id
           if (!doctorIdRef.current) {
             doctorIdRef.current = user.id;
           }
         } else {
           console.log("Profile_doctor: No doctor user session found.");
-          // Якщо немає user session і doctorId не був переданий, тоді не можемо завантажити
           if (!doctorIdRef.current) {
             setError(t("doctor_id_missing"));
             setLoadingInitial(false);
-            setCurrentDoctorUserId(null); // Важливо: очистити
+            setCurrentDoctorUserId(null);
           }
         }
       };
       getDoctorSession();
-      // Очистка при розфокусуванні або демонтажі, якщо потрібно
-      return () => {
-        // Можливо, очистити state, якщо екран має повністю "перезавантажуватися"
-        // setDoctor(null); 
-        // setLoadingInitial(true); 
-        // setError(null);
-        // hasFetchedDataForSessionId.current = false; // Це може бути зайвим, якщо screen re-mounts
-      };
-    }, [t, currentDoctorUserId]) // Залежності
+    }, [t, currentDoctorUserId])
   );
 
   useEffect(() => {
@@ -280,20 +295,28 @@ const Profile_doctor = ({ route }) => {
         setUnreadNotificationsCount(0);
       } else {
         setUnreadNotificationsCount(count || 0);
-        console.log(`Unread notifications count for ${currentDoctorUserId}: ${count}`);
+        console.log(
+          `Unread notifications count for ${currentDoctorUserId}: ${count}`
+        );
       }
     } catch (err) {
-      let errorMessage = 'Unknown error';
+      let errorMessage = "Unknown error";
       if (err instanceof Error) {
         errorMessage = err.message;
-      } else if (typeof err === 'string') {
+      } else if (typeof err === "string") {
         errorMessage = err;
-      } else if (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string') {
+      } else if (
+        typeof err === "object" &&
+        err !== null &&
+        "message" in err &&
+        typeof err.message === "string"
+      ) {
         errorMessage = err.message;
       }
       console.error(
         "Unexpected error fetching unread notifications count:",
-        errorMessage, err
+        errorMessage,
+        err
       );
       setUnreadNotificationsCount(0);
     }
@@ -303,102 +326,125 @@ const Profile_doctor = ({ route }) => {
     fetchUnreadNotificationsCount();
   }, [currentDoctorUserId, fetchUnreadNotificationsCount]);
 
-  const formatYearsText = useCallback((years) => {
-    if (years === null || years === undefined || isNaN(years) || years < 0) {
-      return t("not_specified");
-    }
-    return t("years_experience", { count: years });
-  }, [t]);
+  const formatYearsText = useCallback(
+    (years) => {
+      if (years === null || years === undefined || isNaN(years) || years < 0) {
+        return t("not_specified");
+      }
+      return t("years_experience", { count: years });
+    },
+    [t]
+  );
 
   // Функція для завантаження даних доктора, використовується для початкового завантаження та оновлення
-  const fetchDoctorData = useCallback(async (idToFetch) => {
-    if (!idToFetch) {
-      console.warn("Profile_doctor: No doctor ID available to fetch data in fetchDoctorData.");
-      setError(t("doctor_id_missing"));
-      setLoadingInitial(false);
-      return;
-    }
-
-    setDoctor(null); // Очищаємо попередні дані, щоб показати індикатор для нових
-    setLoadingAvatar(true);
-    setLoadingCertificate(true);
-    setLoadingDiploma(true);
-    setAvatarError(false);
-    setCertificateError(false);
-    setDiplomaError(false);
-    setError(null);
-
-    // Встановлюємо loadingInitial на TRUE ПЕРЕД початком запиту
-    console.log(`Profile_doctor: Setting loadingInitial to TRUE for ID: ${idToFetch}`);
-    setLoadingInitial(true); 
-    
-    console.log(`Profile_doctor: Fetching data for doctor ID: ${idToFetch}`);
-
-    try {
-      const { data, error: fetchError } = await supabase
-        .from("anketa_doctor")
-        .select("*, diploma_url, certificate_photo_url, consultation_cost, experience_years")
-        .eq("user_id", idToFetch)
-        .single();
-
-      if (fetchError) {
-        console.error("Error fetching doctor data from Supabase:", fetchError);
-        if (fetchError.code === "PGRST116") {
-          setError(t("doctor_not_found"));
-        } else {
-          setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
-        }
-        setDoctor(null);
-      } else {
-        setDoctor(data);
-        console.log("Profile_doctor: Doctor data fetched successfully.");
+  const fetchDoctorData = useCallback(
+    async (idToFetch) => {
+      if (!idToFetch) {
+        console.warn(
+          "Profile_doctor: No doctor ID available to fetch data in fetchDoctorData."
+        );
+        setError(t("doctor_id_missing"));
+        setLoadingInitial(false); // Забезпечуємо, що індикатор зникне, якщо ID немає
+        return;
       }
-    } catch (err) {
-      let errorMessage = 'Unknown error';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      } else if (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string') {
-        errorMessage = err.message;
-      }
-      console.error("Unexpected error during data fetch:", errorMessage, err);
-      setError(`${t("unexpected_error")}: ${errorMessage}`);
+
+      // Використовуємо LayoutAnimation для плавних змін у UI
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
       setDoctor(null);
-    } finally {
-      console.log(`Profile_doctor: Setting loadingInitial to FALSE for ID: ${idToFetch}`);
-      setLoadingInitial(false); // Завжди зупиняємо індикатор початкового завантаження
-    }
-  }, [t]);
+      setLoadingAvatar(true);
+      setLoadingCertificate(true);
+      setLoadingDiploma(true);
+      setAvatarError(false);
+      setCertificateError(false);
+      setDiplomaError(false);
+      setError(null);
+
+      // Встановлюємо loadingInitial на TRUE ПЕРЕД початком запиту, якщо це НЕ pull-to-refresh
+      if (!refreshing) {
+        console.log(
+          `Profile_doctor: Setting loadingInitial to TRUE for ID: ${idToFetch}`
+        );
+        setLoadingInitial(true);
+      }
+
+      console.log(`Profile_doctor: Fetching data for doctor ID: ${idToFetch}`);
+
+      try {
+        const { data, error: fetchError } = await supabase
+          .from("anketa_doctor")
+          .select(
+            "*, diploma_url, certificate_photo_url, consultation_cost, experience_years"
+          )
+          .eq("user_id", idToFetch)
+          .single();
+
+        if (fetchError) {
+          console.error("Error fetching doctor data from Supabase:", fetchError);
+          if (fetchError.code === "PGRST116") {
+            setError(t("doctor_not_found"));
+          } else {
+            setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
+          }
+          setDoctor(null);
+        } else {
+          setDoctor(data);
+          console.log("Profile_doctor: Doctor data fetched successfully.");
+        }
+      } catch (err) {
+        let errorMessage = "Unknown error";
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (typeof err === "string") {
+          errorMessage = err;
+        } else if (
+          typeof err === "object" &&
+          err !== null &&
+          "message" in err &&
+          typeof err.message === "string"
+        ) {
+          errorMessage = err.message;
+        }
+        console.error("Unexpected error during data fetch:", errorMessage, err);
+        setError(`${t("unexpected_error")}: ${errorMessage}`);
+        setDoctor(null);
+      } finally {
+        console.log(
+          `Profile_doctor: Setting loadingInitial to FALSE for ID: ${idToFetch}`
+        );
+        setLoadingInitial(false);
+        setRefreshing(false); // Завжди зупиняємо індикатор оновлення
+      }
+    },
+    [t, refreshing] // Додаємо refreshing до залежностей
+  );
 
   // Цей useEffect буде викликати fetchDoctorData, коли doctorIdRef.current або currentDoctorUserId зміниться
   useEffect(() => {
     const finalIdToFetch = doctorIdRef.current || currentDoctorUserId;
-    console.log("Profile_doctor: Main data fetch useEffect triggered. finalIdToFetch:", finalIdToFetch);
-    
+    console.log(
+      "Profile_doctor: Main data fetch useEffect triggered. finalIdToFetch:",
+      finalIdToFetch
+    );
+
     if (finalIdToFetch && !hasFetchedDataForSessionId.current) {
-        console.log(`Profile_doctor: Initiating fetchDoctorData for finalIdToFetch: ${finalIdToFetch}`);
-        fetchDoctorData(finalIdToFetch);
-        hasFetchedDataForSessionId.current = true; // Встановлюємо, що завантаження почалося
+      console.log(
+        `Profile_doctor: Initiating fetchDoctorData for finalIdToFetch: ${finalIdToFetch}`
+      );
+      fetchDoctorData(finalIdToFetch);
+      hasFetchedDataForSessionId.current = true; // Встановлюємо, що завантаження почалося
     } else if (!finalIdToFetch) {
-        setLoadingInitial(false); // Якщо немає ID для завантаження, переконайтеся, що loadingInitial false
+      setLoadingInitial(false); // Якщо немає ID, то завантаження завершено
     } else if (finalIdToFetch && hasFetchedDataForSessionId.current) {
-        console.log("Profile_doctor: Data already fetched for this session ID, skipping re-fetch.");
-        // Якщо дані вже були завантажені для цього ID сесії,
-        // ми не встановлюємо loadingInitial в true, щоб уникнути блимання.
-        // Це важливо після зміни пароля, коли екран просто "оновлюється" через AuthProvider.
-        // Але ми все ще хочемо, щоб loadingInitial було false, якщо дані вже є.
-        if (doctor && doctor.user_id === finalIdToFetch) {
-             setLoadingInitial(false);
-        } else {
-            // Якщо doctor порожній або ID не збігається, але hasFetchedDataForSessionId.current true
-            // Це може бути, якщо попередній fetchDoctorData був неуспішним.
-            // В такому випадку, ми можемо або спробувати повторно завантажити, або залишити як є.
-            // Для простоти, якщо hasFetchedDataForSessionId.current true, значить ми вже намагалися.
-            // Логіка errorContainer обробить показ помилки.
-        }
+      console.log("Profile_doctor: Data already fetched for this session ID, skipping re-fetch.");
+      // Якщо дані вже були завантажені для цього ID сесії, і вони присутні,
+      // то можна одразу встановити loadingInitial в false.
+      // Важливо: це запобігає постійному "блиманню" завантаження при поверненні на екран.
+      if (doctor && doctor.user_id === finalIdToFetch) {
+        setLoadingInitial(false);
+      }
     }
-  }, [currentDoctorUserId, fetchDoctorData]);
+  }, [currentDoctorUserId, fetchDoctorData, doctor]); // Додаємо doctor до залежностей
 
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
@@ -425,6 +471,7 @@ const Profile_doctor = ({ route }) => {
   const languagesForModal = [
     { nameKey: "english", code: "en", emoji: "" },
     { nameKey: "ukrainian", code: "uk", emoji: "" },
+
   ];
 
   const getParsedArray = useCallback((value) => {
@@ -436,46 +483,65 @@ const Profile_doctor = ({ route }) => {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
-      let errorMessage = 'Invalid JSON format';
+      let errorMessage = "Invalid JSON format";
       if (err instanceof Error) {
         errorMessage = err.message;
-      } else if (typeof err === 'string') {
+      } else if (typeof err === "string") {
         errorMessage = err;
-      } else if (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string') {
+      } else if (
+        typeof err === "object" &&
+        err !== null &&
+        "message" in err &&
+        typeof err.message === "string"
+      ) {
         errorMessage = err.message;
       }
-      console.warn("Warning: Invalid JSON format for array (expected array or parsable JSON string):", value, errorMessage, err);
+      console.warn(
+        "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
+        value,
+        errorMessage,
+        err
+      );
       return [];
     }
   }, []);
 
-  const getLanguages = useCallback((languagesData) => {
-    return getParsedArray(languagesData).map((lang) => String(lang).toUpperCase());
-  }, [getParsedArray]);
+  const getLanguages = useCallback(
+    (languagesData) => {
+      return getParsedArray(languagesData).map((lang) =>
+        String(lang).toUpperCase()
+      );
+    },
+    [getParsedArray]
+  );
 
-  const getSpecializations = useCallback((specializationData) => {
-    const parsedSpecs = getParsedArray(specializationData);
-    if (parsedSpecs.length > 0) {
-      if (typeof parsedSpecs[0] === 'string') {
-        return parsedSpecs.map(specValue => t(`categories.${specValue}`)).join(", ");
-      } else if (typeof parsedSpecs[0] === 'object' && parsedSpecs[0].nameKey) {
-        return parsedSpecs.map(specObj => t(`categories.${specObj.nameKey}`)).join(", ");
+  const getSpecializations = useCallback(
+    (specializationData) => {
+      const parsedSpecs = getParsedArray(specializationData);
+      if (parsedSpecs.length > 0) {
+        if (typeof parsedSpecs[0] === "string") {
+          return parsedSpecs.map((specValue) => t(`categories.${specValue}`)).join(", ");
+        } else if (typeof parsedSpecs[0] === "object" && parsedSpecs[0].nameKey) {
+          return parsedSpecs.map((specObj) => t(`categories.${specObj.nameKey}`)).join(", ");
+        }
       }
-    }
-    return t("not_specified");
-  }, [getParsedArray, t]);
+      return t("not_specified");
+    },
+    [getParsedArray, t]
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     // При оновленні, примусово встановлюємо hasFetchedDataForSessionId.current в false,
     // щоб гарантувати перезавантаження даних.
-    hasFetchedDataForSessionId.current = false; 
+    hasFetchedDataForSessionId.current = false;
     await fetchDoctorData(doctorIdRef.current || currentDoctorUserId);
     await fetchUnreadNotificationsCount();
-    setRefreshing(false);
+    // setRefreshing(false) викликається в fetchDoctorData, коли дані завантажені
   }, [fetchDoctorData, fetchUnreadNotificationsCount, doctorIdRef, currentDoctorUserId]);
 
-  if (loadingInitial) {
+  // Тут зміни: індикатор завантаження відображається лише при `loadingInitial` і якщо це не `refreshing`
+  if (loadingInitial && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0EB3EB" />
@@ -484,9 +550,11 @@ const Profile_doctor = ({ route }) => {
     );
   }
 
+  // Якщо `loadingInitial` false, але є помилка
   if (error) {
     return (
       <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={50} color="#E04D53" />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
@@ -494,11 +562,11 @@ const Profile_doctor = ({ route }) => {
             hasFetchedDataForSessionId.current = false; // Примусове перезавантаження
             const idToRetry = doctorIdRef.current || currentDoctorUserId;
             if (idToRetry) {
-                fetchDoctorData(idToRetry);
+              fetchDoctorData(idToRetry);
             } else {
-                // Якщо ID все ще немає, можливо, треба перенаправити або показати іншу помилку
-                setError(t("doctor_id_missing_after_retry"));
-                setLoadingInitial(false); // Забезпечуємо, що індикатор не висить
+              setError(t("doctor_id_missing_after_retry"));
+
+              setLoadingInitial(false);
             }
           }}
         >
@@ -514,13 +582,14 @@ const Profile_doctor = ({ route }) => {
     );
   }
 
-  if (!doctor) {
-    return (
-      <View style={styles.container}>
+  // Якщо `loadingInitial` false, немає помилки, але `doctor` все ще null
+  if (!doctor ) {    return (
+      <View style={styles.noDoctorContainer}>
+        <Ionicons name="information-circle-outline" size={60} color="#0EB3EB" />
         <Text style={styles.noDoctorText}>{t("doctor_not_found")}</Text>
         <TouchableOpacity
           style={styles.backToHomeButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate("HomeScreen")}
         >
           <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
         </TouchableOpacity>
@@ -544,6 +613,7 @@ const Profile_doctor = ({ route }) => {
 
   return (
     <View style={styles.container}>
+      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.languageSelectButton}
@@ -562,26 +632,26 @@ const Profile_doctor = ({ route }) => {
           style={styles.notificationButton}
           onPress={() => navigation.navigate("Messege")}
         >
-          <Ionicons
-            name="notifications-outline"
-            size={24}
-            color="white"
-          />
+          <Ionicons name="notifications-outline" size={24} color="white" />
           {unreadNotificationsCount > 0 && (
             <View style={styles.notificationBadge}>
-              <Text style={styles.notificationNumber}>{unreadNotificationsCount}</Text>
+              <Text style={styles.notificationNumber}>
+                {unreadNotificationsCount}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
+      {/* SCROLLABLE CONTENT */}
       <ScrollView
-        style={styles.scrollViewContent}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#0EB3EB"]}
+            colors={["#0EB3EB", "#3F51B5"]} // Кольори індикатора оновлення
             tintColor={"#0EB3EB"}
           />
         }
@@ -618,11 +688,19 @@ const Profile_doctor = ({ route }) => {
           )}
 
           <View style={styles.doctorDetails}>
-            <Text style={styles.doctorName}>{full_name || t("not_specified")}</Text>
+            <Text style={styles.doctorName}>
+              {full_name || t("not_specified")}
+            </Text>
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("rating")}:</Text>
-              <ValueBox>🌟🌟</ValueBox>
+              <ValueBox>
+                <Ionicons name="star" size={18} color="#FFD700" />
+                <Ionicons name="star" size={18} color="#FFD700" />
+                <Ionicons name="star" size={18} color="#FFD700" />
+                <Ionicons name="star" size={18} color="#FFD700" />
+                <Ionicons name="star-half" size={18} color="#FFD700" />
+              </ValueBox>
             </View>
 
             <View style={styles.infoRowDynamic}>
@@ -639,9 +717,7 @@ const Profile_doctor = ({ route }) => {
 
             <View style={styles.infoRowDynamic}>
               <Text style={styles.label}>{t("work_experience")}:</Text>
-              <ValueBox>
-                {formatYearsText(experience_years)}
-              </ValueBox>
+              <ValueBox>{formatYearsText(experience_years)}</ValueBox>
             </View>
 
             <View style={styles.infoRowDynamic}>
@@ -658,6 +734,7 @@ const Profile_doctor = ({ route }) => {
           </View>
         </View>
 
+        {/* Action Buttons */}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={handleChooseConsultationTime}
@@ -680,12 +757,15 @@ const Profile_doctor = ({ route }) => {
 
         <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
 
+        {/* ABOUT ME SECTION */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("about_me")}</Text>
           <Text style={styles.sectionContent}>
             {about_me || t("not_specified")}
           </Text>
         </View>
+
+        {/* ACHIEVEMENTS SECTION */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("achievements")}</Text>
           <Text style={styles.sectionContent}>
@@ -693,6 +773,7 @@ const Profile_doctor = ({ route }) => {
           </Text>
         </View>
 
+        {/* WORK LOCATION SECTION */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("place_of_work")}</Text>
           <Text style={styles.sectionContent}>
@@ -700,6 +781,7 @@ const Profile_doctor = ({ route }) => {
           </Text>
         </View>
 
+        {/* CERTIFICATE PHOTO SECTION */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
           {certificate_photo_url && !certificateError ? (
@@ -713,13 +795,16 @@ const Profile_doctor = ({ route }) => {
               )}
               <Image
                 source={{ uri: certificate_photo_url }}
-                style={styles.certificateImage}
+                style={styles.documentImage}
                 onLoadStart={() => setLoadingCertificate(true)}
                 onLoad={() => setLoadingCertificate(false)}
                 onError={() => {
                   setLoadingCertificate(false);
                   setCertificateError(true);
-                  console.error("Error loading certificate image:", certificate_photo_url);
+                  console.error(
+                    "Error loading certificate image:",
+                    certificate_photo_url
+                  );
                 }}
               />
             </View>
@@ -728,6 +813,7 @@ const Profile_doctor = ({ route }) => {
           )}
         </View>
 
+        {/* DIPLOMA PHOTO SECTION */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
           {diploma_url && !diplomaError ? (
@@ -741,7 +827,7 @@ const Profile_doctor = ({ route }) => {
               )}
               <Image
                 source={{ uri: diploma_url }}
-                style={styles.certificateImage}
+                style={styles.documentImage}
                 onLoadStart={() => setLoadingDiploma(true)}
                 onLoad={() => setLoadingDiploma(false)}
                 onError={() => {
@@ -755,8 +841,10 @@ const Profile_doctor = ({ route }) => {
             <Text style={styles.noImageText}>{t("no_diploma_photo")}</Text>
           )}
         </View>
+        <View style={{ height: 30 }} />{/* Додатковий відступ знизу */}
       </ScrollView>
 
+      {/* Language Selection Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -780,12 +868,6 @@ const Profile_doctor = ({ route }) => {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-              <Pressable
-                style={[styles.button, styles.buttonClose]}
-                onPress={closeLanguageModal}
-              >
-                <Text style={styles.textStyle}>{t("close")}</Text>
-              </Pressable>
             </View>
           </TouchableWithoutFeedback>
         </Pressable>
@@ -797,17 +879,19 @@ const Profile_doctor = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "white",
+    backgroundColor: "#F0F2F5", // Light background for modern feel
+    paddingTop: Platform.OS === 'android' ? 30 : 10, // Адаптивний paddingTop для Android
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#F0F2F5",
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: "#000000",
+    color: "#666",
     fontFamily: "Mont-Regular",
   },
   errorContainer: {
@@ -815,20 +899,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#ffebee",
+    backgroundColor: "#FCE4EC", // Lighter error background
+    borderRadius: 15,
+    margin: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
   errorText: {
-    fontSize: 16,
-    color: "#000000",
+    fontSize: 17,
+    color: "#D32F2F", // Darker error text
     textAlign: "center",
-    marginBottom: 15,
-    fontFamily: "Mont-Regular",
+    marginBottom: 20,
+    fontFamily: "Mont-SemiBold",
   },
   retryButton: {
     backgroundColor: "#0EB3EB",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 30, // More rounded
+    marginTop: 10,
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
   },
   retryButtonText: {
     color: "#FFF",
@@ -836,19 +933,38 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
+  noDoctorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#E0F7FA", // Light blue background
+    borderRadius: 15,
+    margin: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
   noDoctorText: {
     fontSize: 18,
     textAlign: "center",
     color: "#000000",
-    marginTop: 50,
-    fontFamily: "Mont-Regular",
+    marginTop: 20,
+    fontFamily: "Mont-SemiBold",
   },
   backToHomeButton: {
-    backgroundColor: "#0EB3EB",
+    backgroundColor: "#607D8B", // Slightly darker, more neutral color
     paddingVertical: 12,
     paddingHorizontal: 25,
-    borderRadius: 25,
-    marginTop: 20,
+    borderRadius: 30,
+    marginTop: 15,
+    shadowColor: "#607D8B",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   backToHomeButtonText: {
     color: "#FFF",
@@ -860,18 +976,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
-    paddingTop: 50,
-    paddingVertical: 10,
+    backgroundColor: "transparent", // Прозорий фон
+    paddingTop: Platform.OS === 'android' ? 30 : 50, // Адаптивний paddingTop
+    paddingBottom: 15,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    // Прибрані borderBottomLeftRadius, borderBottomRightRadius, shadow, elevation
+    // якщо хедер прозорий, ці властивості краще застосовувати до елементів всередині
   },
   languageSelectButton: {
-    backgroundColor: "#0EB3EB",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: "#0EB3EB", // Повернуто синій колір
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#0EB3EB", // Тінь під колір кнопки
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   languageButtonContent: {
     flexDirection: "row",
@@ -880,40 +1003,39 @@ const styles = StyleSheet.create({
   languageButtonText: {
     fontSize: 14,
     fontFamily: "Mont-Bold",
-    color: "white",
+    color: "white", // Білий текст
+    marginRight: 5,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
-    color: "#000000",
-    flex: 1,
-    textAlign: "center",
+    color: "#212121", // Темний текст для прозорого фону
+    flex: 1, // Важливо для центрування
+    textAlign: "center", // Важливо для центрування
     marginHorizontal: 10,
     fontFamily: "Mont-Bold",
-  },
-  rightIcon: {
-    width: 50,
-    height: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 15,
   },
   notificationButton: {
     width: width * 0.12,
     height: width * 0.12,
-    backgroundColor: "rgba(14, 179, 235, 0.69)",
+    backgroundColor: "#0EB3EB", // Повернуто синій колір
     borderRadius: width * 0.06,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#0EB3EB", // Тінь під колір кнопки
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   notificationBadge: {
     position: "absolute",
     top: 5,
-    right: 10,
+    right: 5,
     backgroundColor: "#E04D53",
-    borderRadius: 1000,
-    width: 16,
-    height: 16,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
     justifyContent: "center",
     alignItems: "center",
     borderColor: "white",
@@ -921,66 +1043,90 @@ const styles = StyleSheet.create({
   },
   notificationNumber: {
     color: "white",
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Mont-Bold",
   },
-  scrollViewContent: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
+  },
+  scrollViewContent: {
+    paddingHorizontal: 15,
+    paddingVertical: 20,
+    paddingBottom: 50,
   },
   doctorMainInfo: {
     alignItems: "center",
     marginBottom: 20,
-    paddingTop: 20,
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
   avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     overflow: "hidden",
-    marginBottom: 10,
+    marginBottom: 15,
     backgroundColor: "#E3F2FD",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#0EB3EB",
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   avatar: {
     width: "100%",
     height: "100%",
+    resizeMode: "cover",
   },
   avatarLoadingIndicator: {
     position: "absolute",
   },
   doctorDetails: {
     width: "100%",
-    paddingHorizontal: 10,
+    paddingHorizontal: 5,
   },
   doctorName: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 15,
-    color: "#000000",
+    marginBottom: 20,
+    color: "#212121",
     fontFamily: "Mont-Bold",
   },
   infoRowDynamic: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: "#f9f9f9",
+    marginBottom: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    backgroundColor: "#F5F5F5",
     borderWidth: 1,
-    borderColor: "#eee",
+    borderColor: "#E0E0E0",
   },
   label: {
     fontSize: 16,
     color: "#555",
     fontFamily: "Mont-SemiBold",
+    flexShrink: 0,
+    marginRight: 10,
   },
   valueBox: {
     flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
   valueText: {
     fontSize: 16,
@@ -1000,69 +1146,88 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   flagText: {
-    fontSize: 18,
+    fontSize: 20,
     marginLeft: 5,
   },
   actionButton: {
     backgroundColor: "#0EB3EB",
-    paddingVertical: 15,
-    borderRadius: 10,
+    paddingVertical: 18,
+    borderRadius: 15,
     alignItems: "center",
-    marginBottom: 10,
-    marginHorizontal: 20,
+    marginBottom: 15,
+    marginHorizontal: 15,
     flexDirection: "row",
     justifyContent: "center",
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
   },
   actionButtonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
-    marginLeft: 5,
+    marginLeft: 10,
   },
   buttonIcon: {
+    // Вже задано розмір та колір в JSX, тут можна додати інші стилі, якщо потрібно
   },
   sectionTitleLink: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#0EB3EB",
     textAlign: "center",
-    marginTop: 20,
-    marginBottom: 15,
+    marginTop: 25,
+    marginBottom: 18,
     fontFamily: "Mont-Bold",
+    textDecorationLine: "none",
   },
   sectionContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 20,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: "#eee",
-    marginHorizontal: 20,
+    borderColor: "#E0E0E0",
+    marginHorizontal: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
   sectionHeader: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
     color: "#333",
     fontFamily: "Mont-SemiBold",
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEEEEE",
+    paddingBottom: 8,
   },
   sectionContent: {
     fontSize: 16,
     color: "#555",
     lineHeight: 24,
     fontFamily: "Mont-Regular",
+    marginTop: 5,
   },
   imageWrapper: {
     width: "100%",
-    height: 200,
-    backgroundColor: "#E3F2FD",
-    borderRadius: 8,
+    height: 220,
+    backgroundColor: "#F0F8FF",
+    borderRadius: 10,
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#B3E0F2",
+    marginTop: 10,
   },
-  certificateImage: {
+  documentImage: {
     width: "100%",
     height: "100%",
     resizeMode: "contain",
@@ -1071,71 +1236,82 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   noImageText: {
-    fontSize: 14,
+    fontSize: 15,
     color: "#999",
     textAlign: "center",
     fontStyle: "italic",
     fontFamily: "Mont-Regular",
+    paddingVertical: 20,
   },
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
   },
   languageModalContent: {
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 25,
+    padding: 30,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+     borderColor: "#0EB3EB", // Колір рамки
+    borderWidth: 1, // Товщина рамки
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: "80%",
-    maxHeight: "60%",
+    shadowRadius: 8,
+    elevation: 10,
+    width: "85%",
+    maxHeight: "70%",
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 20,
-    color: "#000000",
+    marginBottom: 25,
+    color: "#333",
     fontFamily: "Mont-Bold",
   },
   modalScrollView: {
-    maxHeight: 200,
+    maxHeight: 250,
     width: "100%",
   },
   languageOption: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    width: "100%",
+    flexDirection: "row",
     alignItems: "center",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(14, 179, 235, 0.1)",
+    width: "100%",
+    justifyContent: "center",
   },
   languageOptionText: {
     fontSize: 18,
-    color: "#333",
+    color: "#444",
     fontFamily: "Mont-Regular",
+    marginLeft: 10,
   },
   button: {
-    borderRadius: 20,
-    padding: 10,
+    borderRadius: 30,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     elevation: 2,
-    marginTop: 20,
+    marginTop: 25,
+    width: "70%",
   },
   buttonClose: {
     backgroundColor: "#0EB3EB",
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
   },
   textStyle: {
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
+    fontSize: 16,
+    fontFamily: "Mont-Bold",
   },
 });
-
 export default Profile_doctor;

@@ -231,28 +231,57 @@ export default function Message() {
   /**
    * Позначає сповіщення як прочитане в Supabase та оновлює UI.
    * @param {string} messageId ID сповіщення (з doctor_notifications.id)
+   * @param {string} newStatus Новий статус для поля `data.status` в `doctor_notifications`
    */
-  const markAsRead = useCallback(async (messageId) => {
+  const markAsReadAndStatus = useCallback(async (messageId, newStatus = null) => {
+    // Оновлення локального стану
     setMessages(prevMessages =>
-      prevMessages.map(msg =>
-        msg.id === messageId ? { ...msg, is_read: true } : msg
-      )
+      prevMessages.map(msg => {
+        if (msg.id === messageId) {
+          const updatedRawData = { ...msg.rawData };
+          if (newStatus) {
+            updatedRawData.status = newStatus;
+          }
+          return { ...msg, is_read: true, rawData: updatedRawData };
+        }
+        return msg;
+      })
     );
+
     try {
+      const updateObject = { is_read: true };
+      if (newStatus) {
+        // Запит поточного rawData
+        const { data: currentNotification, error: fetchError } = await supabase
+          .from('doctor_notifications')
+          .select('data')
+          .eq('id', messageId)
+          .single();
+
+        if (fetchError) {
+          console.error("Error fetching current notification data:", fetchError.message);
+          throw fetchError;
+        }
+
+        const existingRawData = currentNotification.data || {};
+        // Оновлення тільки поля status всередині data
+        updateObject.data = { ...existingRawData, status: newStatus };
+      }
+
       const { error } = await supabase
         .from('doctor_notifications')
-        .update({ is_read: true })
+        .update(updateObject)
         .eq('id', messageId);
 
       if (error) {
-        console.error("Error marking notification as read:", error.message);
-        Alert.alert(t('error'), t('failed_to_mark_as_read'));
+        console.error("Error marking notification as read or updating status:", error.message);
+        Alert.alert(t('error'), t('failed_to_update_notification_status'));
       } else {
-        console.log("Notification marked as read in DB:", messageId);
+        console.log(`Notification ${messageId} marked as read and status updated to ${newStatus} in DB.`);
       }
     } catch (error) {
-      console.error("Network error marking notification as read:", error.message);
-      Alert.alert(t('error'), t('failed_to_mark_as_read'));
+      console.error("Network error marking notification as read or updating status:", error.message);
+      Alert.alert(t('error'), t('failed_to_update_notification_status'));
     }
   }, [t]);
 
@@ -277,12 +306,10 @@ export default function Message() {
 
       const bookingId = message.rawData.booking_id;
       const patientId = message.rawData.patient_id;
-      // ВИПРАВЛЕНО: Отримуємо booking_date та booking_time_slot з message.rawData.date та message.rawData.time
       const bookingDate = message.rawData.date;
       const bookingTimeSlot = message.rawData.time;
       const doctorFinalName = doctorFullName || t('doctor'); // Запасне значення, якщо ім'я не завантажилось
 
-      // Повторна перевірка після отримання конкретних полів
       if (!bookingDate || !bookingTimeSlot) {
           console.error("Missing booking date or time slot in rawData:", {
               booking_date: bookingDate ? bookingDate : "missing",
@@ -298,7 +325,7 @@ export default function Message() {
           const { error: updateError } = await supabase
               .from('patient_bookings')
               .update({ status: newStatus })
-              .eq('id', bookingId); // Змінено на .eq('id', bookingId)
+              .eq('id', bookingId);
 
           if (updateError) {
               console.error("Помилка оновлення статусу бронювання в Supabase:", updateError.message);
@@ -308,7 +335,6 @@ export default function Message() {
           console.log(`Бронювання ${bookingId} успішно оновлено до ${newStatus}`);
 
           // Крок 2: Виклик Supabase Edge Function для надсилання сповіщення пацієнту
-          // ПЕРЕВІРТЕ: Замініть на реальний URL вашої Edge Function
          const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
 
           const { data: { session } } = await supabase.auth.getSession();
@@ -324,13 +350,12 @@ export default function Message() {
               booking: {
                   id: bookingId,
                   patient_id: patientId,
-                  doctor_id: currentDoctorUserId, // Передаємо user.id лікаря
+                  doctor_id: currentDoctorUserId,
                   status: newStatus,
-                  // ВИПРАВЛЕНО: Передаємо дату та час з нових змінних
                   booking_date: bookingDate,
                   booking_time_slot: bookingTimeSlot,
               },
-              doctor_name: doctorFinalName, // Передаємо повне ім'я лікаря
+              doctor_name: doctorFinalName,
           };
 
           console.log("Виклик Edge Function handle-booking-status-update з даними:", payload);
@@ -364,19 +389,25 @@ export default function Message() {
           console.log('Edge Function викликана успішно. Відповідь:', await response.json());
           Alert.alert(t('success'), newStatus === 'confirmed' ? t('booking_confirmed_successfully_message') : t('booking_rejected_successfully_message'));
 
-          // Оновлюємо стан повідомлень: позначаємо поточне як прочитане та перезавантажуємо весь список
-          // щоб відобразити оновлений статус бронювання.
+          // Крок 3: Оновлення статусу повідомлення лікаря в таблиці doctor_notifications
           if (message.db_id) {
-            await markAsRead(message.db_id);
+            await markAsReadAndStatus(message.db_id, newStatus);
+          } else {
+            // Якщо з якоїсь причини db_id немає, просто оновлюємо локально та виводимо попередження
+            console.warn("Message does not have db_id, cannot update status in doctor_notifications table.");
+            setMessages(prevMessages =>
+              prevMessages.map(msg =>
+                msg.id === message.id ? { ...msg, is_read: true, rawData: { ...msg.rawData, status: newStatus } } : msg
+              )
+            );
           }
-          // Дуже важливо: перезавантажуємо повідомлення для відображення актуального статусу бронювання
-          await fetchMessagesFromSupabase(currentDoctorUserId);
+
 
       } catch (error) {
           console.error("Помилка обробки бронювання (загальна помилка fetch або DB update):", error.message);
           Alert.alert(t('error'), `${t('failed_to_process_booking')}: ${error.message}`);
       }
-  }, [t, currentDoctorUserId, doctorFullName, markAsRead, fetchMessagesFromSupabase]);
+  }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus]);
 
 
   const handleConfirmBooking = useCallback(async (message) => {
@@ -432,73 +463,73 @@ export default function Message() {
             <Text style={styles.emptyMessagesSubText}>{t("messages_screen.waiting_for_bookings")}</Text>
           </View>
         ) : (
-          messages.map((message) => (
-            <View key={message.id} style={styles.messageGroup}>
-              <View style={styles.dateAndTimestamp}>
-                <Text style={styles.dateText}>{message.date}</Text>
-                <Text style={styles.timestampText}>{message.time}</Text>
-              </View>
-              {/* Стиль повідомлення залежить від того, прочитане воно чи ні */}
-              <View style={[styles.messageCard, message.is_read && styles.messageCardRead]}>
-                <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
-                <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
+          messages.map((message) => {
+            const isConfirmed = message.rawData.status === 'confirmed';
+            const isRejected = message.rawData.status === 'rejected';
 
-                {/* {message.type === 'new_booking' && message.rawData && (
-                    <View style={styles.bookingInfo}>
-                        <Text style={styles.bookingDetailsText}>
-                            {t('patient')}: {(message.rawData && message.rawData.patient_name) || t('not_specified')}
-                        </Text>
-                        <Text style={styles.bookingDetailsText}>
-                            {t('date')}: {(message.rawData && message.rawData.date) || t('not_specified')} 
-                        </Text>
-                        <Text style={styles.bookingDetailsText}>
-                            {t('time')}: {(message.rawData && message.rawData.time) || t('not_specified')} 
-                        </Text>
-                    </View>
-                )} */}
+            const messageCardStyle = [
+              styles.messageCard,
+              // Стиль 'read' застосовується, тільки якщо це не 'new_booking' або 'new_booking' вже оброблено.
+              // Це запобігає затіненню стилів confirmed/rejected стилем read.
+              (message.is_read && message.type !== 'new_booking') && styles.messageCardRead,
+              isConfirmed && styles.messageCardConfirmed,
+              isRejected && styles.messageCardRejected,
+            ];
 
-                {/* Логіка відображення кнопок дій або статусу */}
-                {message.type === 'new_booking' ? (
-                    // Якщо це нове бронювання і воно очікує підтвердження
-                    message.rawData.status === 'pending' && !message.is_read ? (
-                        <View style={styles.bookingActionButtons}>
-                            <TouchableOpacity
-                                style={styles.confirmBookingButton}
-                                onPress={() => handleConfirmBooking(message)}
-                            >
-                                <Text style={styles.confirmBookingButtonText}>{t('confirm_booking')}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.rejectBookingButton}
-                                onPress={() => handleRejectBooking(message)}
-                            >
-                                <Text style={styles.rejectBookingButtonText}>{t('reject_booking')}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        // Якщо бронювання вже оброблено (підтверджено/відхилено)
-                        <Text style={[
-                            styles.statusText,
-                            message.rawData.status === 'confirmed' ? styles.confirmedText : styles.rejectedText
-                        ]}>
-                            {message.rawData.status === 'confirmed' ? t('confirmed_read') : t('rejected_read')}
-                        </Text>
-                    )
-                ) : ( // Якщо це не 'new_booking' тип повідомлення
-                    !message.is_read ? (
-                        <TouchableOpacity
-                            style={styles.markAsReadButton}
-                            onPress={() => message.db_id && markAsRead(message.db_id)} // Перевіряємо db_id перед викликом
-                        >
-                            <Text style={styles.markAsReadButtonText}>{t('mark_as_read')}</Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <Text style={styles.confirmedText}>{t('read')}</Text>
-                    )
-                )}
+            return (
+              <View key={message.id} style={styles.messageGroup}>
+                <View style={styles.dateAndTimestamp}>
+                  <Text style={styles.dateText}>{message.date}</Text>
+                  <Text style={styles.timestampText}>{message.time}</Text>
+                </View>
+                {/* Стиль повідомлення залежить від того, прочитане воно чи ні, та від статусу */}
+                <View style={messageCardStyle}>
+                  <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
+                  <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
+
+                  {/* Логіка відображення кнопок дій або статусу */}
+                  {message.type === 'new_booking' ? (
+                      // Якщо це нове бронювання і воно очікує підтвердження
+                      message.rawData.status === 'pending' ? (
+                          <View style={styles.bookingActionButtons}>
+                              <TouchableOpacity
+                                  style={styles.confirmBookingButton}
+                                  onPress={() => handleConfirmBooking(message)}
+                              >
+                                  <Text style={styles.confirmBookingButtonText}>{t('confirm_booking')}</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                  style={styles.rejectBookingButton}
+                                  onPress={() => handleRejectBooking(message)}
+                              >
+                                  <Text style={styles.rejectBookingButtonText}>{t('reject_booking')}</Text>
+                              </TouchableOpacity>
+                          </View>
+                      ) : (
+                          // Якщо бронювання вже оброблено (підтверджено/відхилено)
+                          <Text style={[
+                              styles.statusText,
+                              isConfirmed ? styles.confirmedText : styles.rejectedText
+                          ]}>
+                              {isConfirmed ? t('confirmed_read') : t('rejected_read')}
+                          </Text>
+                      )
+                  ) : ( // Якщо це не 'new_booking' тип повідомлення
+                      !message.is_read ? (
+                          <TouchableOpacity
+                              style={styles.markAsReadButton}
+                              onPress={() => message.db_id && markAsReadAndStatus(message.db_id)} // Передаємо null для статусу, бо це не бронювання
+                          >
+                              <Text style={styles.markAsReadButtonText}>{t('mark_as_read')}</Text>
+                          </TouchableOpacity>
+                      ) : (
+                          <Text style={styles.readStatusText}>{t('read')}</Text>
+                      )
+                  )}
+                </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -581,6 +612,16 @@ const styles = StyleSheet.create({
   messageCardRead: {
     opacity: 0.7,
     backgroundColor: '#F5F5F5',
+  },
+  messageCardConfirmed: {
+    backgroundColor: '#E6FFE6', // Дуже світло-зелений фон
+    borderColor: '#4CAF50', // Зелена рамка
+    borderWidth: 1,
+  },
+  messageCardRejected: {
+    backgroundColor: '#FFEEEE', // Дуже світло-червоний фон
+    borderColor: '#D32F2F', // Червона рамка
+    borderWidth: 1,
   },
   cardTitle: {
     fontSize: 16,
@@ -670,14 +711,28 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 10,
+    borderWidth: 1, // Додано для статусного тексту
   },
   confirmedText: {
     color: '#2E7D32',
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E6FFE6',
+    borderColor: '#2E7D32',
   },
   rejectedText: {
     backgroundColor: '#FFEBEE',
     color: '#D32F2F',
+    borderColor: '#D32F2F',
+  },
+  readStatusText: { // Стиль для "Прочитано" інших повідомлень
+    fontSize: 14,
+    fontFamily: "Mont-SemiBold",
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#E0E0E0',
+    color: '#757575',
   },
   emptyMessagesContainer: {
     flex: 1,

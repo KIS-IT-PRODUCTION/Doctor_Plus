@@ -286,7 +286,6 @@ export default function PatientMessages() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8f8f8', // Легкий сірий фон для всього екрану
     paddingTop: Platform.OS === 'android' ? 25 : 0, // Додатковий відступ для Android status bar
   },
   header: {
@@ -295,13 +294,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 15,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee', // Легка нижня межа
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2, // Тінь для Android
   },
   backButton: { // Стилі для кнопки "Назад"
     backgroundColor: "rgba(14, 179, 235, 0.2)", // Напівпрозорий синій

@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../providers/AuthProvider";
 import { useTranslation } from "react-i18next";
-// import { supabase } from "../../providers/supabaseClient"; // Більше не потрібен тут для OTP логіки
+
 
 const Login = () => {
   const navigation = useNavigation();
@@ -32,12 +32,11 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false); // Для кнопки "Вхід"
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
-  // --- КЛЮЧОВИЙ useEffect ДЛЯ НАВІГАЦІЇ ---
   useEffect(() => {
     console.log("LOGIN_NAV_EFFECT: Triggered.");
     console.log("  - authLoading:", authLoading);
@@ -45,7 +44,7 @@ const Login = () => {
     console.log("  - session.user:", session && session.user ? "Present" : "Null");
     console.log("  - userRole:", userRole);
 
-    if (!authLoading && session && session.user) { // Прибрали forgotPasswordMode та isProcessingReset
+    if (!authLoading && session && session.user) {
       if (userRole === "doctor") {
         console.log("LOGIN_NAV_EFFECT: User is a doctor, navigating to Profile_doctor.");
         navigation.replace("Profile_doctor");
@@ -61,7 +60,7 @@ const Login = () => {
     } else {
       console.log("LOGIN_NAV_EFFECT: Navigation condition NOT met.");
     }
-  }, [session, navigation, authLoading, userRole, signOut, t]); // Прибрали forgotPasswordMode та isProcessingReset з залежностей
+  }, [session, navigation, authLoading, userRole, signOut, t]);
 
   useEffect(() => {
     if (authError) {
@@ -97,10 +96,8 @@ const Login = () => {
     setIsLoggingIn(false);
   };
 
-  // --- НОВА ЛОГІКА ДЛЯ "ЗАБУЛИ ПАРОЛЬ" ---
   const handleForgotPasswordPress = () => {
-    setLoginError(""); // Очищаємо помилки логіну
-    // Перенаправляємо на новий екран скидання пароля, передаючи email
+    setLoginError("");
     navigation.navigate("ResetPasswordScreen", { email: email });
   };
 
@@ -134,7 +131,7 @@ const Login = () => {
           />
         </View>
 
-        <> {/* Більше не потрібна умова forgotPasswordMode, оскільки логіка перенесена */}
+        <>
             <Text style={styles.subtitle2}>{t("password")}</Text>
             <View style={styles.inputContainer(width)}>
               <Ionicons
@@ -170,8 +167,8 @@ const Login = () => {
 
         <TouchableOpacity
           style={styles.forgotPasswordLink}
-          onPress={handleForgotPasswordPress} // Викликаємо нову функцію навігації
-          disabled={isLoggingIn} // Тільки якщо не відбувається логін
+          onPress={handleForgotPasswordPress}
+          disabled={isLoggingIn}
         >
           <Text style={styles.forgotPasswordText}>
             {t("forgot_password_link")}

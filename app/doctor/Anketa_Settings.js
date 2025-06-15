@@ -914,6 +914,7 @@ const Anketa_Settings = () => {
       style={{
         flex: 1,
         backgroundColor: "#fff",
+        paddingTop: isLargeScreen ? 40 : 40,
       }}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
