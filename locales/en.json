@@ -630,17 +630,6 @@
   "failed_to_send_notification": "Failed to send notification",
   "failed_to_process_booking": "Failed to process booking",
   "user_not_authenticated_please_login_again": "User not authenticated. Please log in again.",
-
-  "failed_to_get_patient_profile_data": "Failed to load patient profile data.",
-  "failed_to_get_user_info_or_profile": "Error getting user session or patient profile.",
-  "no_slot_selected": "No slot selected",
-  "failed_to_get_patient_name": "Failed to get patient name for notification.",
-  "failed_to_send_notification_for_slot": "Failed to send notification for slot",
-  "failed_to_book_slot_error": "Failed to book slot",
-  "booked_by_other": "Booked by other",
-  "booking_summary": "Booking Summary",
-  "successfully_booked_slots": "Successfully booked slots",
-  "failed_slots": "Failed slots",
-  "no_slots_could_be_booked": "No slots could be booked.",
-  "failed_to_book": "Failed to book"
+  "failed_to_update_notification_status": "Failed to update notification status.",
+  "patient_name": "Patient Name"
 }

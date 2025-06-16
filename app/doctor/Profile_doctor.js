@@ -26,7 +26,7 @@ import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
-const isLargeScreen = width > 768;
+const isLargeScreen = width > 768; // Визначення великого екрану
 
 // Вмикаємо LayoutAnimation для Android
 if (
@@ -134,13 +134,14 @@ async function registerForPushNotificationsAsync(userId) {
 }
 
 const ValueBox = ({ children }) => {
+  const { t } = useTranslation();
   const isEmpty =
     !children ||
     (typeof children === "string" && children.trim() === "") ||
     (Array.isArray(children) && children.length === 0);
 
   if (isEmpty) {
-    return <Text style={[styles.value, styles.noValueText]}>Not specified</Text>;
+    return <Text style={[styles.value, styles.noValueText]}>{t("not_specified")}</Text>;
   }
   return (
     <View style={styles.valueBox}>
@@ -219,6 +220,8 @@ const Profile_doctor = ({ route }) => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const [refreshing, setRefreshing] = useState(false); // Для RefreshControl
+  const [loadingTimeoutExpired, setLoadingTimeoutExpired] = useState(false); // Для таймауту завантаження
+  const timeoutRef = useRef(null); // Референс для таймауту
 
   // Для відстеження, чи була вже спроба завантаження даних для поточного ID сесії
   const hasFetchedDataForSessionId = useRef(false);
@@ -227,7 +230,7 @@ const Profile_doctor = ({ route }) => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-  // Отримуємо user session один раз при монтуванні або при фокусі екрану,
+  // Отримуємо user session один раз при монтуванні або при фокусі екрану
   useFocusEffect(
     useCallback(() => {
       console.log("Profile_doctor: useFocusEffect triggered. Fetching user session.");
@@ -249,7 +252,7 @@ const Profile_doctor = ({ route }) => {
           console.log("Profile_doctor: Current logged-in user ID:", user.id);
           if (currentDoctorUserId !== user.id) {
             setCurrentDoctorUserId(user.id);
-            hasFetchedDataForSessionId.current = false;
+            hasFetchedDataForSessionId.current = false; // Скидаємо, якщо user.id змінився
           }
           if (!doctorIdRef.current) {
             doctorIdRef.current = user.id;
@@ -348,7 +351,6 @@ const Profile_doctor = ({ route }) => {
         return;
       }
 
-      // Використовуємо LayoutAnimation для плавних змін у UI
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
       setDoctor(null);
@@ -359,6 +361,7 @@ const Profile_doctor = ({ route }) => {
       setCertificateError(false);
       setDiplomaError(false);
       setError(null);
+      setLoadingTimeoutExpired(false); // Скидаємо таймаут при початку нового завантаження
 
       // Встановлюємо loadingInitial на TRUE ПЕРЕД початком запиту, якщо це НЕ pull-to-refresh
       if (!refreshing) {
@@ -367,6 +370,17 @@ const Profile_doctor = ({ route }) => {
         );
         setLoadingInitial(true);
       }
+
+      // Запускаємо таймаут, якщо він ще не запущений
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        if (loadingInitial) { // Перевіряємо, чи все ще завантажується
+          setLoadingTimeoutExpired(true);
+          console.log("Loading timeout expired. Showing retry/back buttons.");
+        }
+      }, 30000); // 30 секунд
 
       console.log(`Profile_doctor: Fetching data for doctor ID: ${idToFetch}`);
 
@@ -414,9 +428,14 @@ const Profile_doctor = ({ route }) => {
         );
         setLoadingInitial(false);
         setRefreshing(false); // Завжди зупиняємо індикатор оновлення
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current); // Очищаємо таймаут при завершенні завантаження
+          timeoutRef.current = null;
+        }
+        setLoadingTimeoutExpired(false); // Скидаємо таймаут, якщо завантаження завершилося
       }
     },
-    [t, refreshing] // Додаємо refreshing до залежностей
+    [t, refreshing, loadingInitial] // Додаємо refreshing та loadingInitial до залежностей
   );
 
   // Цей useEffect буде викликати fetchDoctorData, коли doctorIdRef.current або currentDoctorUserId зміниться
@@ -530,8 +549,26 @@ const Profile_doctor = ({ route }) => {
     [getParsedArray, t]
   );
 
+  const onRetry = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    hasFetchedDataForSessionId.current = false; // Примусове перезавантаження
+    const idToRetry = doctorIdRef.current || currentDoctorUserId;
+    if (idToRetry) {
+      fetchDoctorData(idToRetry);
+    } else {
+      setError(t("doctor_id_missing_after_retry"));
+      setLoadingInitial(false);
+      setLoadingTimeoutExpired(false); // Скидаємо, щоб кнопки зникли
+    }
+  }, [fetchDoctorData, doctorIdRef, currentDoctorUserId, t]);
+
+  const onBackToHome = useCallback(() => {
+    navigation.goBack(); // Або navigation.navigate("HomeScreen") якщо потрібно на конкретний екран
+  }, [navigation]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setLoadingTimeoutExpired(false); // Скидаємо таймаут при оновленні
     // При оновленні, примусово встановлюємо hasFetchedDataForSessionId.current в false,
     // щоб гарантувати перезавантаження даних.
     hasFetchedDataForSessionId.current = false;
@@ -540,60 +577,48 @@ const Profile_doctor = ({ route }) => {
     // setRefreshing(false) викликається в fetchDoctorData, коли дані завантажені
   }, [fetchDoctorData, fetchUnreadNotificationsCount, doctorIdRef, currentDoctorUserId]);
 
-  // Тут зміни: індикатор завантаження відображається лише при `loadingInitial` і якщо це не `refreshing`
-  if (loadingInitial && !refreshing) {
+
+  // Централізований екран завантаження/помилки/не знайдено
+  if (loadingInitial || error || !doctor) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0EB3EB" />
-        <Text style={styles.loadingText}>{t("loading_profile_data")}</Text>
-      </View>
-    );
-  }
+      <SafeAreaView style={styles.fullscreenContainer}>
+        <View style={styles.centeredContent}>
+          {loadingInitial && !refreshing && (
+            <>
+              <ActivityIndicator size="large" color="#0EB3EB" />
+              <Text style={styles.loadingText}>{t("loading_profile_data")}</Text>
+            </>
+          )}
 
-  // Якщо `loadingInitial` false, але є помилка
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={50} color="#E04D53" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            hasFetchedDataForSessionId.current = false; // Примусове перезавантаження
-            const idToRetry = doctorIdRef.current || currentDoctorUserId;
-            if (idToRetry) {
-              fetchDoctorData(idToRetry);
-            } else {
-              setError(t("doctor_id_missing_after_retry"));
+          {(error || !doctor || loadingTimeoutExpired) && !loadingInitial && (
+            <>
+              {error && <Ionicons name="alert-circle-outline" size={50} color="#E04D53" />}
+              {!error && !doctor && <Ionicons name="information-circle-outline" size={60} color="#0EB3EB" />}
+              
+              <Text style={styles.errorText}>
+                {error || t("doctor_not_found")}
+              </Text>
 
-              setLoadingInitial(false);
-            }
-          }}
-        >
-          <Text style={styles.retryButtonText}>{t("retry")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.backToHomeButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // Якщо `loadingInitial` false, немає помилки, але `doctor` все ще null
-  if (!doctor ) {    return (
-      <View style={styles.noDoctorContainer}>
-        <Ionicons name="information-circle-outline" size={60} color="#0EB3EB" />
-        <Text style={styles.noDoctorText}>{t("doctor_not_found")}</Text>
-        <TouchableOpacity
-          style={styles.backToHomeButton}
-          onPress={() => navigation.navigate("HomeScreen")}
-        >
-          <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
-        </TouchableOpacity>
-      </View>
+              {(loadingTimeoutExpired || error || !doctor) && (
+                <>
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={onRetry}
+                  >
+                    <Text style={styles.retryButtonText}>{t("retry")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.backToHomeButton}
+                    onPress={onBackToHome}
+                  >
+                    <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </>
+          )}
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -612,7 +637,7 @@ const Profile_doctor = ({ route }) => {
   } = doctor;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -872,7 +897,7 @@ const Profile_doctor = ({ route }) => {
           </TouchableWithoutFeedback>
         </Pressable>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -977,7 +1002,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "transparent", // Прозорий фон
-    paddingTop: Platform.OS === 'android' ? 30 : 50, // Адаптивний paddingTop
     paddingBottom: 15,
     paddingHorizontal: 20,
     // Прибрані borderBottomLeftRadius, borderBottomRightRadius, shadow, elevation

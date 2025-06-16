@@ -31,7 +31,6 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.kis_production.DOCTOR",
-      "usesCleartextTraffic": true,
       "intentFilters": [
         {
           "action": "VIEW",

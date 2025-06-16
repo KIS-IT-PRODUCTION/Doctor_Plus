@@ -4,10 +4,5 @@
   <dict>
     <key>aps-environment</key>
     <string>development</string>
-    <key>com.apple.developer.associated-domains</key>
-    <array>
-      <string>applinks:localhost:8081</string>
-      <string>applinks:yslchkbmupuyxgidnzrb.supabase.co</string>
-    </array>
   </dict>
 </plist>

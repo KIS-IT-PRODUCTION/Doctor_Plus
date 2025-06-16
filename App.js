@@ -63,7 +63,7 @@ function InitialNavigator() {
 
   if (session && session.user) {
     if (userRole === "doctor") {
-      defaultInitialRouteName = "Profile_doctor";
+      defaultInitialRouteName = "Anketa_Settings";
       initialRouteParams = { doctorId: session.user.id };
       console.log(`InitialNavigator: Session active, user is doctor. Initial route: ${defaultInitialRouteName}`);
     } else if (userRole === "patient") {

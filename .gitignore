@@ -1,1 +1,4 @@
 node_modules
+# Expo Prebuild / CNG
+android/
+ios/

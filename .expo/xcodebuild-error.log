@@ -1,11 +1,10 @@
 --- xcodebuild: WARNING: Using the first of multiple matching destinations:
-{ platform:iOS Simulator, id:5FD482F6-6F66-4CAA-A505-06904DDF22FD, OS:18.3.1, name:iPhone 16 Pro }
-{ platform:iOS Simulator, id:5FD482F6-6F66-4CAA-A505-06904DDF22FD, OS:18.3.1, name:iPhone 16 Pro }
+{ platform:iOS Simulator, arch:arm64, id:CC3D6D2E-5EBD-4DAF-ACD5-66025367CDF6, OS:17.4, name:iPhone 15 Pro }
+{ platform:iOS Simulator, arch:x86_64, id:CC3D6D2E-5EBD-4DAF-ACD5-66025367CDF6, OS:17.4, name:iPhone 15 Pro }
 ** BUILD FAILED **
 
 
 The following build commands failed:
-	ScanDependencies /Users/kisuk/Library/Developer/Xcode/DerivedData/Doctor-eizuvbjxxpothqeilynfijjmnyik/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/gRPC-C++.build/Objects-normal/arm64/gRPC-C++-dummy.o /Users/kisuk/Doctor/ios/Pods/Target\ Support\ Files/gRPC-C++/gRPC-C++-dummy.m normal arm64 objective-c com.apple.compilers.llvm.clang.1_0.compiler (in target 'gRPC-C++' from project 'Pods')
-	SwiftEmitModule normal arm64 Emitting\ module\ for\ FirebaseCoreInternal (in target 'FirebaseCoreInternal' from project 'Pods')
-	Building workspace Doctor with scheme Doctor and configuration Debug
-(3 failures)
+	ScanDependencies /Users/KISHCHUK/Library/Developer/Xcode/DerivedData/DoctorPlus-evyqrpvognfxlegzniglpupdnhmd/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/React-RuntimeHermes.build/Objects-normal/arm64/React-RuntimeHermes-dummy.o /Users/KISHCHUK/Doctor_Plus/ios/Pods/Target\ Support\ Files/React-RuntimeHermes/React-RuntimeHermes-dummy.m normal arm64 objective-c com.apple.compilers.llvm.clang.1_0.compiler (in target 'React-RuntimeHermes' from project 'Pods')
+	Building workspace DoctorPlus with scheme DoctorPlus and configuration Debug
+(2 failures)

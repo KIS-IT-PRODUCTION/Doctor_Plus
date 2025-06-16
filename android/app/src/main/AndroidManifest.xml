@@ -31,11 +31,6 @@
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
         <data android:scheme="doctor"/>
-        <data android:scheme="http" android:host="localhost" android:port="8081" android:pathPrefix="/reset-password"/>
-        <data android:scheme="http" android:host="localhost" android:port="3000" android:pathPrefix="/reset-password"/>
-        <data android:scheme="https" android:host="yslchkbmupuyxgidnzrb.supabase.co" android:pathPrefix="/auth/v1/verify"/>
-        <data android:scheme="https" android:host="yslchkbmupuyxgidnzrb.supabase.co" android:pathPrefix="/auth/v1/callback"/>
-        <data android:scheme="https" android:host="yslchkbmupuyxgidnzrb.supabase.co" android:pathPrefix="/reset-password"/>
         <data android:scheme="exp+doctor"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>

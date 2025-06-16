@@ -8,13 +8,36 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
+  Dimensions, // <-- Додано Dimensions
+  Platform, // <-- Додано Platform
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg"; // ПЕРЕВІРТЕ: Переконайтеся, що шлях до іконки правильний
+import Icon from "../../assets/icon.svg";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
-import { supabase } from '../../providers/supabaseClient'; // ПЕРЕВІРТЕ: Переконайтеся, що шлях до Supabase клієнта правильний
+import { supabase } from '../../providers/supabaseClient';
+import Constants from 'expo-constants'; // <-- Додано Constants
+
+// Отримання розмірів екрану
+const { width, height } = Dimensions.get("window");
+
+// Функції для масштабування розмірів (як у вас вже є)
+const scale = (size) => (width / 375) * size;
+const verticalScale = (size) => (height / 812) * size;
+const moderateScale = (size, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
+
+// ... (весь ваш існуючий код компонента Message та інших функцій без змін) ...
+// На цьому етапі я не буду повторювати весь код компонента Message,
+// оскільки зміни стосуються лише стилів.
+// Переконайтеся, що ви замінили лише секцію `styles`.
+
+// === Компоненти та дані ===
+// ... (Ваш існуючий код getParsedArray, specializationsList, consultationLanguagesList,
+//      LanguageFlags, InfoBox, DoctorCard - вони не потрібні тут, бо це Message.js)
+
+// Починаємо з компонента Message (від його `export default function Message() { ... }` до кінця файлу)
 
 export default function Message() {
   const navigation = useNavigation();
@@ -22,10 +45,9 @@ export default function Message() {
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null); // Змінено на currentDoctorUserId
+  const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
 
-  // Використання useRef для підписок Expo Notifications
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
 
@@ -33,20 +55,14 @@ export default function Message() {
     navigation.goBack();
   };
 
-  /**
-   * Додає нове повідомлення до стану, перевіряючи на дублікати.
-   * @param {object} notificationContent Вміст сповіщення з Expo (notification.request.content)
-   */
   const addNewMessage = useCallback((notificationContent) => {
     const { title, body, data } = notificationContent;
     const now = new Date();
-    // Використання Locale для Intl.DateTimeFormat (наприклад, 'uk-UA')
-    const locale = t('locale') || 'uk-UA'; // Використовуємо 'uk-UA' як запасний варіант
+    const locale = t('locale') || 'uk-UA';
     const messageDate = new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(now);
     const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(now);
 
     setMessages(prevMessages => {
-      // Перевірка на дублікати за db_id (якщо є) або унікальною комбінацією полів
       const isDuplicate = prevMessages.some(msg =>
         (data && data.db_id && msg.db_id === data.db_id) ||
         (msg.title === title && msg.body === body && msg.date === messageDate && msg.time === messageTime && msg.type === (data.type || 'general'))
@@ -57,7 +73,6 @@ export default function Message() {
         return prevMessages;
       }
 
-      // Припускаємо, що статус зберігається у data.status або default 'pending'
       const messageStatus = (data && data.status) ? String(data.status).toLowerCase() : 'pending';
 
       return [
@@ -68,7 +83,7 @@ export default function Message() {
           body: body,
           date: messageDate,
           time: messageTime,
-          is_read: (data && data.is_read) || false, // Припускаємо, що is_read може прийти з даних
+          is_read: (data && data.is_read) || false,
           type: (data && data.type) || 'general',
           rawData: { ...data, status: messageStatus } || {},
         },
@@ -77,10 +92,6 @@ export default function Message() {
     });
   }, [t]);
 
-  /**
-   * Завантажує сповіщення лікаря з Supabase.
-   * @param {string} doctorUserId ID користувача лікаря з auth.uid()
-   */
   const fetchMessagesFromSupabase = useCallback(async (doctorUserId) => {
     if (!doctorUserId) {
       console.warn("Doctor user ID is missing, cannot fetch notifications.");
@@ -94,7 +105,7 @@ export default function Message() {
       const { data, error } = await supabase
         .from('doctor_notifications')
         .select('*')
-        .eq('doctor_id', doctorUserId) // ВИПРАВЛЕНО: Використовуємо doctor_id, який є user_id лікаря
+        .eq('doctor_id', doctorUserId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -106,7 +117,6 @@ export default function Message() {
       const locale = t('locale') || 'uk-UA';
 
       const formattedMessages = data.map(notif => {
-        // Переконайтеся, що notif.data існує перед доступом до нього
         const rawData = notif.data || {};
         const messageStatus = (rawData.status) ? String(rawData.status).toLowerCase() : 'pending';
 
@@ -133,7 +143,6 @@ export default function Message() {
     }
   }, [t]);
 
-  // Отримання ID користувача лікаря та його повного імені при завантаженні компонента
   useEffect(() => {
     const getDoctorData = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -142,14 +151,14 @@ export default function Message() {
         return;
       }
       if (user) {
-        setCurrentDoctorUserId(user.id); // Встановлюємо user.id
+        setCurrentDoctorUserId(user.id);
         console.log("Current doctor user ID:", user.id);
 
         try {
             const { data: doctorProfile, error: profileError } = await supabase
                 .from('profile_doctor')
                 .select('full_name')
-                .eq('user_id', user.id) // ВИПРАВЛЕНО: Використовуємо user_id з таблиці profile_doctor
+                .eq('user_id', user.id)
                 .single();
 
             if (profileError) {
@@ -171,17 +180,15 @@ export default function Message() {
     getDoctorData();
   }, [t]);
 
-  // Використання useFocusEffect для завантаження повідомлень при фокусі на екрані
   useFocusEffect(
     useCallback(() => {
       if (currentDoctorUserId) {
         fetchMessagesFromSupabase(currentDoctorUserId);
       }
-      return () => {}; // Функція очищення
+      return () => {};
     }, [currentDoctorUserId, fetchMessagesFromSupabase])
   );
 
-  // Обробка push-сповіщень Expo
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -200,16 +207,14 @@ export default function Message() {
       console.log('Користувач натиснув на сповіщення (Message.js):', response);
       const { title, body, data } = response.notification.request.content;
 
-      addNewMessage(response.notification.request.content); // Додаємо сповіщення до UI, якщо його ще немає
+      addNewMessage(response.notification.request.content);
 
       if (data && data.type === 'new_booking' && data.patient_name && data.booking_date && data.booking_time_slot) {
         Alert.alert(
           t('new_booking_notification_title'),
           `${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || t('not_specified')}.`,
           [{ text: t('view_details'), onPress: () => {
-              // Навігація до екрану деталей бронювання, якщо необхідно
               console.log("Navigate to booking details for booking_id:", data.booking_id);
-              // navigation.navigate('BookingDetails', { bookingId: data.booking_id, patientId: data.patient_id });
             }
           }]
         );
@@ -228,13 +233,7 @@ export default function Message() {
     };
   }, [t, addNewMessage]);
 
-  /**
-   * Позначає сповіщення як прочитане в Supabase та оновлює UI.
-   * @param {string} messageId ID сповіщення (з doctor_notifications.id)
-   * @param {string} newStatus Новий статус для поля `data.status` в `doctor_notifications`
-   */
   const markAsReadAndStatus = useCallback(async (messageId, newStatus = null) => {
-    // Оновлення локального стану
     setMessages(prevMessages =>
       prevMessages.map(msg => {
         if (msg.id === messageId) {
@@ -251,7 +250,6 @@ export default function Message() {
     try {
       const updateObject = { is_read: true };
       if (newStatus) {
-        // Запит поточного rawData
         const { data: currentNotification, error: fetchError } = await supabase
           .from('doctor_notifications')
           .select('data')
@@ -264,7 +262,6 @@ export default function Message() {
         }
 
         const existingRawData = currentNotification.data || {};
-        // Оновлення тільки поля status всередині data
         updateObject.data = { ...existingRawData, status: newStatus };
       }
 
@@ -285,13 +282,7 @@ export default function Message() {
     }
   }, [t]);
 
-  /**
-   * Оновлює статус бронювання в patient_bookings та надсилає сповіщення пацієнту.
-   * @param {object} message Об'єкт повідомлення, що містить rawData з booking_id та patient_id.
-   * @param {string} newStatus Новий статус для бронювання ('confirmed' або 'rejected').
-   */
   const updateBookingStatusAndNotify = useCallback(async (message, newStatus) => {
-      // Перевірка на наявність усіх необхідних даних
       if (!message || !message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId) {
           console.error("Missing essential data for updateBookingStatusAndNotify (initial check):", {
               message: message ? "present" : "missing",
@@ -308,7 +299,7 @@ export default function Message() {
       const patientId = message.rawData.patient_id;
       const bookingDate = message.rawData.date;
       const bookingTimeSlot = message.rawData.time;
-      const doctorFinalName = doctorFullName || t('doctor'); // Запасне значення, якщо ім'я не завантажилось
+      const doctorFinalName = doctorFullName || t('doctor');
 
       if (!bookingDate || !bookingTimeSlot) {
           console.error("Missing booking date or time slot in rawData:", {
@@ -320,7 +311,6 @@ export default function Message() {
       }
 
       try {
-          // Крок 1: Оновлення статусу бронювання в таблиці patient_bookings
           console.log(`Оновлення бронювання ${bookingId} на статус: ${newStatus} для пацієнта ${patientId}`);
           const { error: updateError } = await supabase
               .from('patient_bookings')
@@ -334,7 +324,6 @@ export default function Message() {
 
           console.log(`Бронювання ${bookingId} успішно оновлено до ${newStatus}`);
 
-          // Крок 2: Виклик Supabase Edge Function для надсилання сповіщення пацієнту
          const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
 
           const { data: { session } } = await supabase.auth.getSession();
@@ -389,11 +378,9 @@ export default function Message() {
           console.log('Edge Function викликана успішно. Відповідь:', await response.json());
           Alert.alert(t('success'), newStatus === 'confirmed' ? t('booking_confirmed_successfully_message') : t('booking_rejected_successfully_message'));
 
-          // Крок 3: Оновлення статусу повідомлення лікаря в таблиці doctor_notifications
           if (message.db_id) {
             await markAsReadAndStatus(message.db_id, newStatus);
           } else {
-            // Якщо з якоїсь причини db_id немає, просто оновлюємо локально та виводимо попередження
             console.warn("Message does not have db_id, cannot update status in doctor_notifications table.");
             setMessages(prevMessages =>
               prevMessages.map(msg =>
@@ -401,8 +388,6 @@ export default function Message() {
               )
             );
           }
-
-
       } catch (error) {
           console.error("Помилка обробки бронювання (загальна помилка fetch або DB update):", error.message);
           Alert.alert(t('error'), `${t('failed_to_process_booking')}: ${error.message}`);
@@ -446,13 +431,13 @@ export default function Message() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
+          <Ionicons name="arrow-back" size={moderateScale(24)} color="#000" /> 
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {t("messages_screen.header_title")}
         </Text>
         <View>
-          <Icon width={50} height={50} />
+          <Icon width={moderateScale(50)} height={moderateScale(50)} /> 
         </View>
       </View>
 
@@ -469,8 +454,6 @@ export default function Message() {
 
             const messageCardStyle = [
               styles.messageCard,
-              // Стиль 'read' застосовується, тільки якщо це не 'new_booking' або 'new_booking' вже оброблено.
-              // Це запобігає затіненню стилів confirmed/rejected стилем read.
               (message.is_read && message.type !== 'new_booking') && styles.messageCardRead,
               isConfirmed && styles.messageCardConfirmed,
               isRejected && styles.messageCardRejected,
@@ -482,14 +465,11 @@ export default function Message() {
                   <Text style={styles.dateText}>{message.date}</Text>
                   <Text style={styles.timestampText}>{message.time}</Text>
                 </View>
-                {/* Стиль повідомлення залежить від того, прочитане воно чи ні, та від статусу */}
                 <View style={messageCardStyle}>
                   <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                   <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
 
-                  {/* Логіка відображення кнопок дій або статусу */}
                   {message.type === 'new_booking' ? (
-                      // Якщо це нове бронювання і воно очікує підтвердження
                       message.rawData.status === 'pending' ? (
                           <View style={styles.bookingActionButtons}>
                               <TouchableOpacity
@@ -506,7 +486,6 @@ export default function Message() {
                               </TouchableOpacity>
                           </View>
                       ) : (
-                          // Якщо бронювання вже оброблено (підтверджено/відхилено)
                           <Text style={[
                               styles.statusText,
                               isConfirmed ? styles.confirmedText : styles.rejectedText
@@ -514,11 +493,11 @@ export default function Message() {
                               {isConfirmed ? t('confirmed_read') : t('rejected_read')}
                           </Text>
                       )
-                  ) : ( // Якщо це не 'new_booking' тип повідомлення
+                  ) : (
                       !message.is_read ? (
                           <TouchableOpacity
                               style={styles.markAsReadButton}
-                              onPress={() => message.db_id && markAsReadAndStatus(message.db_id)} // Передаємо null для статусу, бо це не бронювання
+                              onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
                           >
                               <Text style={styles.markAsReadButtonText}>{t('mark_as_read')}</Text>
                           </TouchableOpacity>
@@ -540,7 +519,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : verticalScale(50), // Адаптовано для Android
   },
   loadingContainer: {
     flex: 1,
@@ -549,57 +528,57 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: verticalScale(10), // Адаптовано розмір
+    fontSize: moderateScale(16), // Адаптовано розмір
     color: '#333',
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingHorizontal: scale(15), // Адаптовано розмір
+    paddingVertical: verticalScale(10), // Адаптовано розмір
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: 25,
-    width: 48,
-    height: 48,
+    borderRadius: moderateScale(25), // Адаптовано розмір
+    width: moderateScale(48), // Адаптовано розмір
+    height: moderateScale(48), // Адаптовано розмір
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: moderateScale(18), // Адаптовано розмір
     fontFamily: "Mont-Bold",
     color: "#333",
   },
   messageList: {
-    paddingVertical: 20,
-    paddingHorizontal: 15,
+    paddingVertical: verticalScale(20), // Адаптовано розмір
+    paddingHorizontal: scale(15), // Адаптовано розмір
     flexGrow: 1,
   },
   messageGroup: {
-    marginBottom: 20,
+    marginBottom: verticalScale(20), // Адаптовано розмір
   },
   dateAndTimestamp: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 10,
-    paddingHorizontal: 5,
+    marginBottom: verticalScale(10), // Адаптовано розмір
+    paddingHorizontal: scale(5), // Адаптовано розмір
   },
   dateText: {
-    fontSize: 14,
+    fontSize: moderateScale(14), // Адаптовано розмір
     fontWeight: "bold",
     color: "#666",
   },
   timestampText: {
-    fontSize: 14,
+    fontSize: moderateScale(14), // Адаптовано розмір
     color: "#666",
   },
   messageCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 15,
-    padding: 15,
+    borderRadius: moderateScale(15), // Адаптовано розмір
+    padding: moderateScale(15), // Адаптовано розмір
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -614,54 +593,55 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   messageCardConfirmed: {
-    backgroundColor: '#E6FFE6', // Дуже світло-зелений фон
-    borderColor: '#4CAF50', // Зелена рамка
+    backgroundColor: '#E6FFE6',
+    borderColor: '#4CAF50',
     borderWidth: 1,
   },
   messageCardRejected: {
-    backgroundColor: '#FFEEEE', // Дуже світло-червоний фон
-    borderColor: '#D32F2F', // Червона рамка
+    backgroundColor: '#FFEEEE',
+    borderColor: '#D32F2F',
     borderWidth: 1,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: moderateScale(16), // Адаптовано розмір
     fontFamily: "Mont-SemiBold",
-    marginBottom: 5,
+    marginBottom: verticalScale(5), // Адаптовано розмір
     color: "#333",
   },
   cardText: {
-    fontSize: 14,
+    fontSize: moderateScale(14), // Адаптовано розмір
     fontFamily: "Mont-Regular",
     color: "#555",
-    marginBottom: 10,
+    marginBottom: verticalScale(10), // Адаптовано розмір
   },
   bookingInfo: {
-    marginTop: 5,
-    marginBottom: 10,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
+    marginTop: verticalScale(5), // Адаптовано розмір
+    marginBottom: verticalScale(10), // Адаптовано розмір
+    paddingVertical: verticalScale(5), // Адаптовано розмір
+    paddingHorizontal: scale(8), // Адаптовано розмір
     backgroundColor: '#F0F8FF',
-    borderRadius: 8,
+    borderRadius: moderateScale(8), // Адаптовано розмір
     borderLeftWidth: 3,
     borderLeftColor: '#0EB3EB',
   },
   bookingDetailsText: {
-    fontSize: 13,
+    fontSize: moderateScale(13), // Адаптовано розмір
     fontFamily: "Mont-Regular",
     color: "#444",
-    marginBottom: 2,
+    marginBottom: verticalScale(2), // Адаптовано розмір
   },
   bookingActionButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    marginTop: 10,
-    gap: 10, // Використання gap для кращого контролю відступу
+    marginTop: verticalScale(10), // Адаптовано розмір
+    gap: scale(10), // Адаптовано розмір (якщо підтримується)
+    flexWrap: 'wrap', // <-- ДОДАНО! Дозволяє кнопкам переноситися на наступний рядок
   },
   confirmBookingButton: {
     backgroundColor: '#4CAF50',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 25,
+    paddingVertical: verticalScale(10), // Адаптовано розмір
+    paddingHorizontal: scale(15), // Адаптовано розмір
+    borderRadius: moderateScale(25), // Адаптовано розмір
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -670,14 +650,14 @@ const styles = StyleSheet.create({
   },
   confirmBookingButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: moderateScale(14), // Адаптовано розмір
     fontFamily: "Mont-SemiBold",
   },
   rejectBookingButton: {
     backgroundColor: '#D32F2F',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 25,
+    paddingVertical: verticalScale(10), // Адаптовано розмір
+    paddingHorizontal: scale(15), // Адаптовано розмір
+    borderRadius: moderateScale(25), // Адаптовано розмір
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -686,32 +666,32 @@ const styles = StyleSheet.create({
   },
   rejectBookingButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: moderateScale(14), // Адаптовано розмір
     fontFamily: "Mont-SemiBold",
   },
   markAsReadButton: {
     backgroundColor: '#0EB3EB',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
+    paddingVertical: verticalScale(8), // Адаптовано розмір
+    paddingHorizontal: scale(15), // Адаптовано розмір
+    borderRadius: moderateScale(20), // Адаптовано розмір
     alignSelf: 'flex-start',
-    marginTop: 10,
+    marginTop: verticalScale(10), // Адаптовано розмір
     opacity: 0.8,
   },
   markAsReadButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: moderateScale(13), // Адаптовано розмір
     fontFamily: "Mont-SemiBold",
   },
   statusText: {
-    fontSize: 14,
+    fontSize: moderateScale(14), // Адаптовано розмір
     fontFamily: "Mont-SemiBold",
-    marginTop: 10,
+    marginTop: verticalScale(10), // Адаптовано розмір
     alignSelf: 'flex-start',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1, // Додано для статусного тексту
+    paddingVertical: verticalScale(5), // Адаптовано розмір
+    paddingHorizontal: scale(10), // Адаптовано розмір
+    borderRadius: moderateScale(10), // Адаптовано розмір
+    borderWidth: 1,
   },
   confirmedText: {
     color: '#2E7D32',
@@ -723,14 +703,14 @@ const styles = StyleSheet.create({
     color: '#D32F2F',
     borderColor: '#D32F2F',
   },
-  readStatusText: { // Стиль для "Прочитано" інших повідомлень
-    fontSize: 14,
+  readStatusText: {
+    fontSize: moderateScale(14), // Адаптовано розмір
     fontFamily: "Mont-SemiBold",
-    marginTop: 10,
+    marginTop: verticalScale(10), // Адаптовано розмір
     alignSelf: 'flex-start',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 10,
+    paddingVertical: verticalScale(5), // Адаптовано розмір
+    paddingHorizontal: scale(10), // Адаптовано розмір
+    borderRadius: moderateScale(10), // Адаптовано розмір
     backgroundColor: '#E0E0E0',
     color: '#757575',
   },
@@ -738,19 +718,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: verticalScale(50), // Адаптовано розмір
   },
   emptyMessagesText: {
-    fontSize: 18,
+    fontSize: moderateScale(18), // Адаптовано розмір
     fontFamily: "Mont-SemiBold",
     color: "#666",
-    marginBottom: 10,
+    marginBottom: verticalScale(10), // Адаптовано розмір
   },
   emptyMessagesSubText: {
-    fontSize: 14,
+    fontSize: moderateScale(14), // Адаптовано розмір
     fontFamily: "Mont-Regular",
     color: "#888",
     textAlign: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: scale(20), // Адаптовано розмір
   },
 });

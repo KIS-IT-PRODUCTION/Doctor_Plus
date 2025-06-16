@@ -10,12 +10,12 @@ import {
   Animated,
   Easing,
   ActivityIndicator,
-  Platform, // Import Platform for OS-specific styling
-  SafeAreaView, // Import SafeAreaView for proper layout on iOS
+  Platform,
+  SafeAreaView,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../assets/icon.svg"; // Make sure the path to icon.svg is correct
+import Icon from "../assets/icon.svg";
 
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
@@ -78,7 +78,19 @@ const specializationsList = [
   { value: "oncologist", nameKey: "categories.oncologist" },
   { value: "allergist", nameKey: "categories.allergist" },
   { value: "physiotherapist", nameKey: "categories.physiotherapist" },
+  { value: "traumatologist", nameKey: "categories.traumatologist" },
+  { value: "gynecologist", nameKey: "categories.gynecologist" },
+  { value: "urologist", nameKey: "categories.urologist" },
+  { value: "pulmonologist", nameKey: "categories.pulmonologist" },
+  { value: "nephrologist", nameKey: "categories.nephrologist" },
+  { value: "rheumatologist", nameKey: "categories.rheumatologist" },
+  { value: "infectiousDiseasesSpecialist", nameKey: "categories.infectiousDiseasesSpecialist" },
+  { value: "psychologist", nameKey: "categories.psychologist" },
+  { value: "nutritionist", nameKey: "categories.nutritionist" },
+  { value: "radiologist", nameKey: "categories.radiologist" },
+  { value: "anesthesiologist", nameKey: "categories.anesthesiologist" },
 ];
+
 
 const consultationLanguagesList = [
   { code: "UK", nameKey: "ukrainian", emoji: "🇺🇦" },
@@ -213,7 +225,7 @@ const DoctorCard = ({ doctor }) => {
 const ChooseSpecial = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { specialization: initialSpecialization } = route.params || {};
+  const { specialization: initialSpecialization, searchQuery } = route.params || {};
 
   const { t } = useTranslation();
   const [isSortModalVisible, setSortModalVisible] = useState(false);
@@ -223,65 +235,120 @@ const ChooseSpecial = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Default sort by experience years descending
   const [currentSortOption, setCurrentSortOption] = useState("experience_desc");
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let query = supabase
+      let queryBuilder = supabase
         .from("anketa_doctor")
         .select("*, consultation_cost, experience_years, created_at, avatar_url");
 
       if (initialSpecialization) {
-        // Use 'cs' (contains string) for array contains matching for JSONB columns
-        // This assumes 'specialization' in DB is a JSONB array of strings e.g., ["cardiologist", "pediatrician"]
-        query = query.filter(
+        // Якщо передана спеціалізація (наприклад, з кнопок категорій)
+        // Шукаємо точний збіг спеціалізації
+        queryBuilder = queryBuilder.filter(
           "specialization",
-          "cs",
+          "cs", // 'cs' - contains string, шукає точний елемент у масиві JSONB
           `["${initialSpecialization}"]`
         );
+      } else if (searchQuery) {
+        // Якщо передано загальний пошуковий запит (з поля пошуку)
+        const searchPattern = `%${searchQuery}%`; // Pattern для ilike
+
+        // Використовуємо rpc (Remote Procedure Call) для виклику кастомної функції Supabase
+        // Ця функція шукатиме як по full_name, так і по спеціалізаціях у JSONB масиві.
+        // Це вимагає створення функції в Supabase.
+        const { data, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
+            p_search_query: searchQuery, // Передаємо пошуковий запит
+        });
+
+        if (rpcError) {
+            console.error("Error searching doctors with RPC:", rpcError);
+            setError(`${t("error_fetching_doctors")}: ${rpcError.message}`);
+            setDoctors([]);
+            setLoading(false);
+            return; // Виходимо з функції
+        }
+
+        // Встановлюємо отримані через RPC дані
+        setDoctors(data.map(doctor => {
+            // Оскільки RPC повертає повні дані, ми можемо їх обробити тут.
+            // Переконайтеся, що RPC повертає всі необхідні поля.
+            const parsedCommunicationLanguages = getParsedArray(
+              doctor.communication_languages
+            );
+
+            let timeInAppDisplay = t("not_specified");
+            if (doctor.created_at) {
+              const joinedDate = new Date(doctor.created_at);
+              const now = new Date();
+              const diffTime = Math.abs(now.getTime() - joinedDate.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+              if (diffDays < 30) {
+                timeInAppDisplay = t("days_in_app", { count: diffDays });
+              } else if (diffDays < 365) {
+                const diffMonths = Math.floor(diffDays / 30);
+                timeInAppDisplay = t("months_in_app", { count: diffMonths });
+              } else {
+                const diffYears = Math.floor(diffDays / 365);
+                timeInAppDisplay = t("years_in_app", { count: diffYears });
+              }
+            }
+
+            return {
+              ...doctor,
+              communication_languages: parsedCommunicationLanguages,
+              time_in_app: timeInAppDisplay,
+            };
+        }));
+        setLoading(false);
+        return; // Виходимо, оскільки RPC вже повернув відфільтровані дані
       }
 
+      // Якщо немає ні specialization, ні searchQuery, або після фільтрації по specialization
+      // застосовуємо сортування до queryBuilder
       switch (currentSortOption) {
         case "experience_desc":
-          query = query.order("experience_years", {
+          queryBuilder = queryBuilder.order("experience_years", {
             ascending: false,
             nullsFirst: false,
-          }); // Nulls at the end
+          });
           break;
         case "experience_asc":
-          query = query.order("experience_years", {
+          queryBuilder = queryBuilder.order("experience_years", {
             ascending: true,
             nullsFirst: true,
-          }); // Nulls at the beginning
+          });
           break;
         case "price_asc":
-          query = query.order("consultation_cost", {
+          queryBuilder = queryBuilder.order("consultation_cost", {
             ascending: true,
             nullsFirst: true,
-          }); // Nulls at the beginning
+          });
           break;
         case "price_desc":
-          query = query.order("consultation_cost", {
+          queryBuilder = queryBuilder.order("consultation_cost", {
             ascending: false,
             nullsFirst: false,
-          }); // Nulls at the end
+          });
           break;
         default:
-          query = query.order("experience_years", {
+          queryBuilder = queryBuilder.order("experience_years", {
             ascending: false,
             nullsFirst: false,
           });
       }
 
-      const { data, error: fetchError } = await query;
+      // Виконуємо запит, якщо не було RPC
+      const { data, error: fetchError } = await queryBuilder;
 
       if (fetchError) {
         console.error("Error fetching doctors:", fetchError);
         setError(`${t("error_fetching_doctors")}: ${fetchError.message}`);
-        setDoctors([]); // Clear doctors on error
+        setDoctors([]);
       } else {
         const processedDoctors = data.map((doctor) => {
           const parsedCommunicationLanguages = getParsedArray(
@@ -309,7 +376,6 @@ const ChooseSpecial = () => {
           return {
             ...doctor,
             communication_languages: parsedCommunicationLanguages,
-            // specialization is now handled by getTranslatedSpecializations in DoctorCard
             time_in_app: timeInAppDisplay,
           };
         });
@@ -318,11 +384,11 @@ const ChooseSpecial = () => {
     } catch (e) {
       console.error("Unexpected error during doctor fetch:", e);
       setError(`${t("unexpected_error")}: ${e.message}`);
-      setDoctors([]); // Clear doctors on unexpected error
+      setDoctors([]);
     } finally {
       setLoading(false);
     }
-  }, [t, initialSpecialization, currentSortOption]);
+  }, [t, initialSpecialization, searchQuery, currentSortOption]);
 
   useEffect(() => {
     fetchDoctors();
@@ -386,6 +452,9 @@ const ChooseSpecial = () => {
         (s) => s.value === initialSpecialization
       );
       return spec ? t(spec.nameKey) : t("doctors");
+    }
+    if (searchQuery) {
+        return `${t("search_results_for")} "${searchQuery}"`; // Новий ключ для перекладу
     }
     return t("doctors");
   };
@@ -543,7 +612,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === "android" ? 30 : 0, // Adjust for Android status bar
+    paddingTop: Platform.OS === "android" ? 30 : 0,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
@@ -598,12 +667,12 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   card: {
-    backgroundColor: "#E3F2FD", // Light blue background
+    backgroundColor: "#E3F2FD",
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
-    elevation: 3, // Android shadow
-    shadowColor: "#000", // iOS shadow
+    elevation: 3,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -612,18 +681,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 10,
-    borderBottomWidth: 1, // Separator
+    borderBottomWidth: 1,
     borderBottomColor: "#CFD8DC",
     paddingBottom: 10,
   },
   avatar: {
-    width: 80, // Slightly larger avatar
+    width: 80,
     height: 80,
-    borderRadius: 40, // Half of width/height for perfect circle
+    borderRadius: 40,
     marginRight: 15,
-    borderWidth: 2, // More prominent border
-    borderColor: "#0EB3EB", // Primary theme color
-    backgroundColor: "#F5F5F5", // Placeholder background
+    borderWidth: 2,
+    borderColor: "#0EB3EB",
+    backgroundColor: "#F5F5F5",
   },
   avatarPlaceholder: {
     justifyContent: "center",
@@ -636,13 +705,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 8, // More space
+    marginBottom: 8,
     fontFamily: "Mont-Bold",
   },
   infoBoxRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4, // Tighter spacing for info rows
+    marginBottom: 4,
   },
   infoBoxLabel: {
     fontSize: 13,
@@ -652,16 +721,16 @@ const styles = StyleSheet.create({
   },
   infoBoxValueContainer: {
     flex: 1,
-    flexDirection: "row", // Ensure flags display horizontally
+    flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap", // Allow content to wrap
+    flexWrap: "wrap",
   },
   infoBoxValueText: {
     fontSize: 14,
     color: "#333",
     fontWeight: "500",
     fontFamily: "Mont-Regular",
-    flexShrink: 1, // Allow text to shrink
+    flexShrink: 1,
   },
   notSpecifiedText: {
     fontStyle: "italic",
@@ -685,12 +754,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 15,
-    borderTopWidth: 1, // Separator
+    borderTopWidth: 1,
     borderTopColor: "#CFD8DC",
     paddingTop: 10,
   },
   goToButton: {
-    backgroundColor: "#0EB3EB", // Use primary theme color
+    backgroundColor: "#0EB3EB",
     paddingVertical: 10,
     paddingHorizontal: 25,
     borderRadius: 25,
@@ -709,12 +778,12 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#3498DB", // A distinct blue for price
+    color: "#3498DB",
     fontFamily: "Mont-Bold",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)", // Darker overlay
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "flex-end",
   },
   sortModalContainer: {
@@ -735,14 +804,14 @@ const styles = StyleSheet.create({
   },
   sortOptionButton: {
     paddingVertical: 15,
-    paddingHorizontal: 10, // Added horizontal padding
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     alignItems: "flex-start",
   },
   sortOptionText: {
     fontSize: 16,
-    color: "#333", // Darker text for non-selected
+    color: "#333",
     fontWeight: "500",
     fontFamily: "Mont-Regular",
   },
