@@ -25,8 +25,11 @@ import HomeScreen from "./app/HomeScreen";
 import Search from "./app/Search";
 import Messege from "./app/doctor/Messege";
 import Faq from "./app/Faq";
+import Faq_doctor from "./app/doctor/Faq_doctor"; // Ймовірно, для лікарів
 import Support from "./app/Support";
+import Support_doctor from "./app/doctor/Support_doctor"; // Ймовірно, для лікарів
 import Review from "./app/Rewiew";
+import Rewiew_app from "./app/doctor/Rewiew_app"; // Ймовірно, для лікарів
 import WriteReview from "./app/WriteRewiew";
 import Profile from "./app/Profile";
 import Register from "./app/doctor/Register"; // Ймовірно, для лікарів
@@ -96,6 +99,9 @@ function InitialNavigator() {
   <Stack.Screen name="Anketa_Settings" component={Anketa_Settings} />
   <Stack.Screen name="Patsient_Home" component={Patsient_Home} />
   <Stack.Screen name="Search" component={Search} />
+  <Stack.Screen name="Faq_doctor" component={Faq_doctor} />
+  <Stack.Screen name="Support_doctor" component={Support_doctor} />
+  <Stack.Screen name="Rewiew_app" component={Rewiew_app} />
   <Stack.Screen name="Messege" component={Messege} />
   <Stack.Screen name="Faq" component={Faq} />
   <Stack.Screen name="Support" component={Support} />

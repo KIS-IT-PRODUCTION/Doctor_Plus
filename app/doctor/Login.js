@@ -84,8 +84,8 @@ const Login = () => {
 
     setIsLoggingIn(true);
     console.log("Login (handleLogin): Attempting sign in...");
-
-    const { success, error } = await signIn(email, password);
+  
+      const { success, error } = await signIn(email, password);
 
     if (error) {
       console.error("Login (handleLogin): Помилка входу:", error.message);

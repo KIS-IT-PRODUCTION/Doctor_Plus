@@ -24,6 +24,7 @@ import { supabase } from "../../providers/supabaseClient";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
+import TabBar_doctor from "../../components/TopBar_doctor"; // Переконайтеся, що шлях правильний
 
 const { width } = Dimensions.get("window");
 const isLargeScreen = width > 768; // Визначення великого екрану
@@ -222,10 +223,45 @@ const Profile_doctor = ({ route }) => {
   const [refreshing, setRefreshing] = useState(false); // Для RefreshControl
   const [loadingTimeoutExpired, setLoadingTimeoutExpired] = useState(false); // Для таймауту завантаження
   const timeoutRef = useRef(null); // Референс для таймауту
+  const [activeTab, setActiveTab] = useState("Profile_doctor");
+
+  useFocusEffect(
+    useCallback(() => {
+      // Встановлюємо активну вкладку при фокусуванні на цьому екрані
+      setActiveTab("Profile_doctor"); // Встановіть назву вкладки, яка відповідає цьому екрану
+    }, [])
+  );
 
   // Для відстеження, чи була вже спроба завантаження даних для поточного ID сесії
   const hasFetchedDataForSessionId = useRef(false);
-
+ const handleTabPress = (tabName) => {
+    setActiveTab(tabName);
+    // Використовуйте navigation.navigate() для переходу на відповідний екран
+    // Переконайтеся, що ці назви екранів відповідають назвам, які ви визначили у вашому навігаторі
+    switch (tabName) {
+      case "Home_doctor":
+        navigation.navigate("Home_doctor");
+        break;
+      case "Records_doctor":
+        navigation.navigate("Records_doctor");
+        break;
+      case "Chat_doctor":
+        navigation.navigate("Chat_doctor");
+        break;
+      case "Headphones_doctor":
+        navigation.navigate("Support_doctor"); // Припустимо, що підтримка
+        break;
+      case "Profile_doctor": // Це екран відгуків
+        // Якщо цей екран вже активний, не переходимо знову
+        // navigation.navigate("Rewiew_app"); // Або назва вашого екрану відгуків
+        break;
+      case "Profile_doctor":
+        navigation.navigate("Profile_doctor");
+        break;
+      default:
+        break;
+    }
+  };
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
@@ -868,6 +904,7 @@ const Profile_doctor = ({ route }) => {
         </View>
         <View style={{ height: 30 }} />{/* Додатковий відступ знизу */}
       </ScrollView>
+      <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
 
       {/* Language Selection Modal */}
       <Modal
