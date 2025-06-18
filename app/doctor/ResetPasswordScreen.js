@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Regular",
   },
   button: (width) => ({
-    backgroundColor: "black",
+    backgroundColor: "#0EB3EB",
     borderRadius: 555,
     paddingVertical: 15,
     width: width * 0.9,

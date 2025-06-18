@@ -116,118 +116,126 @@ const Support_doctorScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>
-              {t("support_screen.title")}
-            </Text>
-            <View>
-              <Icon width={50} height={50} />
-            </View>
-          </View>
-
-          <View style={styles.contentContainer}>
-            <Text style={styles.instructionText}>
-              {t("Support_doctor_screen.instruction")}
-            </Text>
-
-            <Text style={styles.label}>{t("Support_doctor_screen.emailLabel")}</Text>
-            <View style={styles.inputField}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color="#BDBDBD"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.emailInput}
-                placeholder="john.doe@domain.com"
-                placeholderTextColor="#BDBDBD"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
-
-            <Text style={styles.label}>
-              {t("Support_doctor_screen.messageLabel")}
-            </Text>
-            <View style={styles.messageInputContainer}>
-              <TextInput
-                style={styles.messageInput}
-                placeholder={t("Support_doctor_screen.messagePlaceholder")}
-                placeholderTextColor="#BDBDBD"
-                multiline
-                textAlignVertical="top"
-                value={message}
-                onChangeText={setMessage}
-              />
-              <View style={styles.messageTips}>
-                <Text style={styles.messageTipItem}>
-                  • {t("Support_doctor_screen.tip1")}
-                </Text>
-                <Text style={styles.messageTipItem}>
-                  • {t("Support_doctor_screen.tip2")}
-                </Text>
-                <Text style={styles.messageTipItem}>
-                  • {t("Support_doctor_screen.tip3")}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.label}>
-              {t("Support_doctor_screen.selectUserType")}
-            </Text>
-            <View style={styles.userTypeButtonsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.userTypeButton,
-                  userType === "doctor" && styles.userTypeButtonActive,
-                ]}
-                onPress={() => setUserType("doctor")}
-              >
-                <Text
-                  style={[
-                    styles.userTypeButtonText,
-                    userType === "doctor" && styles.userTypeButtonTextActive,
-                  ]}
-                >
-                  {t("Support_doctor_screen.doctor")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.userTypeButton,
-                  userType === "patient" && styles.userTypeButtonActive,
-                ]}
-                onPress={() => setUserType("patient")}
-              >
-                <Text
-                  style={[
-                    styles.userTypeButtonText,
-                    userType === "patient" && styles.userTypeButtonTextActive,
-                  ]}
-                >
-                  {t("Support_doctor_screen.patient")}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>
-                {t("Support_doctor_screen.send")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+         <KeyboardAvoidingView
+           style={{ flex: 1 }}
+           behavior={Platform.OS === "ios" ? "padding" : "height"}
+           keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+         >
+           <ScrollView contentContainerStyle={styles.scrollContent}>
+             {/* Header */}
+             <View style={styles.header}>
+               {/* *** ЗАКОМЕНТОВАНО ТУТ: Кнопка назад, якщо вона не потрібна за дизайном ***
+               <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+                 <Ionicons name="arrow-back" size={24} color="#000" />
+               </TouchableOpacity>
+               */}
+               <Text style={styles.headerTitle}>{t("support_screen.title")}</Text>
+               <View>
+                 <Icon width={50} height={50} />
+               </View>
+             </View>
+   
+             <View style={styles.contentContainer}>
+               <Text style={styles.instructionText}>
+                 {t("support_screen.instruction")}
+               </Text>
+   
+               <Text style={styles.label}>{t("support_screen.emailLabel")}</Text>
+               <View style={styles.inputField}>
+                 <Ionicons
+                   name="mail-outline"
+                   size={20}
+                   color="#BDBDBD"
+                   style={styles.inputIcon}
+                 />
+                 <TextInput
+                   style={styles.emailInput}
+                   placeholder="john.doe@domain.com"
+                   placeholderTextColor="#BDBDBD"
+                   keyboardType="email-address"
+                   autoCapitalize="none"
+                   value={email}
+                   onChangeText={setEmail}
+                 />
+               </View>
+   
+               <Text style={styles.label}>{t("support_screen.messageLabel")}</Text>
+               <View style={styles.messageInputContainer}>
+                 <TextInput
+                   style={styles.messageInput}
+                   placeholder={t("support_screen.messagePlaceholder")}
+                   placeholderTextColor="#BDBDBD"
+                   multiline
+                   textAlignVertical="top"
+                   value={message}
+                   onChangeText={setMessage}
+                 />
+                 <View style={styles.messageTips}>
+                   <Text style={styles.messageTipItem}>
+                     • {t("support_screen.tip1")}
+                   </Text>
+                   <Text style={styles.messageTipItem}>
+                     • {t("support_screen.tip2")}
+                   </Text>
+                   <Text style={styles.messageTipItem}>
+                     • {t("support_screen.tip3")}
+                   </Text>
+                   {/* <Text style={styles.messageTipItem}>
+                     • {t("support_screen.tip4")}
+                   </Text> */}
+                 </View>
+               </View>
+   
+               <Text style={styles.label}>
+                 {t("support_screen.selectUserType")}
+               </Text>
+               <View style={styles.userTypeButtonsContainer}>
+                 <TouchableOpacity
+                   style={[
+                     styles.userTypeButton,
+                     userType === "doctor" && styles.userTypeButtonActive,
+                   ]}
+                   onPress={() => setUserType("doctor")}
+                 >
+                   <Text
+                     style={[
+                       styles.userTypeButtonText,
+                       userType === "doctor" && styles.userTypeButtonTextActive,
+                     ]}
+                   >
+                     {t("support_screen.doctor")}
+                   </Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity
+                   style={[
+                     styles.userTypeButton,
+                     userType === "patient" && styles.userTypeButtonActive,
+                   ]}
+                   onPress={() => setUserType("patient")}
+                 >
+                   <Text
+                     style={[
+                       styles.userTypeButtonText,
+                       userType === "patient" && styles.userTypeButtonTextActive,
+                     ]}
+                   >
+                     {t("support_screen.patient")}
+                   </Text>
+                 </TouchableOpacity>
+               </View>
+   
+               <TouchableOpacity
+                 style={styles.submitButton}
+                 onPress={handleSubmit}
+               >
+                 <Text style={styles.submitButtonText}>
+                   {t("support_screen.send")}
+                 </Text>
+               </TouchableOpacity>
+             </View>
+           </ScrollView>
+         </KeyboardAvoidingView>
+   
 
       {/* TabBar внизу екрана */}
       <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />

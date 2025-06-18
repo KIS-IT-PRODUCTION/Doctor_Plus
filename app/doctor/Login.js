@@ -8,14 +8,13 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
-  Alert,
+  // Alert, // Не використовуємо Alert, оскільки це блокує UI
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../providers/AuthProvider";
 import { useTranslation } from "react-i18next";
-
 
 const Login = () => {
   const navigation = useNavigation();
@@ -33,18 +32,24 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  // Додаємо новий стан для відстеження, чи була успішна автентифікація через форму
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
   useEffect(() => {
+    console.log("-----------------------------------------");
     console.log("LOGIN_NAV_EFFECT: Triggered.");
-    console.log("  - authLoading:", authLoading);
-    console.log("  - session:", session ? "Present" : "Null");
-    console.log("  - session.user:", session && session.user ? "Present" : "Null");
-    console.log("  - userRole:", userRole);
+    console.log(`  - authLoading: ${authLoading}`);
+    console.log(`  - session: ${session ? "Present" : "Null"}`);
+    console.log(`  - session.user: ${session && session.user ? "Present" : "Null"}`);
+    console.log(`  - userRole: ${userRole}`);
+    console.log(`  - isAuthenticated (Effect): ${isAuthenticated}`);
 
-    if (!authLoading && session && session.user) {
+    // Навігація повинна відбуватися, якщо сесія дійсна І користувач успішно автентифікований
+    if (!authLoading && session && session.user && isAuthenticated) {
+      console.log("LOGIN_NAV_EFFECT: All conditions for navigation met.");
       if (userRole === "doctor") {
         console.log("LOGIN_NAV_EFFECT: User is a doctor, navigating to Profile_doctor.");
         navigation.replace("Profile_doctor");
@@ -54,46 +59,68 @@ const Login = () => {
         setLoginError(t("error_doctors_only_login"));
         setEmail("");
         setPassword("");
+        setIsAuthenticated(false); // Скидаємо прапор, якщо це не лікар
       } else if (userRole === null) {
         console.log("LOGIN_NAV_EFFECT: Session active, but userRole is null. Waiting for role to be set or defaulting to HomeScreen.");
       }
-    } else {
-      console.log("LOGIN_NAV_EFFECT: Navigation condition NOT met.");
+    } else if (!authLoading && !session && isAuthenticated) {
+        // Це може статися, якщо signIn повернув success=true, але session ще не оновилась
+        // або якщо є якась аномалія. В цьому випадку, скидаємо isAuthenticated
+        // щоб не застрягти в стані очікування, якщо сесія не встановилася
+        console.log("LOGIN_NAV_EFFECT: isAuthenticated True, but session is NULL. Resetting isAuthenticated.");
+        setIsAuthenticated(false);
     }
-  }, [session, navigation, authLoading, userRole, signOut, t]);
+    else {
+      console.log("LOGIN_NAV_EFFECT: Navigation condition NOT met. Staying on Login screen.");
+    }
+    console.log("-----------------------------------------");
+  }, [session, navigation, authLoading, userRole, signOut, t, isAuthenticated]); // Додаємо isAuthenticated до залежностей
 
   useEffect(() => {
     if (authError) {
       console.error("Login (useEffect - AuthError): AuthProvider error:", authError.message);
       setLoginError(t("error_login_failed", { error: authError.message }));
       setIsLoggingIn(false);
+      setIsAuthenticated(false); // Скидаємо прапор, якщо є помилка автентифікації
+      console.log("Login (useEffect - AuthError): isAuthenticated set to false due to authError.");
     }
   }, [authError, t]);
 
   const handleLogin = async () => {
-    setLoginError("");
+    setLoginError(""); // Очищаємо попередні помилки
+    setIsAuthenticated(false); // Скидаємо перед кожною спробою входу
+    console.log("handleLogin: Starting login attempt. isAuthenticated set to false.");
 
     if (!email.trim()) {
       setLoginError(t("error_empty_email"));
+      console.log("handleLogin: Email is empty.");
       return;
     }
     if (!password.trim()) {
       setLoginError(t("error_empty_password"));
+      console.log("handleLogin: Password is empty.");
       return;
     }
 
     setIsLoggingIn(true);
-    console.log("Login (handleLogin): Attempting sign in...");
+    console.log("handleLogin: Attempting sign in with email:", email);
   
-      const { success, error } = await signIn(email, password);
+    const { success, error } = await signIn(email, password);
+    console.log(`handleLogin: signIn completed. Success: ${success}, Error: ${error ? error.message : 'None'}`);
 
     if (error) {
-      console.error("Login (handleLogin): Помилка входу:", error.message);
+      console.error("handleLogin: Помилка входу:", error.message);
       setLoginError(t("error_login_failed", { error: error.message }));
+      // В цьому випадку, isAuthenticated залишається false, і навігація не відбудеться
+      console.log("handleLogin: Login failed. Error message set. isAuthenticated remains false.");
     } else if (success) {
-      console.log("Login (handleLogin): Вхід успішний. AuthProvider тепер відповідає за навігацію.");
+      console.log("handleLogin: Вхід успішний. AuthProvider тепер відповідає за навігацію.");
+      setIsAuthenticated(true); // Встановлюємо прапор тільки при успішному вході
+      // Навігація тепер буде викликана через useEffect, коли сесія оновиться і userRole буде визначено.
+      console.log("handleLogin: Login successful. isAuthenticated set to true. Expect useEffect to navigate.");
     }
     setIsLoggingIn(false);
+    console.log("handleLogin: Login attempt finished. isLoggingIn set to false.");
   };
 
   const handleForgotPasswordPress = () => {

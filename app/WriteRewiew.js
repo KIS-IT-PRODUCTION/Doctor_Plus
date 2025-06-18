@@ -6,28 +6,33 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView, // Для уникнення перекриття клавіатурою
-  Platform, // Для Platform-специфічних стилів
-  ScrollView, // <--- ДОДАЙ ЦЕЙ ІМПОРТ
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useNavigation } from "@react-navigation/native"; // Для навігації назад
+import { useNavigation } from "@react-navigation/native";
 import Icon from "../assets/icon.svg";
 import { Ionicons } from "@expo/vector-icons";
+import { supabase } from "../providers/supabaseClient"; // *** Перевірте цей шлях ***
 
 const WriteReview = () => {
   const { t } = useTranslation();
   const navigation = useNavigation();
 
-  const [title, setTitle] = useState("");
+  // Змінено 'title' на 'userFullName' для вводу ПІБ
+  const [userFullName, setUserFullName] = useState("");
   const [reviewText, setReviewText] = useState("");
-  const [rating, setRating] = useState(0); // Оцінка від 0 до 5
+  const [rating, setRating] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const renderStars = () => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
       stars.push(
-        <TouchableOpacity key={i} onPress={() => setRating(i)}>
+        <TouchableOpacity key={i} onPress={() => setRating(i)} disabled={loading}>
           <Text style={i <= rating ? styles.starFilled : styles.starEmpty}>
             ★
           </Text>
@@ -37,39 +42,103 @@ const WriteReview = () => {
     return <View style={styles.starsContainer}>{stars}</View>;
   };
 
-  const handleSubmit = () => {
-    // Тут буде логіка відправлення відгуку
-    console.log("Title:", title);
-    console.log("Review Text:", reviewText);
-    console.log("Rating:", rating);
-    // Наприклад, відправити дані на сервер, потім повернутися на попередній екран
-    // navigation.goBack(); // Або navigation.navigate('ReviewsScreen');
+  const handleSubmit = async () => {
+    // Валідація: перевіряємо, що ПІБ та відгук не порожні, і оцінка поставлена
+    if (!userFullName.trim() || !reviewText.trim() || rating === 0) {
+      Alert.alert(t("writeReview.validationErrorTitle"), t("writeReview.validationErrorMessage"));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("Error fetching user session:", userError?.message || "User not found");
+        Alert.alert(t("writeReview.error"), t("writeReview.loginRequired"));
+        setLoading(false);
+        return;
+      }
+
+      // Отримання імені користувача з профілю, але його ми вже не використовуємо для відображення
+      // Це може бути корисно для внутрішніх перевірок, але не обов'язково зберігати в user_name
+      // оскільки userFullName буде використовуватись для відображення
+      // Якщо ви все ще хочете зберігати full_name з таблиці profiles в user_name, залиште цей блок.
+      // Якщо ні, його можна видалити, і user_name буде просто user.id
+      let userNameFromProfile = null;
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.warn("Could not fetch user profile name:", profileError.message);
+      } else if (profileData && profileData.full_name) {
+        userNameFromProfile = profileData.full_name;
+      }
+
+      const { data, error } = await supabase
+        .from('app_reviews') // Ваша таблиця відгуків
+        .insert([
+          {
+            user_id: user.id,
+            // user_name: userNameFromProfile || user.email || `User_${user.id.substring(0, 8)}`, // Це поле тепер може бути необов'язковим або використовуватись для іншого
+            user_name: userFullName.trim(), // Зберігаємо введене користувачем ПІБ в user_name
+            description: reviewText.trim(),
+            rating: rating,
+          },
+        ]);
+
+      if (error) {
+        console.error("Error submitting review:", error.message);
+        Alert.alert(t("writeReview.error"), `${t("writeReview.submitError")} ${error.message}`);
+      } else {
+        console.log("Review submitted successfully:", data);
+        Alert.alert(t("writeReview.success"), t("writeReview.submitSuccess"));
+        // Очистити форму
+        setUserFullName("");
+        setReviewText("");
+        setRating(0);
+        navigation.goBack();
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      Alert.alert(t("writeReview.error"), `${t("writeReview.unexpectedError")} ${err.message || String(err)}`);
+    } finally {
+      setLoading(false);
+    }
   };
+
   const handleBackPress = () => {
     navigation.goBack();
   };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"} // Адаптація під iOS/Android
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBackPress} disabled={loading}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
         <Icon width={50} height={50} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        <Text style={styles.label}>{t("writeReview.titleLabel")}</Text>
+        {/* Поле для вводу ПІБ */}
+        <Text style={styles.label}>{t("writeReview.fullNameLabel")}</Text>
         <TextInput
           style={styles.input}
-          placeholder={t("writeReview.titlePlaceholder")}
-          value={title}
-          onChangeText={setTitle}
+          placeholder={t("writeReview.fullNamePlaceholder")}
+          value={userFullName}
+          onChangeText={setUserFullName}
           placeholderTextColor="#aaa"
+          editable={!loading}
         />
 
+        {/* Поле для опису відгуку */}
         <Text style={styles.label}>{t("writeReview.reviewTextLabel")}</Text>
         <TextInput
           style={styles.textArea}
@@ -77,18 +146,24 @@ const WriteReview = () => {
           value={reviewText}
           onChangeText={setReviewText}
           multiline={true}
-          numberOfLines={6} // Додаємо кілька рядків за замовчуванням
-          textAlignVertical="top" // Вирівнювання тексту зверху для Android
+          numberOfLines={6}
+          textAlignVertical="top"
           placeholderTextColor="#aaa"
+          editable={!loading}
         />
 
+        {/* Поле для рейтингу */}
         <Text style={styles.label}>{t("writeReview.yourRatingLabel")}</Text>
         {renderStars()}
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>
-            {t("writeReview.submitButton")}
-          </Text>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>
+              {t("writeReview.submitButton")}
+            </Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -98,14 +173,14 @@ const WriteReview = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "white", // Легкий фон
+    backgroundColor: "white",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 50, // Відступ зверху для статус-бару
+    paddingTop: 50,
     paddingBottom: 20,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
@@ -129,10 +204,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     marginBottom: 10,
-    marginTop: 20, // Відступ між полями
+    marginTop: 20,
   },
   input: {
-    backgroundColor: "#E0F2F7", // Світло-блакитний фон, як на зображенні
+    backgroundColor: "#E0F2F7",
     borderRadius: 8,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -146,26 +221,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: "#333",
-    minHeight: 120, // Мінімальна висота для текстового поля
-    textAlignVertical: "top", // Вирівнювання тексту зверху для Android
+    minHeight: 120,
+    textAlignVertical: "top",
   },
   starsContainer: {
     flexDirection: "row",
     marginTop: 10,
-    marginBottom: 30, // Відступ перед кнопкою
+    marginBottom: 30,
   },
   starFilled: {
-    color: "#FFD700", // Золотий колір для заповнених зірок
-    fontSize: 30, // Більший розмір зірок
+    color: "#FFD700",
+    fontSize: 30,
     marginRight: 5,
   },
   starEmpty: {
-    color: "#D3D3D3", // Сірий колір для порожніх зірок
+    color: "#D3D3D3",
     fontSize: 30,
     marginRight: 5,
   },
   submitButton: {
-    backgroundColor: "#0EB3EB", // Синій колір кнопки
+    backgroundColor: "#0EB3EB",
     paddingVertical: 15,
     borderRadius: 18,
     alignItems: "center",
