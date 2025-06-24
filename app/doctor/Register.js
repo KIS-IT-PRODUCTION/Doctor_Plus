@@ -314,6 +314,7 @@ const Register = () => {
       if (data.user) {
         console.log("Supabase user registered. User ID:", data.user.id);
 
+        // Insert doctor's profile data, INCLUDING the initial points
         const { error: profileError } = await supabase
           .from("profile_doctor")
           .insert([
@@ -321,8 +322,9 @@ const Register = () => {
               user_id: data.user.id,
               full_name: fullName.trim(),
               phone: phone.trim() || null,
-              country: country?.name || null, // Зберігаємо англійську назву, або можна зберігати t(`countries.${country.name}`)
+              country: country?.name || null,
               language: i18n.language || null,
+              doctor_points: 1000, // <--- Додано: ініціалізуємо бали лікаря
             },
           ]);
 
@@ -332,15 +334,20 @@ const Register = () => {
             profileError.message
           );
           setRegistrationError(t("error_profile_save_failed"));
-        } else {
-          Alert.alert(t("success_title"), t("success_registration_message"));
-          setFullName("");
-          setEmail("");
-          setPassword("");
-          setPhone("");
-          setCountry(null);
-          navigation.navigate("Login");
+          // Optionally, you might want to delete the auth user here if profile saving fails
+          // await supabase.auth.admin.deleteUser(data.user.id); // Consider if you want to clean up auth user on profile creation failure
+          return;
         }
+
+        // Removed the separate "doctor_points" table insert, as the column is now in "profile_doctor"
+
+        Alert.alert(t("success_title"), t("success_registration_message"));
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setPhone("");
+        setCountry(null);
+        navigation.navigate("Login");
       } else {
         console.warn("Supabase signUp completed, but user object is missing.");
         Alert.alert(t("success_title"), t("success_registration_message"));
@@ -416,7 +423,7 @@ const Register = () => {
         >
           <Text style={styles.selectCountryText}>
             {country
-              ? `${country.emoji} ${t(`countries.${country.name}`)}` // Перекладаємо назву країни
+              ? `${country.emoji} ${t(`countries.${country.name}`)}`
               : t("select_country")}
           </Text>
         </TouchableOpacity>
@@ -722,7 +729,7 @@ const styles = StyleSheet.create({
 
   // Нові та оновлені стилі для модального вікна вибору країни
   centeredView: {
-    ...StyleSheet.absoluteFillObject, // Розтягує на весь екран
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(14, 179, 235, 0.1)",
@@ -742,28 +749,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     width: width * 0.9,
-    maxHeight: Dimensions.get("window").height * 0.8, // Обмеження висоти модального вікна
+    maxHeight: Dimensions.get("window").height * 0.8,
   }),
   modalBorder: {
-    borderColor: "#0EB3EB", // Колір рамки
-    borderWidth: 1, // Товщина рамки
+    borderColor: "#0EB3EB",
+    borderWidth: 1,
   },
-  // modalTitle (залишається як було, але його немає в модальному вікні вибору країни в прикладі)
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 15,
   },
   modalScrollView: {
-    width: "100%", // ScrollView займає всю доступну ширину
+    width: "100%",
   },
   countryItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     width: "100%",
-    justifyContent: "space-between", // Розносить елементи по краях
-    paddingHorizontal: 15, // Додаємо горизонтальний відступ
+    justifyContent: "space-between",
+    paddingHorizontal: 15,
   },
   countryEmoji: {
     fontSize: 24,
@@ -771,25 +777,25 @@ const styles = StyleSheet.create({
   },
   countryName: {
     fontSize: 18,
-    flex: 1, // Займає весь доступний простір
+    flex: 1,
   },
   countryItemSelected: {
-    backgroundColor: "rgba(14, 179, 235, 0.1)", // Колір фону для вибраного елемента
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
     borderRadius: 10,
   },
   countryItemTextSelected: {
     fontWeight: "bold",
-    color: "#0EB3EB", // Колір тексту для вибраного елемента
+    color: "#0EB3EB",
   },
   button: {
     borderRadius: 20,
     padding: 10,
     elevation: 2,
     marginTop: 15,
-    width: "100%", // Кнопка займає всю доступну ширину
+    width: "100%",
   },
   buttonClose: {
-    backgroundColor: "#0EB3EB", // Колір кнопки "Закрити"
+    backgroundColor: "#0EB3EB",
   },
   textStyle: {
     color: "white",
@@ -808,8 +814,8 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
-    borderColor: "#0EB3EB", // Колір рамки
-    borderWidth: 1, // Товщина рамки
+    borderColor: "#0EB3EB",
+    borderWidth: 1,
     alignItems: "center",
     width: Dimensions.get("window").width * 0.8,
     shadowColor: "#000",
@@ -822,17 +828,13 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   languageOption: {
-    paddingVertical: 15,
+    paddingVertical: 10,
     width: "100%",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#rgba(14, 179, 235, 0.1)",
   },
   languageOptionText: {
     fontSize: 18,
-    fontFamily: "Mont-Regular",
-    color: "#333333",
+    color: "#333",
   },
 });
-
 export default Register;

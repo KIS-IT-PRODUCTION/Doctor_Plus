@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Doctor Plus",
+    "name": "",
     "slug": "DOCTOR",
     "scheme": "doctor",
     "version": "1.0.0",
@@ -39,9 +39,7 @@
       "tabletImage": "./assets/icon.png",
       "tabletBackgroundColor": "#ffffff",
       "darkModeImage": "./assets/icon.png",
-      "darkModeBackgroundColor": "#ffffff",
-      "width": "5%",
-      "height": "5%"
+      "darkModeBackgroundColor": "#ffffff"
     }
     },
     "android": {

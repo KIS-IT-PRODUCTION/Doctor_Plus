@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -16,6 +14,8 @@ import {
   RefreshControl,
   LayoutAnimation,
   UIManager,
+  View, // <--- Важливо: додайте View, якщо його немає, для обгортки Text
+  Text, // <--- Важливо: додайте Text, якщо його немає
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,12 +24,13 @@ import { supabase } from "../../providers/supabaseClient";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
-import TabBar_doctor from "../../components/TopBar_doctor"; // Переконайтеся, що шлях правильний
+import TabBar_doctor from "../../components/TopBar_doctor";
+import NetInfo from "@react-native-community/netinfo";
+import { LinearGradient } from 'expo-linear-gradient'; // <-- ДОДАНО: Імпорт LinearGradient
 
 const { width } = Dimensions.get("window");
-const isLargeScreen = width > 768; // Визначення великого екрану
+const isLargeScreen = width > 768;
 
-// Вмикаємо LayoutAnimation для Android
 if (
   Platform.OS === "android" &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -197,12 +198,13 @@ const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
 
-  const doctorIdRef = useRef(
-    route.params?.doctorId ? String(route.params.doctorId) : null
-  );
+  // ID доктора, який має відображатися на екрані.
+  // Може бути отриманий з параметрів маршруту (для перегляду чужого профілю)
+  // або з поточної сесії користувача (для власного профілю).
+  const doctorIdFromParams = route.params?.doctorId ? String(route.params.doctorId) : null;
 
   const [doctor, setDoctor] = useState(null);
-  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [loadingInitial, setLoadingInitial] = useState(true); // Показуємо лоадер при першому завантаженні
   const [error, setError] = useState(null);
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
@@ -217,27 +219,40 @@ const Profile_doctor = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
-  const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
+  // ID поточного залогіненого користувача (доктора)
+  const [currentLoggedInDoctorId, setCurrentLoggedInDoctorId] = useState(null);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
-  const [refreshing, setRefreshing] = useState(false); // Для RefreshControl
-  const [loadingTimeoutExpired, setLoadingTimeoutExpired] = useState(false); // Для таймауту завантаження
-  const timeoutRef = useRef(null); // Референс для таймауту
+  const [refreshing, setRefreshing] = useState(false); // Для RefreshControl (pull-to-refresh)
+  const [loadingTimeoutExpired, setLoadingTimeoutExpired] = useState(false);
+  const timeoutRef = useRef(null);
   const [activeTab, setActiveTab] = useState("Profile_doctor");
+  const [isConnected, setIsConnected] = useState(true);
+
+  // **** НОВІ РЕФЕРЕНСИ ДЛЯ КОНТРОЛЮ ЗАВАНТАЖЕННЯ ****
+  // Відстежує, чи вже був здійснений перший fetch (при ініціалізації або першому фокусі)
+  const hasLoadedInitialData = useRef(false);
+  // Зберігає user_id, для якого дані були успішно завантажені востаннє.
+  const lastFetchedDoctorId = useRef(null);
+  // **** КІНЕЦЬ НОВИХ РЕФЕРЕНСІВ ****
+
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected);
+      console.log("Is connected?", state.isConnected);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      // Встановлюємо активну вкладку при фокусуванні на цьому екрані
-      setActiveTab("Profile_doctor"); // Встановіть назву вкладки, яка відповідає цьому екрану
+      setActiveTab("Profile_doctor");
     }, [])
   );
 
-  // Для відстеження, чи була вже спроба завантаження даних для поточного ID сесії
-  const hasFetchedDataForSessionId = useRef(false);
- const handleTabPress = (tabName) => {
+  const handleTabPress = (tabName) => {
     setActiveTab(tabName);
-    // Використовуйте navigation.navigate() для переходу на відповідний екран
-    // Переконайтеся, що ці назви екранів відповідають назвам, які ви визначили у вашому навігаторі
     switch (tabName) {
       case "Home_doctor":
         navigation.navigate("Home_doctor");
@@ -249,72 +264,110 @@ const Profile_doctor = ({ route }) => {
         navigation.navigate("Chat_doctor");
         break;
       case "Headphones_doctor":
-        navigation.navigate("Support_doctor"); // Припустимо, що підтримка
-        break;
-      case "Profile_doctor": // Це екран відгуків
-        // Якщо цей екран вже активний, не переходимо знову
-        // navigation.navigate("Rewiew_app"); // Або назва вашого екрану відгуків
+        navigation.navigate("Support_doctor");
         break;
       case "Profile_doctor":
-        navigation.navigate("Profile_doctor");
         break;
       default:
         break;
     }
   };
+
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-  // Отримуємо user session один раз при монтуванні або при фокусі екрану
-  useFocusEffect(
-    useCallback(() => {
-      console.log("Profile_doctor: useFocusEffect triggered. Fetching user session.");
-      const getDoctorSession = async () => {
-        const {
-          data: { user },
-          error: sessionError,
-        } = await supabase.auth.getUser();
+  // Цей useEffect завантажує ID поточного залогіненого користувача (доктора)
+  // та ініціює завантаження даних, якщо це перший запуск або зміна користувача.
+  useEffect(() => {
+    console.log("Profile_doctor: Main useEffect triggered.");
+    const getDoctorSessionAndFetch = async () => {
+      // Завжди отримуємо актуальну сесію при фокусі
+      const {
+        data: { user },
+        error: sessionError,
+      } = await supabase.auth.getUser();
 
-        if (sessionError) {
-          console.error("Error getting doctor user session:", sessionError.message);
-          setError(t("session_error") + sessionError.message);
+      if (sessionError) {
+        console.error("Error getting doctor user session:", sessionError.message);
+        setError(t("session_error") + sessionError.message);
+        setLoadingInitial(false);
+        setCurrentLoggedInDoctorId(null);
+        return;
+      }
+
+      let targetId = doctorIdFromParams; // Спочатку беремо ID з параметрів маршруту
+
+      if (user) {
+        console.log("Profile_doctor: Current logged-in user ID:", user.id);
+        setCurrentLoggedInDoctorId(user.id); // Оновлюємо стан для залогіненого ID
+
+        // Якщо ID з параметрів маршруту не вказано, використовуємо ID залогіненого користувача
+        if (!targetId) {
+          targetId = user.id;
+        }
+      } else {
+        console.log("Profile_doctor: No doctor user session found.");
+        setCurrentLoggedInDoctorId(null);
+        if (!targetId) { // Якщо немає ні залогіненого юзера, ні ID в параметрах
+          setError(t("doctor_id_missing"));
           setLoadingInitial(false);
-          setCurrentDoctorUserId(null);
           return;
         }
+      }
 
-        if (user) {
-          console.log("Profile_doctor: Current logged-in user ID:", user.id);
-          if (currentDoctorUserId !== user.id) {
-            setCurrentDoctorUserId(user.id);
-            hasFetchedDataForSessionId.current = false; // Скидаємо, якщо user.id змінився
-          }
-          if (!doctorIdRef.current) {
-            doctorIdRef.current = user.id;
-          }
-        } else {
-          console.log("Profile_doctor: No doctor user session found.");
-          if (!doctorIdRef.current) {
-            setError(t("doctor_id_missing"));
-            setLoadingInitial(false);
-            setCurrentDoctorUserId(null);
-          }
-        }
-      };
-      getDoctorSession();
-    }, [t, currentDoctorUserId])
-  );
+      // Визначаємо, чи потрібно завантажувати дані:
+      // 1. Це перший раз, коли ми завантажуємо дані для цього компонента.
+      // 2. Або targetId змінився з часу останнього успішного завантаження.
+      // 3. Або ми примусово оновлюємо (refreshing).
+      const shouldFetch =
+        (targetId && !hasLoadedInitialData.current) || // Перше завантаження
+        (targetId && targetId !== lastFetchedDoctorId.current) || // Зміна користувача
+        refreshing; // Ручне оновлення
 
+      console.log(`Profile_doctor: Fetch check - targetId: ${targetId}, hasLoadedInitialData: ${hasLoadedInitialData.current}, lastFetchedDoctorId: ${lastFetchedDoctorId.current}, refreshing: ${refreshing}`);
+
+      if (shouldFetch) {
+        console.log(`Profile_doctor: Initiating fetchDoctorData for ID: ${targetId}`);
+        fetchDoctorData(targetId);
+        hasLoadedInitialData.current = true; // Позначаємо, що перший fetch відбувся
+      } else if (doctor && doctor.user_id === targetId) {
+        // Якщо дані вже є і це той самий доктор, просто переконайтесь, що не показуємо лоадер.
+        setLoadingInitial(false);
+        setError(null); // Очищаємо помилку, якщо вона була
+      } else {
+        // Якщо немає ID для завантаження або вже завантажено і немає потреби оновлювати
+        setLoadingInitial(false);
+        setError(null);
+      }
+    };
+
+    getDoctorSessionAndFetch();
+
+    // Очищення таймауту, якщо компонент розмонтовується або залежності змінюються
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [
+    t,
+    doctorIdFromParams, // Залежить від змін у параметрах маршруту
+    refreshing, // Залежить від того, чи ми вручну оновлюємо
+  ]);
+
+  // Окремий useEffect для реєстрації push-сповіщень
   useEffect(() => {
-    if (currentDoctorUserId) {
-      console.log("Profile_doctor: Registering for push notifications...");
-      registerForPushNotificationsAsync(currentDoctorUserId);
+    if (currentLoggedInDoctorId) {
+      console.log("Profile_doctor: Registering for push notifications for user:", currentLoggedInDoctorId);
+      registerForPushNotificationsAsync(currentLoggedInDoctorId);
     }
-  }, [currentDoctorUserId]);
+  }, [currentLoggedInDoctorId]);
+
 
   const fetchUnreadNotificationsCount = useCallback(async () => {
-    if (!currentDoctorUserId) {
+    if (!currentLoggedInDoctorId) {
       setUnreadNotificationsCount(0);
       return;
     }
@@ -323,7 +376,7 @@ const Profile_doctor = ({ route }) => {
       const { count, error: countError } = await supabase
         .from("doctor_notifications")
         .select("id", { count: "exact" })
-        .eq("doctor_id", currentDoctorUserId)
+        .eq("doctor_id", currentLoggedInDoctorId)
         .eq("is_read", false);
 
       if (countError) {
@@ -335,7 +388,7 @@ const Profile_doctor = ({ route }) => {
       } else {
         setUnreadNotificationsCount(count || 0);
         console.log(
-          `Unread notifications count for ${currentDoctorUserId}: ${count}`
+          `Unread notifications count for ${currentLoggedInDoctorId}: ${count}`
         );
       }
     } catch (err) {
@@ -359,11 +412,15 @@ const Profile_doctor = ({ route }) => {
       );
       setUnreadNotificationsCount(0);
     }
-  }, [currentDoctorUserId]);
+  }, [currentLoggedInDoctorId]);
 
-  useEffect(() => {
-    fetchUnreadNotificationsCount();
-  }, [currentDoctorUserId, fetchUnreadNotificationsCount]);
+  // Оновлюємо лічильник сповіщень при зміні залогіненого користувача або при фокусі
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadNotificationsCount();
+    }, [fetchUnreadNotificationsCount])
+  );
+
 
   const formatYearsText = useCallback(
     (years) => {
@@ -375,7 +432,6 @@ const Profile_doctor = ({ route }) => {
     [t]
   );
 
-  // Функція для завантаження даних доктора, використовується для початкового завантаження та оновлення
   const fetchDoctorData = useCallback(
     async (idToFetch) => {
       if (!idToFetch) {
@@ -383,13 +439,16 @@ const Profile_doctor = ({ route }) => {
           "Profile_doctor: No doctor ID available to fetch data in fetchDoctorData."
         );
         setError(t("doctor_id_missing"));
-        setLoadingInitial(false); // Забезпечуємо, що індикатор зникне, якщо ID немає
+        setLoadingInitial(false);
         return;
       }
 
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-      setDoctor(null);
+      // Скидаємо лише якщо не оновлюємо дані (refreshing)
+      if (!refreshing) {
+        setDoctor(null); // Щоб старі дані не відображались, поки завантажуються нові
+      }
       setLoadingAvatar(true);
       setLoadingCertificate(true);
       setLoadingDiploma(true);
@@ -397,22 +456,16 @@ const Profile_doctor = ({ route }) => {
       setCertificateError(false);
       setDiplomaError(false);
       setError(null);
-      setLoadingTimeoutExpired(false); // Скидаємо таймаут при початку нового завантаження
+      setLoadingTimeoutExpired(false);
 
-      // Встановлюємо loadingInitial на TRUE ПЕРЕД початком запиту, якщо це НЕ pull-to-refresh
-      if (!refreshing) {
-        console.log(
-          `Profile_doctor: Setting loadingInitial to TRUE for ID: ${idToFetch}`
-        );
-        setLoadingInitial(true);
-      }
+      // Завжди показуємо лоадер, коли починається fetch
+      setLoadingInitial(true);
 
-      // Запускаємо таймаут, якщо він ще не запущений
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => {
-        if (loadingInitial) { // Перевіряємо, чи все ще завантажується
+        if (loadingInitial) { // Перевіряємо, чи лоадер все ще активний
           setLoadingTimeoutExpired(true);
           console.log("Loading timeout expired. Showing retry/back buttons.");
         }
@@ -437,8 +490,10 @@ const Profile_doctor = ({ route }) => {
             setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
           }
           setDoctor(null);
+          lastFetchedDoctorId.current = null; // Позначаємо, що останнє завантаження було невдалим
         } else {
           setDoctor(data);
+          lastFetchedDoctorId.current = idToFetch; // Зберігаємо ID, для якого дані були успішно завантажені
           console.log("Profile_doctor: Doctor data fetched successfully.");
         }
       } catch (err) {
@@ -458,48 +513,22 @@ const Profile_doctor = ({ route }) => {
         console.error("Unexpected error during data fetch:", errorMessage, err);
         setError(`${t("unexpected_error")}: ${errorMessage}`);
         setDoctor(null);
+        lastFetchedDoctorId.current = null; // Позначаємо, що останнє завантаження було невдалим
       } finally {
         console.log(
-          `Profile_doctor: Setting loadingInitial to FALSE for ID: ${idToFetch}`
+          `Profile_doctor: Setting loadingInitial to FALSE after fetch for ID: ${idToFetch}`
         );
         setLoadingInitial(false);
-        setRefreshing(false); // Завжди зупиняємо індикатор оновлення
+        setRefreshing(false); // Завершуємо refresh
         if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current); // Очищаємо таймаут при завершенні завантаження
+          clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
-        setLoadingTimeoutExpired(false); // Скидаємо таймаут, якщо завантаження завершилося
+        setLoadingTimeoutExpired(false);
       }
     },
-    [t, refreshing, loadingInitial] // Додаємо refreshing та loadingInitial до залежностей
+    [t, refreshing, loadingInitial] // Додаємо loadingInitial для перевірки в таймауті
   );
-
-  // Цей useEffect буде викликати fetchDoctorData, коли doctorIdRef.current або currentDoctorUserId зміниться
-  useEffect(() => {
-    const finalIdToFetch = doctorIdRef.current || currentDoctorUserId;
-    console.log(
-      "Profile_doctor: Main data fetch useEffect triggered. finalIdToFetch:",
-      finalIdToFetch
-    );
-
-    if (finalIdToFetch && !hasFetchedDataForSessionId.current) {
-      console.log(
-        `Profile_doctor: Initiating fetchDoctorData for finalIdToFetch: ${finalIdToFetch}`
-      );
-      fetchDoctorData(finalIdToFetch);
-      hasFetchedDataForSessionId.current = true; // Встановлюємо, що завантаження почалося
-    } else if (!finalIdToFetch) {
-      setLoadingInitial(false); // Якщо немає ID, то завантаження завершено
-    } else if (finalIdToFetch && hasFetchedDataForSessionId.current) {
-      console.log("Profile_doctor: Data already fetched for this session ID, skipping re-fetch.");
-      // Якщо дані вже були завантажені для цього ID сесії, і вони присутні,
-      // то можна одразу встановити loadingInitial в false.
-      // Важливо: це запобігає постійному "блиманню" завантаження при поверненні на екран.
-      if (doctor && doctor.user_id === finalIdToFetch) {
-        setLoadingInitial(false);
-      }
-    }
-  }, [currentDoctorUserId, fetchDoctorData, doctor]); // Додаємо doctor до залежностей
 
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
@@ -514,7 +543,8 @@ const Profile_doctor = ({ route }) => {
   };
 
   const handleChooseConsultationTime = () => {
-    const targetDoctorId = doctorIdRef.current || currentDoctorUserId;
+    // Використовуємо ID, який зараз відображається на екрані (або з параметрів, або залогінений)
+    const targetDoctorId = doctorIdFromParams || currentLoggedInDoctorId;
 
     if (targetDoctorId) {
       navigation.navigate("ConsultationTime", { doctorId: targetDoctorId });
@@ -526,7 +556,6 @@ const Profile_doctor = ({ route }) => {
   const languagesForModal = [
     { nameKey: "english", code: "en", emoji: "" },
     { nameKey: "ukrainian", code: "uk", emoji: "" },
-
   ];
 
   const getParsedArray = useCallback((value) => {
@@ -587,77 +616,106 @@ const Profile_doctor = ({ route }) => {
 
   const onRetry = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    hasFetchedDataForSessionId.current = false; // Примусове перезавантаження
-    const idToRetry = doctorIdRef.current || currentDoctorUserId;
-    if (idToRetry) {
-      fetchDoctorData(idToRetry);
-    } else {
-      setError(t("doctor_id_missing_after_retry"));
-      setLoadingInitial(false);
-      setLoadingTimeoutExpired(false); // Скидаємо, щоб кнопки зникли
-    }
-  }, [fetchDoctorData, doctorIdRef, currentDoctorUserId, t]);
+    setError(null); // Очищаємо помилку перед повторною спробою
+    setLoadingTimeoutExpired(false);
+    // Примусово скидаємо hasLoadedInitialData та lastFetchedDoctorId,
+    // щоб main useEffect зрозумів, що потрібно перезавантажити дані.
+    hasLoadedInitialData.current = false;
+    lastFetchedDoctorId.current = null;
+    // Запускаємо useEffect, щоб він перевірив і викликав fetchDoctorData
+    // через залежність від doctorIdFromParams (або якщо currentLoggedInDoctorId буде встановлено)
+    // Змінимо state, щоб спрацювала реакція useEffect
+    setLoadingInitial(true); // Показуємо лоадер одразу
+  }, [doctorIdFromParams, t]);
+
 
   const onBackToHome = useCallback(() => {
-    navigation.goBack(); // Або navigation.navigate("HomeScreen") якщо потрібно на конкретний екран
+    navigation.goBack();
   }, [navigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setLoadingTimeoutExpired(false); // Скидаємо таймаут при оновленні
-    // При оновленні, примусово встановлюємо hasFetchedDataForSessionId.current в false,
-    // щоб гарантувати перезавантаження даних.
-    hasFetchedDataForSessionId.current = false;
-    await fetchDoctorData(doctorIdRef.current || currentDoctorUserId);
-    await fetchUnreadNotificationsCount();
-    // setRefreshing(false) викликається в fetchDoctorData, коли дані завантажені
-  }, [fetchDoctorData, fetchUnreadNotificationsCount, doctorIdRef, currentDoctorUserId]);
+    setLoadingTimeoutExpired(false);
+    setError(null);
+    // Примусово скидаємо hasLoadedInitialData та lastFetchedDoctorId,
+    // щоб `useEffect` зрозумів, що потрібно перезавантажити дані.
+    hasLoadedInitialData.current = false;
+    lastFetchedDoctorId.current = null;
+    const idToRefresh = doctorIdFromParams || currentLoggedInDoctorId;
+    if (idToRefresh) {
+      await fetchDoctorData(idToRefresh);
+      await fetchUnreadNotificationsCount();
+    } else {
+      setRefreshing(false);
+      setLoadingInitial(false);
+      setError(t("doctor_id_missing_for_refresh"));
+    }
+  }, [fetchDoctorData, fetchUnreadNotificationsCount, doctorIdFromParams, currentLoggedInDoctorId, t]);
 
+  // **** УМОВИ РЕНДЕРИНГУ ЕКРАНУ ЗАВАНТАЖЕННЯ/ПОМИЛКИ ****
+  // Ми показуємо екран завантаження/помилки, якщо:
+  // 1. `loadingInitial` є `true` І **немає вже завантажених даних** (`doctor` === null).
+  // 2. АБО є помилка (`error` не null).
+  // 3. АБО минув таймаут завантаження (`loadingTimeoutExpired`).
+  // 4. АБО немає підключення до інтернету (`!isConnected`).
+  // 5. АБО `doctor` є `null` І `loadingInitial` є `false` (означає, що завантаження завершилось, але даних немає).
+  const shouldShowFullScreenState =
+    (loadingInitial && !doctor) || // Початкове завантаження без даних
+    error || // Є помилка
+    loadingTimeoutExpired || // Таймаут
+    !isConnected || // Немає інтернету
+    (!doctor && !loadingInitial && !refreshing); // Завантаження завершилось, але даних немає і це не refresh
 
-  // Централізований екран завантаження/помилки/не знайдено
-  if (loadingInitial || error || !doctor) {
+  if (shouldShowFullScreenState) {
     return (
-      <SafeAreaView style={styles.fullscreenContainer}>
-        <View style={styles.centeredContent}>
-          {loadingInitial && !refreshing && (
-            <>
-              <ActivityIndicator size="large" color="#0EB3EB" />
-              <Text style={styles.loadingText}>{t("loading_profile_data")}</Text>
-            </>
-          )}
+      // Обертаємо SafeAreaView в LinearGradient для фону
+      
+        <SafeAreaView style={styles.fullscreenContainer}>
+        
 
-          {(error || !doctor || loadingTimeoutExpired) && !loadingInitial && (
-            <>
-              {error && <Ionicons name="alert-circle-outline" size={50} color="#E04D53" />}
-              {!error && !doctor && <Ionicons name="information-circle-outline" size={60} color="#0EB3EB" />}
-              
+          {/* Показуємо іконки та текст помилки, якщо є помилка, немає даних, минув таймаут АБО НЕМАЄ ІНТЕРНЕТУ */}
+          {(!loadingInitial || error || loadingTimeoutExpired || !isConnected || (!doctor && !loadingInitial)) && (
+            <View style={styles.errorContainer}>
+              {(!isConnected || error || !doctor) && (
+                <Ionicons name="alert-circle-outline" size={50} color="#D32F2F" />
+              )}
+
               <Text style={styles.errorText}>
-                {error || t("doctor_not_found")}
+                {!isConnected
+                  ? t("no_internet_connection")
+                  : error || t("doctor_not_found")}
               </Text>
 
-              {(loadingTimeoutExpired || error || !doctor) && (
+              {/* Кнопки "Повторити" та "Назад" показуємо, якщо немає з'єднання АБО є помилка/таймаут */}
+              {(!isConnected || error || loadingTimeoutExpired || (!doctor && !loadingInitial)) && (
                 <>
                   <TouchableOpacity
-                    style={styles.retryButton}
+                    style={styles.retryButton} // Сам TouchableOpacity
                     onPress={onRetry}
                   >
-                    <Text style={styles.retryButtonText}>{t("retry")}</Text>
+                    
+                      <Text style={styles.retryButtonText}>{t("retry")}</Text>
+                    
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.backToHomeButton}
+                    style={styles.backToHomeButton} // Сам TouchableOpacity
                     onPress={onBackToHome}
                   >
-                    <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
+                   
+                      <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
+                    
                   </TouchableOpacity>
                 </>
               )}
-            </>
+            </View>
           )}
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+       // <-- Закриття LinearGradient для fullscreenContainer
     );
   }
+  // **** КІНЕЦЬ УМОВ РЕНДЕРИНГУ ****
 
+  // Якщо ми дійшли сюди, значить `doctor` не null, і ми можемо відображати профіль
   const {
     full_name,
     avatar_url,
@@ -673,325 +731,358 @@ const Profile_doctor = ({ route }) => {
   } = doctor;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.languageSelectButton}
-          onPress={openLanguageModal}
-        >
-          <View style={styles.languageButtonContent}>
-            <Text style={styles.languageButtonText}>
-              {displayedLanguageCode}
-            </Text>
-            <Ionicons name="chevron-down-outline" size={16} color="white" />
-          </View>
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={() => navigation.navigate("Messege")}
-        >
-          <Ionicons name="notifications-outline" size={24} color="white" />
-          {unreadNotificationsCount > 0 && (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationNumber}>
-                {unreadNotificationsCount}
+    // Обертаємо SafeAreaView в LinearGradient для фону основного екрану
+   
+      <SafeAreaView style={styles.container}>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.languageSelectButton} // Сам TouchableOpacity
+            onPress={openLanguageModal}
+          >
+           
+              <Text style={styles.languageButtonText}>
+                {displayedLanguageCode}
               </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+              <Ionicons name="chevron-down-outline" size={16} color="white" />
+          </TouchableOpacity>
 
-      {/* SCROLLABLE CONTENT */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={["#0EB3EB", "#3F51B5"]} // Кольори індикатора оновлення
-            tintColor={"#0EB3EB"}
-          />
-        }
-      >
-        <View style={styles.doctorMainInfo}>
-          {avatar_url && !avatarError ? (
-            <View style={styles.avatarContainer}>
-              {loadingAvatar && (
-                <ActivityIndicator
-                  size="large"
-                  color="#0EB3EB"
-                  style={styles.avatarLoadingIndicator}
-                />
+          <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
+          <TouchableOpacity
+            style={styles.notificationButton} // Сам TouchableOpacity
+            onPress={() => navigation.navigate("Messege")}
+          >
+              <Ionicons name="notifications-outline" size={24} color="white" />
+              {unreadNotificationsCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationNumber}>
+                    {unreadNotificationsCount}
+                  </Text>
+                </View>
               )}
-              <Image
-                source={{ uri: avatar_url }}
-                style={styles.avatar}
-                onLoadStart={() => setLoadingAvatar(true)}
-                onLoad={() => setLoadingAvatar(false)}
-                onError={() => {
-                  setLoadingAvatar(false);
-                  setAvatarError(true);
-                  console.error("Error loading avatar image:", avatar_url);
-                }}
-              />
-            </View>
-          ) : (
-            <Image
-              source={{
-                uri: "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo",
-              }}
-              style={styles.avatar}
+          </TouchableOpacity>
+        </View>
+
+        {/* SCROLLABLE CONTENT */}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh} // Викликаємо onRefresh при протягуванні
+              colors={["#0EB3EB", "#3F51B5"]}
+              tintColor={"#0EB3EB"}
             />
-          )}
+          }
+        >
+          <View style={styles.doctorMainInfo}>
+            {avatar_url && !avatarError ? (
+              <View style={styles.avatarContainer}>
+                {loadingAvatar && (
+                  <ActivityIndicator
+                    size="large"
+                    color="#0EB3EB"
+                    style={styles.avatarLoadingIndicator}
+                  />
+                )}
+                <Image
+                  source={{ uri: avatar_url }}
+                  style={styles.avatar}
+                  onLoadStart={() => setLoadingAvatar(true)}
+                  onLoad={() => setLoadingAvatar(false)}
+                  onError={() => {
+                    setLoadingAvatar(false);
+                    setAvatarError(true);
+                    console.error("Error loading avatar image:", avatar_url);
+                  }}
+                />
+              </View>
+            ) : (
+              <Image
+                source={{
+                  uri: "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo",
+                }}
+                style={styles.avatar}
+              />
+            )}
 
-          <View style={styles.doctorDetails}>
-            <Text style={styles.doctorName}>
-              {full_name || t("not_specified")}
-            </Text>
+            <View style={styles.doctorDetails}>
+              <Text style={styles.doctorName}>
+                {full_name || t("not_specified")}
+              </Text>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("rating")}:</Text>
-              <ValueBox>
-                <Ionicons name="star" size={18} color="#FFD700" />
-                <Ionicons name="star" size={18} color="#FFD700" />
-                <Ionicons name="star" size={18} color="#FFD700" />
-                <Ionicons name="star" size={18} color="#FFD700" />
-                <Ionicons name="star-half" size={18} color="#FFD700" />
-              </ValueBox>
-            </View>
+              <View style={styles.infoRowDynamic}>
+                <Text style={styles.label}>{t("rating")}:</Text>
+                <ValueBox>
+                  <Ionicons name="star" size={18} color="#FFD700" />
+                  <Ionicons name="star" size={18} color="#FFD700" />
+                  <Ionicons name="star" size={18} color="#FFD700" />
+                  <Ionicons name="star" size={18} color="#FFD700" />
+                  <Ionicons name="star-half" size={18} color="#FFD700" />
+                </ValueBox>
+              </View>
+              <View style={styles.infoRowDynamic}>
+                <Text style={styles.label}>{t("communication_language")}:</Text>
+                <ValueBox>
+                  <LanguageFlags languages={getLanguages(communication_languages)} />
+                </ValueBox>
+              </View>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("communication_language")}:</Text>
-              <ValueBox>
-                <LanguageFlags languages={getLanguages(communication_languages)} />
-              </ValueBox>
-            </View>
+              <View style={styles.infoRowDynamic}>
+                <Text style={styles.label}>{t("specialization")}:</Text>
+                <ValueBox>{getSpecializations(specialization)}</ValueBox>
+              </View>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("specialization")}:</Text>
-              <ValueBox>{getSpecializations(specialization)}</ValueBox>
-            </View>
+              <View style={styles.infoRowDynamic}>
+                <Text style={styles.label}>{t("work_experience")}:</Text>
+                <ValueBox>{formatYearsText(experience_years)}</ValueBox>
+              </View>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("work_experience")}:</Text>
-              <ValueBox>{formatYearsText(experience_years)}</ValueBox>
-            </View>
+              <View style={styles.infoRowDynamic}>
+                <Text style={styles.label}>{t("work_location")}:</Text>
+                <ValueBox>{work_location || t("not_specified")}</ValueBox>
+              </View>
 
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("work_location")}:</Text>
-              <ValueBox>{work_location || t("not_specified")}</ValueBox>
-            </View>
-
-            <View style={styles.infoRowDynamic}>
-              <Text style={styles.label}>{t("consultation_cost")}:</Text>
-              <ValueBox>
-                {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
-              </ValueBox>
+              <View style={styles.infoRowDynamic}>
+                <Text style={styles.label}>{t("consultation_cost")}:</Text>
+                <ValueBox>
+                  {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
+                </ValueBox>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Action Buttons */}
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleChooseConsultationTime}
-        >
-          <Ionicons name="time-outline" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.actionButtonText}>
-            {t("choose_consultation_time")}
-          </Text>
-        </TouchableOpacity>
+          {/* Action Buttons */}
+          <TouchableOpacity
+            style={styles.actionButton} // Сам TouchableOpacity
+            onPress={handleChooseConsultationTime}
+          >
+            
+              <Ionicons name="time-outline" size={24} color="white" style={styles.buttonIcon} />
+              <Text style={styles.actionButtonText}>
+                {t("choose_consultation_time")}
+              </Text>
+            
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleProfileDoctorSettingsPress}
-        >
-          <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.actionButtonText}>
-            {t("profile_doctor_settings")}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton} // Сам TouchableOpacity
+            onPress={handleProfileDoctorSettingsPress}
+          >
+            
+              <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
+              <Text style={styles.actionButtonText}>
+                {t("profile_doctor_settings")}
+              </Text>
+            
+          </TouchableOpacity>
 
-        <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
+          <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
 
-        {/* ABOUT ME SECTION */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t("about_me")}</Text>
-          <Text style={styles.sectionContent}>
-            {about_me || t("not_specified")}
-          </Text>
-        </View>
+          {/* ABOUT ME SECTION */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeader}>{t("about_me")}</Text>
+            <Text style={styles.sectionContent}>
+              {about_me || t("not_specified")}
+            </Text>
+          </View>
 
-        {/* ACHIEVEMENTS SECTION */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t("achievements")}</Text>
-          <Text style={styles.sectionContent}>
-            {achievements || t("not_specified")}
-          </Text>
-        </View>
+          {/* ACHIEVEMENTS SECTION */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeader}>{t("achievements")}</Text>
+            <Text style={styles.sectionContent}>
+              {achievements || t("not_specified")}
+            </Text>
+          </View>
 
-        {/* WORK LOCATION SECTION */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t("place_of_work")}</Text>
-          <Text style={styles.sectionContent}>
-            {work_location || t("not_specified")}
-          </Text>
-        </View>
+          {/* WORK LOCATION SECTION */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeader}>{t("place_of_work")}</Text>
+            <Text style={styles.sectionContent}>
+              {work_location || t("not_specified")}
+            </Text>
+          </View>
 
-        {/* CERTIFICATE PHOTO SECTION */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
-          {certificate_photo_url && !certificateError ? (
-            <View style={styles.imageWrapper}>
-              {loadingCertificate && (
-                <ActivityIndicator
-                  size="small"
-                  color="#0EB3EB"
-                  style={styles.imageLoadingIndicator}
+          {/* CERTIFICATE PHOTO SECTION */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
+            {certificate_photo_url && !certificateError ? (
+              <View style={styles.imageWrapper}>
+                {loadingCertificate && (
+                  <ActivityIndicator
+                    size="small"
+                    color="#0EB3EB"
+                    style={styles.imageLoadingIndicator}
+                  />
+                )}
+                <Image
+                  source={{ uri: certificate_photo_url }}
+                  style={styles.documentImage}
+                  onLoadStart={() => setLoadingCertificate(true)}
+                  onLoad={() => setLoadingCertificate(false)}
+                  onError={() => {
+                    setLoadingCertificate(false);
+                    setCertificateError(true);
+                    console.error(
+                      "Error loading certificate image:",
+                      certificate_photo_url
+                    );
+                  }}
                 />
-              )}
-              <Image
-                source={{ uri: certificate_photo_url }}
-                style={styles.documentImage}
-                onLoadStart={() => setLoadingCertificate(true)}
-                onLoad={() => setLoadingCertificate(false)}
-                onError={() => {
-                  setLoadingCertificate(false);
-                  setCertificateError(true);
-                  console.error(
-                    "Error loading certificate image:",
-                    certificate_photo_url
-                  );
-                }}
-              />
-            </View>
-          ) : (
-            <Text style={styles.noImageText}>{t("no_certificate_photo")}</Text>
-          )}
-        </View>
+              </View>
+            ) : (
+              <Text style={styles.noImageText}>{t("no_certificate_photo")}</Text>
+            )}
+          </View>
 
-        {/* DIPLOMA PHOTO SECTION */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
-          {diploma_url && !diplomaError ? (
-            <View style={styles.imageWrapper}>
-              {loadingDiploma && (
-                <ActivityIndicator
-                  size="small"
-                  color="#0EB3EB"
-                  style={styles.imageLoadingIndicator}
+          {/* DIPLOMA PHOTO SECTION */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
+            {diploma_url && !diplomaError ? (
+              <View style={styles.imageWrapper}>
+                {loadingDiploma && (
+                  <ActivityIndicator
+                    size="small"
+                    color="#0EB3EB"
+                    style={styles.imageLoadingIndicator}
+                  />
+                )}
+                <Image
+                  source={{ uri: diploma_url }}
+                  style={styles.documentImage}
+                  onLoadStart={() => setLoadingDiploma(true)}
+                  onLoad={() => setLoadingDiploma(false)}
+                  onError={() => {
+                    setLoadingDiploma(false);
+                    setDiplomaError(true);
+                    console.error(
+                      "Error loading diploma image:",
+                      diploma_url
+                    );
+                  }}
                 />
-              )}
-              <Image
-                source={{ uri: diploma_url }}
-                style={styles.documentImage}
-                onLoadStart={() => setLoadingDiploma(true)}
-                onLoad={() => setLoadingDiploma(false)}
-                onError={() => {
-                  setLoadingDiploma(false);
-                  setDiplomaError(true);
-                  console.error("Error loading diploma image:", diploma_url);
-                }}
-              />
-            </View>
-          ) : (
-            <Text style={styles.noImageText}>{t("no_diploma_photo")}</Text>
-          )}
-        </View>
-        <View style={{ height: 30 }} />{/* Додатковий відступ знизу */}
-      </ScrollView>
-      <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
-
-      {/* Language Selection Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={isLanguageModalVisible}
-        onRequestClose={closeLanguageModal}
-      >
-        <Pressable style={styles.modalOverlay} onPress={closeLanguageModal}>
-          <TouchableWithoutFeedback>
-            <View style={styles.languageModalContent}>
-              <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
-              <ScrollView style={styles.modalScrollView}>
-                {languagesForModal.map((item) => (
-                  <TouchableOpacity
-                    key={item.code}
-                    style={styles.languageOption}
-                    onPress={() => handleLanguageSelect(item.code)}
-                  >
-                    <Text style={styles.languageOptionText}>
-                      {item.emoji} {t(item.nameKey)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
-        </Pressable>
-      </Modal>
-    </SafeAreaView>
+              </View>
+            ) : (
+              <Text style={styles.noImageText}>{t("no_diploma_photo")}</Text>
+            )}
+          </View>
+    
+          {/* Language Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={isLanguageModalVisible}
+            onRequestClose={closeLanguageModal}
+          >
+            <TouchableWithoutFeedback onPress={closeLanguageModal}>
+              <View style={styles.modalOverlay}>
+                <TouchableWithoutFeedback>
+                  <View style={styles.languageModalContent}>
+                    <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
+                    <ScrollView style={styles.modalScrollView}>
+                      {languagesForModal.map((lang) => (
+                        <TouchableOpacity
+                          key={lang.code}
+                          style={styles.languageOption}
+                          onPress={() => handleLanguageSelect(lang.code)}
+                        >
+                          <Text style={styles.languageOptionText}>
+                            {t(lang.nameKey)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
+        </ScrollView>
+          <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
+      </SafeAreaView>
+     // <-- Закриття LinearGradient для основного контейнера
   );
 };
 
+// Зі стилями, які я надав у попередній відповіді
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0F2F5", // Light background for modern feel
-    paddingTop: Platform.OS === 'android' ? 30 : 10, // Адаптивний paddingTop для Android
+    backgroundColor: "#F0F2F5",
+    paddingTop: Platform.OS === 'android' ? 30 : 10,
+  },
+  // Додаємо стиль для градієнтного фону всього екрану
+  containerGradient: {
+    flex: 1,
+  },
+  fullscreenContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent", // Фон буде від градієнта
   },
   loadingContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F0F2F5",
+    backgroundColor: "white",
+    borderRadius: 20, // Більше заокруглення
+    padding: 40, // Більший відступ
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 }, // Більш виражена тінь
+    shadowOpacity: 0.2,
+    shadowRadius: 10, // Більший радіус розмиття
+    elevation: 10,
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#666",
+    marginTop: 20, // Більший відступ
+    fontSize: 19, // Трохи більший шрифт
+    color: "#444", // Темніший колір
     fontFamily: "Mont-Regular",
+    fontWeight: "500",
   },
   errorContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
-    backgroundColor: "#FCE4EC", // Lighter error background
-    borderRadius: 15,
-    margin: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+    padding: 30, // Більший відступ
+    backgroundColor: "#FFEBEE",
+    borderRadius: 20, // Більше заокруглення
+    marginHorizontal: 25, // Більший горизонтальний відступ
+    shadowColor: "#EF5350",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+    borderWidth: 1, // Додаємо тонку рамку
+    borderColor: '#EF9A9A', // Колір рамки
   },
   errorText: {
-    fontSize: 17,
-    color: "#D32F2F", // Darker error text
+    fontSize: 19, // Трохи більший шрифт
+    color: "#D32F2F",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 30, // Більший відступ
     fontFamily: "Mont-SemiBold",
+    lineHeight: 28, // Покращений міжрядковий інтервал
   },
   retryButton: {
-    backgroundColor: "#0EB3EB",
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 30, // More rounded
-    marginTop: 10,
+    borderRadius: 30,
+    marginTop: 20,
+    overflow: 'hidden', // Для градієнта
     shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  retryButtonGradient: { // Додано для градієнта
+    paddingVertical: 16,
+    paddingHorizontal: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   retryButtonText: {
     color: "#FFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
@@ -999,112 +1090,133 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
-    backgroundColor: "#E0F7FA", // Light blue background
-    borderRadius: 15,
-    margin: 20,
+    padding: 25,
+    backgroundColor: "#E0F7FA",
+    borderRadius: 20,
+    margin: 25,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 7,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#B2EBF2',
   },
   noDoctorText: {
-    fontSize: 18,
+    fontSize: 20, // Більший шрифт
     textAlign: "center",
     color: "#000000",
-    marginTop: 20,
+    marginTop: 25, // Більший відступ
     fontFamily: "Mont-SemiBold",
+    lineHeight: 28,
   },
   backToHomeButton: {
-    backgroundColor: "#607D8B", // Slightly darker, more neutral color
-    paddingVertical: 12,
-    paddingHorizontal: 25,
     borderRadius: 30,
-    marginTop: 15,
+    marginTop: 20,
+    overflow: 'hidden',
     shadowColor: "#607D8B",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 7,
+    elevation: 7,
+  },
+  backToHomeButtonGradient: { // Додано для градієнта
+    paddingVertical: 16,
+    paddingHorizontal: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backToHomeButtonText: {
     color: "#FFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
-  header: {
+header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "transparent", // Прозорий фон
-    paddingBottom: 15,
+    justifyContent: "space-between", // Keeps elements on the ends (like buttons)
+    paddingBottom: 10,
     paddingHorizontal: 20,
-    // Прибрані borderBottomLeftRadius, borderBottomRightRadius, shadow, elevation
-    // якщо хедер прозорий, ці властивості краще застосовувати до елементів всередині
+    position: "relative",
+    zIndex: 1,
+    height: 70,
+    backgroundColor: "transparent",
+    paddingBottom: 20,
   },
   languageSelectButton: {
-    backgroundColor: "#0EB3EB", // Повернуто синій колір
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 25, // Більш заокруглені кути
+    paddingVertical: 8, // Перенесено в градієнт
+    paddingHorizontal: 16, // Більший горизонтальний відступ
+    backgroundColor: "#0EB3EB", // Колір фону кнопки
     flexDirection: "row",
+        zIndex: 1,
+
     alignItems: "center",
-    shadowColor: "#0EB3EB", // Тінь під колір кнопки
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    overflow: 'hidden', // Для градієнта
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 5,
   },
+ 
   languageButtonContent: {
     flexDirection: "row",
     alignItems: "center",
   },
   languageButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Mont-Bold",
-    color: "white", // Білий текст
-    marginRight: 5,
+    color: "white",
+    marginRight: 8, // Більший відступ
   },
-  headerTitle: {
+   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#212121", // Темний текст для прозорого фону
-    flex: 1, // Важливо для центрування
-    textAlign: "center", // Важливо для центрування
-    marginHorizontal: 10,
+    color: "#212121",
+    textAlign: "center", // This centers the text content horizontally within its own bounds
     fontFamily: "Mont-Bold",
+    alignItems: "center",
+    justifyContent: "center", // This centers the text content horizontally within its own bounds
+    position: "absolute",
+    left: 0,
+    top: 0,
+    paddingVertical: 10, // Adds some vertical padding
+    right: 0,
+    bottom: 0,
+
   },
   notificationButton: {
-    width: width * 0.12,
-    height: width * 0.12,
-    backgroundColor: "#0EB3EB", // Повернуто синій колір
-    borderRadius: width * 0.06,
+    width: width * 0.13, // Трохи більший розмір
+    height: width * 0.13,
+    borderRadius: width * 0.065,
+    backgroundColor: "#0EB3EB", // Колір фону кнопки
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#0EB3EB", // Тінь під колір кнопки
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    overflow: 'hidden', // Для градієнта
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 5,
   },
   notificationBadge: {
     position: "absolute",
-    top: 5,
-    right: 5,
-    backgroundColor: "#E04D53",
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    top: 3, // Трохи зміщено
+    right: 3, // Трохи зміщено
+    backgroundColor: "#FF5252", // Яскравіший червоний
+    borderRadius: 12, // Більш заокруглений
+    width: 24, // Більший розмір
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
     borderColor: "white",
-    borderWidth: 1,
+    borderWidth: 2, // Товстіша рамка
   },
   notificationNumber: {
     color: "white",
-    fontSize: 12,
+    fontSize: 13, // Трохи більший шрифт
     fontFamily: "Mont-Bold",
   },
   scrollView: {
@@ -1112,37 +1224,37 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     paddingHorizontal: 15,
-    paddingVertical: 20,
-    paddingBottom: 50,
+    paddingVertical: 25, // Більший відступ
+    paddingBottom: 70, // Більший відступ знизу
   },
   doctorMainInfo: {
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 25, // Більший відступ
     backgroundColor: "white",
-    borderRadius: 15,
-    padding: 20,
+    borderRadius: 20, // Більше заокруглення
+    padding: 25, // Більший відступ
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 130, // Більший аватар
+    height: 130,
+    borderRadius: 70,
     overflow: "hidden",
-    marginBottom: 15,
+    marginBottom: 20, // Більший відступ
     backgroundColor: "#E3F2FD",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#0EB3EB",
+    borderWidth: 1, // Товстіша рамка
+    borderColor: "#0EB3EB", // Яскравіший синій
     shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 }, // Більш виражена тінь
+    shadowOpacity: 0.5, // Більша прозорість тіні
+    shadowRadius: 10, // Більший радіус розмиття
+    elevation: 10,
   },
   avatar: {
     width: "100%",
@@ -1154,13 +1266,13 @@ const styles = StyleSheet.create({
   },
   doctorDetails: {
     width: "100%",
-    paddingHorizontal: 5,
+    paddingHorizontal: 10, // Більший відступ
   },
   doctorName: {
-    fontSize: 26,
+    fontSize: 20, // Більший шрифт
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 25, // Більший відступ
     color: "#212121",
     fontFamily: "Mont-Bold",
   },
@@ -1168,20 +1280,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    marginBottom: 12, // Більший відступ
+    paddingVertical: 15, // Більший вертикальний відступ
+    paddingHorizontal: 20, // Більший горизонтальний відступ
+    borderRadius: 15, // Більше заокруглення
+    backgroundColor: "white", // Білий фон
+    borderWidth: 0, // Прибираємо рамку
+    shadowColor: "#000", // Додаємо тінь
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   label: {
-    fontSize: 16,
+    fontSize: 16, // Трохи більший шрифт
     color: "#555",
     fontFamily: "Mont-SemiBold",
     flexShrink: 0,
-    marginRight: 10,
+    marginRight: 15, // Більший відступ
   },
   valueBox: {
     flexShrink: 1,
@@ -1190,7 +1306,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   valueText: {
-    fontSize: 16,
+    fontSize: 16, // Трохи більший шрифт
     color: "#333",
     textAlign: "right",
     fontFamily: "Mont-Regular",
@@ -1207,86 +1323,95 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   flagText: {
-    fontSize: 20,
-    marginLeft: 5,
+    fontSize: 22, // Більший розмір прапора
+    marginLeft: 8, // Більший відступ
   },
   actionButton: {
-    backgroundColor: "#0EB3EB",
-    paddingVertical: 18,
-    borderRadius: 15,
-    alignItems: "center",
-    marginBottom: 15,
-    marginHorizontal: 15,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 16, // Більший вертикальний відступ
+    paddingHorizontal: 30, // Більший горизонтальний відступ
+    height: 60, // Більша висота кнопки
+    borderRadius: 18, // Заокругленіші кути
+    marginBottom: 18, // Більший відступ
+    marginHorizontal: 20, // Більший горизонтальний відступ
+    backgroundColor: "#0EB3EB", // Колір фону кнопки
+    overflow: 'hidden', // Для градієнта
     shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   actionButtonText: {
     color: "white",
-    fontSize: 18,
+    fontSize: 16, // Більший шрифт
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
-    marginLeft: 10,
+    marginLeft: 10, // Більший відступ між іконкою та текстом
+    textAlign: "center", // Центруємо текст
+    flex: 1, // Дозволяємо тексту займати весь прості
   },
   buttonIcon: {
-    // Вже задано розмір та колір в JSX, тут можна додати інші стилі, якщо потрібно
+    // Стилі для іконки, якщо потрібно, але колір і розмір зазвичай передаються в JSX
   },
   sectionTitleLink: {
-    fontSize: 20,
+    fontSize: 20, // Більший шрифт
     fontWeight: "bold",
     color: "#0EB3EB",
     textAlign: "center",
-    marginTop: 25,
-    marginBottom: 18,
+    marginTop: 30, // Більший відступ
+    marginBottom: 20, // Більший відступ
     fontFamily: "Mont-Bold",
     textDecorationLine: "none",
   },
   sectionContainer: {
     backgroundColor: "white",
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderRadius: 20, // Більше заокруглення
+    padding: 25, // Більший відступ
+    marginBottom: 20, // Більший відступ
+    borderWidth: 0, // Прибираємо рамку
     marginHorizontal: 15,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   sectionHeader: {
-    fontSize: 20,
+    fontSize: 18, // Більший шрифт
     fontWeight: "bold",
-    marginBottom: 10,
+    marginBottom: 12, // Більший відступ
     color: "#333",
     fontFamily: "Mont-SemiBold",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEEEEE",
-    paddingBottom: 8,
+    borderBottomWidth: 0, // Прибираємо рамку
+    paddingBottom: 0,
+    textAlign: 'center', // Центруємо заголовок секції
   },
   sectionContent: {
-    fontSize: 16,
+    fontSize: 16, // Трохи більший шрифт
     color: "#555",
-    lineHeight: 24,
+    lineHeight: 26, // Покращений міжрядковий інтервал
     fontFamily: "Mont-Regular",
-    marginTop: 5,
+    marginTop: 10, // Більший відступ
   },
   imageWrapper: {
     width: "100%",
-    height: 220,
+    height: 250, // Більша висота
     backgroundColor: "#F0F8FF",
-    borderRadius: 10,
+    borderRadius: 15, // Більше заокруглення
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#B3E0F2",
-    marginTop: 10,
+    marginTop: 15, // Більший відступ
+    shadowColor: "#000", // Додаємо тінь
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   documentImage: {
     width: "100%",
@@ -1297,82 +1422,69 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   noImageText: {
-    fontSize: 15,
+    fontSize: 16, // Трохи більший шрифт
     color: "#999",
     textAlign: "center",
     fontStyle: "italic",
     fontFamily: "Mont-Regular",
-    paddingVertical: 20,
+    paddingVertical: 25, // Більший відступ
   },
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
+    backgroundColor: "rgba(14, 179, 235, 0.2)", // Більш прозорий фон модального вікна
   },
   languageModalContent: {
     backgroundColor: "white",
-    borderRadius: 20,
-    padding: 30,
+    borderRadius: 25, // Більше заокруглення
+    padding: 35, // Більший відступ
     alignItems: "center",
     shadowColor: "#000",
-     borderColor: "#0EB3EB", // Колір рамки
-    borderWidth: 1, // Товщина рамки
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 10,
-    width: "85%",
-    maxHeight: "70%",
+    borderColor: "#0EB3EB",
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 12,
+    width: "90%", // Трохи ширше
+    maxHeight: "75%", // Трохи вище
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 24, // Більший шрифт
     fontWeight: "bold",
-    marginBottom: 25,
+    marginBottom: 30, // Більший відступ
     color: "#333",
     fontFamily: "Mont-Bold",
   },
   modalScrollView: {
-    maxHeight: 250,
+    maxHeight: 300, // Більша висота
     width: "100%",
   },
   languageOption: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
+    paddingVertical: 18, // Більший відступ
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(14, 179, 235, 0.1)",
+    borderBottomColor: "rgba(14, 179, 235, 0.15)", // Темніша лінія
     width: "100%",
-    justifyContent: "center",
+    justifyContent: "flex-start", // Вирівнюємо ліворуч
+    paddingLeft: 10, // Відступ зліва
   },
   languageOptionText: {
-    fontSize: 18,
+    fontSize: 18, // Більший шрифт
     color: "#444",
     fontFamily: "Mont-Regular",
-    marginLeft: 10,
+    marginLeft: 15, // Більший відступ
   },
-  button: {
-    borderRadius: 30,
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    elevation: 2,
-    marginTop: 25,
-    width: "70%",
-  },
-  buttonClose: {
-    backgroundColor: "#0EB3EB",
-    shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6,
-  },
+
   textStyle: {
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
-    fontSize: 16,
+    fontSize: 16, // Трохи більший шрифт
     fontFamily: "Mont-Bold",
   },
 });
+
 export default Profile_doctor;

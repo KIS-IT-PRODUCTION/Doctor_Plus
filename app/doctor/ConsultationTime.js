@@ -8,11 +8,13 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Platform, // <-- Додаємо Platform для умовних стилів
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../providers/supabaseClient';
+import { LinearGradient } from 'expo-linear-gradient'; // Import LinearGradient
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
@@ -24,7 +26,7 @@ const ConsultationTime = ({ route }) => {
   console.log("Current doctorId (on load):", doctorId);
 
   const [doctorAvailableSlots, setDoctorAvailableSlots] = useState({});
-  const [scheduleData, setScheduleData] = useState([]); // Початковий стан - порожній масив
+  const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -57,14 +59,14 @@ const ConsultationTime = ({ route }) => {
       });
     }
     console.log("Schedule generated:", days);
-    return days; // Завжди повертає масив
+    return days;
   }, []);
 
   const fetchDoctorSchedule = useCallback(async () => {
     if (!doctorId) {
       console.warn("No doctorId provided to fetch schedule. Cannot fetch.");
       setLoading(false);
-      setScheduleData(generateSchedule()); // Забезпечуємо ініціалізацію scheduleData
+      setScheduleData(generateSchedule());
       return;
     }
     setLoading(true);
@@ -79,12 +81,11 @@ const ConsultationTime = ({ route }) => {
       if (error) {
         console.error("Error fetching doctor schedule:", error.message);
         Alert.alert(t('error'), t('failed_to_load_schedule'));
-        setScheduleData(generateSchedule()); // Забезпечуємо ініціалізацію scheduleData
+        setScheduleData(generateSchedule());
         return;
       }
 
       const fetchedSlots = {};
-      // *** Важлива зміна: Перевірка, чи data є масивом ***
       if (Array.isArray(data)) {
         data.forEach(item => {
           const formattedTimeSlot = item.time_slot.substring(0, 5);
@@ -95,14 +96,14 @@ const ConsultationTime = ({ route }) => {
         console.warn("Supabase returned non-array data, or data is null/undefined:", data);
       }
 
-      console.log("Fetched slots from DB (fetchedSlots object):", fetchedSlots); 
+      console.log("Fetched slots from DB (fetchedSlots object):", fetchedSlots);
       setDoctorAvailableSlots(fetchedSlots);
       setScheduleData(generateSchedule());
       console.log("Doctor schedule fetched and states updated.");
     } catch (err) {
       console.error("Catch error fetching doctor schedule:", err.message);
       Alert.alert(t('error'), t('failed_to_load_schedule'));
-      setScheduleData(generateSchedule()); // Забезпечуємо ініціалізацію scheduleData
+      setScheduleData(generateSchedule());
     } finally {
       setLoading(false);
     }
@@ -136,11 +137,9 @@ const ConsultationTime = ({ route }) => {
     console.log("Attempting to save doctor availability...");
     try {
       const slotsToSave = [];
-      // Додамо перевірку Array.isArray для scheduleData
-      if (Array.isArray(scheduleData)) { 
+      if (Array.isArray(scheduleData)) {
         scheduleData.forEach(dayData => {
-          // Додамо перевірку Array.isArray для dayData.slots
-          if (Array.isArray(dayData.slots)) { 
+          if (Array.isArray(dayData.slots)) {
             dayData.slots.forEach(slot => {
               if (doctorAvailableSlots[slot.id]) {
                 slotsToSave.push({
@@ -218,45 +217,66 @@ const ConsultationTime = ({ route }) => {
           onPress={saveDoctorAvailability}
           disabled={saving}
         >
-          {saving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveButtonText}>{t('save_schedule')}</Text>
-          )}
+          <LinearGradient
+            colors={['#0EB3EB', '#0A8BA6']} // Gradient colors for save button
+            style={styles.saveButtonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>{t('save_schedule')}</Text>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
-        {/* *** Ключова зміна: Перевірка Array.isArray перед .map *** */}
         {Array.isArray(scheduleData) && scheduleData.map((dayData, dayIndex) => (
-          <View key={dayIndex} style={styles.dayContainer}>
-            <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
-            <View style={styles.slotsContainer}>
-              {/* *** Ключова зміна: Перевірка Array.isArray перед .map *** */}
-              {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
-                const isSlotSelected = doctorAvailableSlots[slot.id];
-                console.log(`Slot ID: ${slot.id}, isSlotSelected: ${isSlotSelected}`);
-                return (
-                  <TouchableOpacity
-                    key={slot.id}
-                    style={[
-                      styles.timeSlotButton,
-                      isSlotSelected && styles.timeSlotButtonSelected,
-                      !isSlotSelected && styles.timeSlotButtonUnavailable,
-                    ]}
-                    onPress={() => handleSlotPress(slot)}
-                  >
-                    <Text style={[
-                      styles.timeSlotText,
-                      isSlotSelected && styles.timeSlotTextSelected,
-                      !isSlotSelected && styles.timeSlotTextUnavailable,
-                    ]}>
-                      {slot.time}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          // Змінюємо dayContainer на View та додаємо LinearGradient всередині для "скляного" ефекту
+          <View key={dayIndex} style={styles.dayCardOuter}>
+            <LinearGradient
+              // Ці кольори створюють ефект напівпрозорого скла
+              colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)']}
+              style={styles.dayContainerInner}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
+              <View style={styles.slotsContainer}>
+                {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
+                  const isSlotSelected = doctorAvailableSlots[slot.id];
+                  console.log(`Slot ID: ${slot.id}, isSlotSelected: ${isSlotSelected}`);
+                  return (
+                    <TouchableOpacity
+                      key={slot.id}
+                      onPress={() => handleSlotPress(slot)}
+                      style={styles.timeSlotWrapper} // Wrapper for gradient
+                    >
+                      {isSlotSelected ? (
+                        <LinearGradient
+                          colors={['#0EB3EB', '#0A8BA6']} // Gradient for selected slot
+                          style={styles.timeSlotButtonSelected}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                        >
+                          <Text style={styles.timeSlotTextSelected}>
+                            {slot.time}
+                          </Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.timeSlotButtonUnavailable}>
+                          <Text style={styles.timeSlotTextUnavailable}>
+                            {slot.time}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </LinearGradient>
           </View>
         ))}
       </ScrollView>
@@ -267,125 +287,160 @@ const ConsultationTime = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#F5F7FA', // Lighter background for overall screen
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#F5F7FA',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#333',
+    color: '#555',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     paddingTop: 50,
-    paddingVertical: 10,
+    paddingVertical: 15,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomWidth: 0, // Remove border for cleaner look
+    shadowColor: '#000', // Add shadow to header
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   backButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
+    backgroundColor: 'rgba(14, 179, 235, 0.1)', // Lighter, more subtle background
     borderRadius: 25,
     width: 48,
     height: 48,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#333333',
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
-    // fontFamily: 'Mont-Bold',
   },
   saveButton: {
-    backgroundColor: '#0EB3EB',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    borderRadius: 12, // More rounded corners
+    overflow: 'hidden', // Crucial for gradient to respect border-radius
+    shadowColor: '#0EB3EB', // Shadow matching gradient color
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  saveButtonGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    // fontFamily: 'Mont-Medium',
+    fontSize: 15,
   },
   scrollViewContent: {
     paddingHorizontal: 15,
-    paddingBottom: 20,
+    paddingBottom: 30,
   },
-  dayContainer: {
+  // Новий зовнішній контейнер для тіні та ефекту скла
+  dayCardOuter: {
     marginTop: 20,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 15,
-    padding: 15,
+    borderRadius: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    overflow: 'hidden', // Важливо для обрізки вмісту по borderRadius
+    // backdropFilter та border (для ефекту скла) переміщуємо на inner
+  },
+  // Внутрішній LinearGradient для "скляного" ефекту
+  dayContainerInner: {
+    borderRadius: 18,
+    padding: 20,
+    // Додаємо тонку прозору рамку для візуального відділення "скла"
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    // backdropFilter: 'blur(10px)', // Це тільки для Web. Для нативних:
+    ...Platform.select({
+      ios: {
+        // На iOS backdropFilter працює
+        // Requires importing 'react-native-blur' or 'expo-blur' for a true blur effect
+        // For simplicity, we're just using translucent background here
+        // If you want a real blur, you'd integrate `BlurView` from `expo-blur`
+        // and wrap the content of dayContainerInner with it.
+      },
+      android: {
+        // Android не підтримує backdropFilter нативно.
+        // Ефект імітується напівпрозорим градієнтом та тінями.
+      },
+    }),
   },
   dayHeader: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#CFD8DC',
-    paddingBottom: 5,
-    // fontFamily: 'Mont-Bold',
+    color: '#222',
+    marginBottom: 15,
+    textAlign: 'center', // Center the day header
   },
   slotsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around', // Use space-around for better distribution
   },
-  timeSlotButton: {
+  timeSlotWrapper: {
     width: ITEM_WIDTH,
+    marginBottom: 12,
     borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    overflow: 'hidden', // Crucial for gradient on selected slots
+    shadowColor: '#000', // General shadow for all slots
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   timeSlotButtonUnavailable: {
-    backgroundColor: '#E0E0E0',
-    borderColor: '#BDBDBD',
+    backgroundColor: 'rgba(240, 240, 240, 0.7)', // Lighter, slightly transparent background for unavailable slots
+    borderColor: 'rgba(224, 224, 224, 0.7)',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
   },
   timeSlotButtonSelected: {
-    backgroundColor: '#0EB3EB',
-    borderColor: '#0A8BA6',
-    shadowColor: '#0EB3EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    // Shadow is applied to the wrapper to make it consistent
   },
   timeSlotText: {
     fontSize: 14,
     fontWeight: '600',
-    // fontFamily: 'Mont-Medium',
   },
   timeSlotTextUnavailable: {
-    color: '#757575',
+    color: '#888888', // Softer color for unavailable text
   },
   timeSlotTextSelected: {
     color: '#FFFFFF',
+    fontWeight: 'bold', // Make selected text bolder
   },
 });
 

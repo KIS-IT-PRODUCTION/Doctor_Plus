@@ -1,6 +1,6 @@
 // app/doctor/ResetPasswordScreen.js
 
-import React, { useState, useEffect, useCallback } from "react"; // Додаємо useCallback
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -23,7 +23,7 @@ const ResetPasswordScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { email: initialEmail } = route.params || {};
-  const { signIn } = useAuth(); // Зміни не потрібні, використовуємо його як є
+  const { signIn } = useAuth();
 
   const { t } = useTranslation();
 
@@ -38,22 +38,21 @@ const ResetPasswordScreen = () => {
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
-  // Ця функція тепер буде просто очищати форму, але навігацію ми будемо робити явно.
-  const clearForm = () => {
+  const clearForm = useCallback(() => { // Використовуємо useCallback для clearForm
     setOtpSent(false);
     setOtp("");
     setNewPassword("");
     setConfirmNewPassword("");
-    setEmail("");
+    setEmail(initialEmail || ""); // Зберігаємо початковий email, якщо він є
     setResetError("");
-  };
+  }, [initialEmail]);
 
   const handleSendPasswordResetOtp = useCallback(async (emailToSend) => {
     setResetError("");
     if (!emailToSend.trim()) {
-      await Alert.alert(t("forgot_password_title"), t("forgot_password_enter_email"));
+      Alert.alert(t("forgot_password_title"), t("forgot_password_enter_email"));
       console.log("ResetPasswordScreen (handleSendPasswordResetOtp): Email is empty. Aborting OTP send.");
-      setIsProcessingReset(false);
+      setIsProcessingReset(false); // Завжди встановлюємо false, якщо не відправляємо
       return;
     }
 
@@ -71,14 +70,11 @@ const ResetPasswordScreen = () => {
 
       if (error) {
         console.error("ResetPasswordScreen (handleSendPasswordResetOtp): Supabase OTP send error:", error.message, "Error code:", error.code);
-        if (error.details) console.error("Error details:", error.details);
-        if (error.hint) console.error("Error hint:", error.hint);
-        
-        await Alert.alert(t("error_title"), t("forgot_password_send_otp_error", { error: error.message }));
+        Alert.alert(t("error_title"), t("forgot_password_send_otp_error", { error: error.message }));
         setOtpSent(false);
       } else {
         console.log("ResetPasswordScreen (handleSendPasswordResetOtp): Supabase OTP send successful. Data:", data);
-        await Alert.alert(
+        Alert.alert(
           t("forgot_password_title"),
           t("forgot_password_check_email_for_otp", { email: emailToSend })
         );
@@ -87,7 +83,7 @@ const ResetPasswordScreen = () => {
       }
     } catch (err) {
       console.error("ResetPasswordScreen (handleSendPasswordResetOtp): Unexpected error during OTP send:", err.message);
-      await Alert.alert(t("error_title"), t("error_general_send_otp"));
+      Alert.alert(t("error_title"), t("error_general_send_otp"));
       setOtpSent(false);
     } finally {
       setIsProcessingReset(false);
@@ -101,7 +97,7 @@ const ResetPasswordScreen = () => {
       console.log("ResetPasswordScreen: initialEmail present, OTP not yet sent. Auto-sending OTP.");
       setEmail(initialEmail);
       handleSendPasswordResetOtp(initialEmail);
-    } else if (!initialEmail) {
+    } else if (!initialEmail && !isProcessingReset) { // Додано !isProcessingReset, щоб не конфліктувати з поточною операцією
       Alert.alert(t("error_title"), t("reset_password_no_email_provided"), [
         { text: t("ok_button"), onPress: () => navigation.goBack() }
       ]);
@@ -162,45 +158,28 @@ const ResetPasswordScreen = () => {
       } else {
         console.log("ResetPasswordScreen (handleVerifyOtpAndSetNewPassword): Password updated successfully. Attempting auto-sign-in...");
 
-        const { success: signInSuccess, error: signInError } = await signIn(email, newPassword);
+        // Тут ми покладаємося на AuthProvider, який слухає зміни стану авторизації.
+        // Замість прямого signIn тут, ми даємо supabase.auth.updateUser завершити
+        // і дозволяємо onAuthStateChange в AuthProvider виявити, що користувач тепер
+        // авторизований, і перенаправити його.
 
-        if (signInError) {
-          console.error("ResetPasswordScreen (handleVerifyOtpAndSetNewPassword): Auto-sign-in error:", signInError.message);
-          Alert.alert(t("success_title"), t("error_auto_login_failed", { error: signInError.message }), [
-            {
-              text: t("ok_button"),
-              onPress: () => {
-                setTimeout(() => {
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Auth' }], // Навігація до "Auth" екрану, який обробляє логіку перенаправлення
-                  });
-                  clearForm(); // Очищаємо форму після навігації
-                }, 100);
-              },
+        Alert.alert(t("success_title"), t("success_password_updated_and_logged_in"), [
+          {
+            text: t("ok_button"),
+            onPress: () => {
+              // Просто переходимо на екран Auth, який має логіку перенаправлення
+              // на Profile_doctor.js, якщо користувач авторизований.
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Auth' }],
+              });
+              // Очищення форми після успішної навігації
+              clearForm(); 
             },
-          ]);
-        } else if (signInSuccess) {
-          console.log("ResetPasswordScreen (handleVerifyOtpAndSetNewPassword): User successfully signed in after password reset. Navigating to Home Screen.");
-          Alert.alert(t("success_title"), t("success_password_updated_and_logged_in"), [
-            {
-              text: t("ok_button"),
-              onPress: () => {
-                setTimeout(() => {
-                  // Використовуємо navigation.reset, щоб повністю очистити стек
-                  // і перейти на головний екран.
-                  // Припускаючи, що "Home" - це назва вашого головного екрану
-                  // Або ж "Auth" - це початковий екран Auth Navigator, який потім перенаправить на Home/Profile
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Auth' }], // 'Auth' або 'MainTabs' чи 'Home' залежить від вашої структури
-                  });
-                  clearForm(); // Очищаємо форму після навігації
-                }, 100);
-              },
-            },
-          ]);
-        }
+          },
+        ]);
+        // Важливо: після Alert і навігації, не робіть тут signIn
+        // бо це може викликати гонку станів.
       }
     } catch (err) {
       console.error("ResetPasswordScreen (handleVerifyOtpAndSetNewPassword): Unexpected error during OTP verification or password update:", err.message);

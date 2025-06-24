@@ -68,8 +68,8 @@
   "error_general_forgot_password": "An unexpected error occurred during password reset.",
   "doctor_profile_title": "Settings",
   "profile": "Profile",
-  "profile_doctor": "Doctor Profile",
-  "profile_doctor_settings": "Doctor Profile Settings",
+  "profile_doctor": "Profile",
+  "profile_doctor_settings": " Profile Settings",
   "select_country": "Select Country of Residence",
   "select_country_modal_title": "Select a Country",
   "select_specialization": "Select Specialization",
@@ -188,7 +188,7 @@
   },
 
   "messages_screen": {
-    "header_title": "Messages (Doctor)",
+    "header_title": "Messages",
     "today": "Today",
     "yesterday": "Yesterday",
     "consultation_confirmation_title": "Consultation Confirmation",
@@ -523,7 +523,7 @@
   "info": "Info",
   "loading_schedule": "Loading schedule...",
   "failed_to_load_schedule": "Failed to load schedule.",
-  "set_my_availability": "Set My Availability",
+  "set_my_availability": "Availability",
   "save_schedule": "Save Schedule",
   "schedule_saved_successfully": "Schedule saved successfully!",
   "failed_to_save_schedule": "Failed to save schedule.",

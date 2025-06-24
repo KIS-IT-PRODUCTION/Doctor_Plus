@@ -8,8 +8,8 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
-  Dimensions, // <-- Додано Dimensions
-  Platform, // <-- Додано Platform
+  Dimensions,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../../assets/icon.svg";
@@ -17,27 +17,15 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../../providers/supabaseClient';
-import Constants from 'expo-constants'; // <-- Додано Constants
+import Constants from 'expo-constants';
+import { LinearGradient } from 'expo-linear-gradient';
 
-// Отримання розмірів екрану
 const { width, height } = Dimensions.get("window");
 
-// Функції для масштабування розмірів (як у вас вже є)
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) =>
   size + (scale(size) - size) * factor;
-
-// ... (весь ваш існуючий код компонента Message та інших функцій без змін) ...
-// На цьому етапі я не буду повторювати весь код компонента Message,
-// оскільки зміни стосуються лише стилів.
-// Переконайтеся, що ви замінили лише секцію `styles`.
-
-// === Компоненти та дані ===
-// ... (Ваш існуючий код getParsedArray, specializationsList, consultationLanguagesList,
-//      LanguageFlags, InfoBox, DoctorCard - вони не потрібні тут, бо це Message.js)
-
-// Починаємо з компонента Message (від його `export default function Message() { ... }` до кінця файлу)
 
 export default function Message() {
   const navigation = useNavigation();
@@ -304,7 +292,7 @@ export default function Message() {
       if (!bookingDate || !bookingTimeSlot) {
           console.error("Missing booking date or time slot in rawData:", {
               booking_date: bookingDate ? bookingDate : "missing",
-              booking_time_slot: bookingTimeSlot ? bookingTimeSlot : "missing",
+              booking_time_slot: bookingTimeSlot ? booking_time_slot : "missing",
           });
           Alert.alert(t('error'), t('invalid_booking_data_for_update_date_time'));
           return;
@@ -323,6 +311,33 @@ export default function Message() {
           }
 
           console.log(`Бронювання ${bookingId} успішно оновлено до ${newStatus}`);
+
+        // --- НОВА ЛОГІКА: Зняття балів з лікаря при відхиленні консультації ---
+          if (newStatus === 'rejected') {
+              console.log(`Знімаємо 50 балів з лікаря ${currentDoctorUserId} через відхилення бронювання.`);
+              const { data: doctorProfile, error: fetchProfileError } = await supabase
+                  .from('profile_doctor') // Використовуємо таблицю 'profile_doctor'
+                  .select('doctor_points') // Вибираємо колонку 'doctor_points'
+                  .eq('user_id', currentDoctorUserId) // Фільтруємо за user_id поточного лікаря
+                  .single();
+
+              if (fetchProfileError) {
+                  console.error("Помилка при отриманні балів лікаря:", fetchProfileError.message);
+              } else if (doctorProfile) {
+                  const newPoints = Math.max(0, (doctorProfile.doctor_points || 0) - 50); // Використовуємо doctor_points
+                  const { error: updatePointsError } = await supabase
+                      .from('profile_doctor') // Оновлюємо таблицю 'profile_doctor'
+                      .update({ doctor_points: newPoints }) // Оновлюємо колонку 'doctor_points'
+                      .eq('user_id', currentDoctorUserId);
+
+                  if (updatePointsError) {
+                      console.error("Помилка при оновленні балів лікаря:", updatePointsError.message);
+                  } else {
+                      console.log(`Бали лікаря ${currentDoctorUserId} оновлено до ${newPoints}`);
+                  }
+              }
+          }
+          // --- КІНЕЦЬ НОВОЇ ЛОГІКИ ---
 
          const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
 
@@ -431,13 +446,13 @@ export default function Message() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={moderateScale(24)} color="#000" /> 
+          <Ionicons name="arrow-back" size={moderateScale(24)} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {t("messages_screen.header_title")}
         </Text>
         <View>
-          <Icon width={moderateScale(50)} height={moderateScale(50)} /> 
+          <Icon width={moderateScale(50)} height={moderateScale(50)} />
         </View>
       </View>
 
@@ -451,13 +466,8 @@ export default function Message() {
           messages.map((message) => {
             const isConfirmed = message.rawData.status === 'confirmed';
             const isRejected = message.rawData.status === 'rejected';
-
-            const messageCardStyle = [
-              styles.messageCard,
-              (message.is_read && message.type !== 'new_booking') && styles.messageCardRead,
-              isConfirmed && styles.messageCardConfirmed,
-              isRejected && styles.messageCardRejected,
-            ];
+            const isNewBooking = message.type === 'new_booking';
+            const isPendingBooking = isNewBooking && message.rawData.status === 'pending';
 
             return (
               <View key={message.id} style={styles.messageGroup}>
@@ -465,24 +475,58 @@ export default function Message() {
                   <Text style={styles.dateText}>{message.date}</Text>
                   <Text style={styles.timestampText}>{message.time}</Text>
                 </View>
-                <View style={messageCardStyle}>
+                <LinearGradient
+                  colors={
+                    isPendingBooking
+                      ? ['#FFFFFF', '#F0F8FF']
+                      : isConfirmed
+                      ? ['#E6FFE6', '#D4FAD4']
+                      : isRejected
+                      ? ['#FFEEEE', '#FAD4D4']
+                      : message.is_read
+                      ? ['#F8F8F8', '#ECECEC']
+                      : ['#FFFFFF', '#FDFDFD']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[
+                    styles.messageCard,
+                    isConfirmed && styles.messageCardConfirmedBorder,
+                    isRejected && styles.messageCardRejectedBorder,
+                    !message.is_read && styles.messageCardUnread,
+                  ]}
+                >
                   <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                   <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
 
-                  {message.type === 'new_booking' ? (
-                      message.rawData.status === 'pending' ? (
+                  {isNewBooking ? (
+                      isPendingBooking ? (
                           <View style={styles.bookingActionButtons}>
                               <TouchableOpacity
-                                  style={styles.confirmBookingButton}
                                   onPress={() => handleConfirmBooking(message)}
+                                  style={styles.actionButtonContainer}
                               >
-                                  <Text style={styles.confirmBookingButtonText}>{t('confirm_booking')}</Text>
+                                  <LinearGradient
+                                      colors={['#4CAF50', '#2E7D32']}
+                                      style={styles.actionButtonGradient}
+                                      start={{ x: 0, y: 0 }}
+                                      end={{ x: 1, y: 0 }}
+                                  >
+                                      <Text style={styles.actionButtonText}>{t('confirm_booking')}</Text>
+                                  </LinearGradient>
                               </TouchableOpacity>
                               <TouchableOpacity
-                                  style={styles.rejectBookingButton}
                                   onPress={() => handleRejectBooking(message)}
+                                  style={styles.actionButtonContainer}
                               >
-                                  <Text style={styles.rejectBookingButtonText}>{t('reject_booking')}</Text>
+                                  <LinearGradient
+                                      colors={['#D32F2F', '#B71C1C']}
+                                      style={styles.actionButtonGradient}
+                                      start={{ x: 0, y: 0 }}
+                                      end={{ x: 1, y: 0 }}
+                                  >
+                                      <Text style={styles.actionButtonText}>{t('reject_booking')}</Text>
+                                  </LinearGradient>
                               </TouchableOpacity>
                           </View>
                       ) : (
@@ -496,16 +540,23 @@ export default function Message() {
                   ) : (
                       !message.is_read ? (
                           <TouchableOpacity
-                              style={styles.markAsReadButton}
                               onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
+                              style={styles.actionButtonContainer}
                           >
-                              <Text style={styles.markAsReadButtonText}>{t('mark_as_read')}</Text>
+                              <LinearGradient
+                                  colors={['#0EB3EB', '#0A8BA6']}
+                                  style={styles.actionButtonGradient}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                               >
+                                  <Text style={styles.actionButtonText}>{t('mark_as_read')}</Text>
+                              </LinearGradient>
                           </TouchableOpacity>
                       ) : (
                           <Text style={styles.readStatusText}>{t('read')}</Text>
                       )
                   )}
-                </View>
+                </LinearGradient>
               </View>
             );
           })
@@ -518,199 +569,171 @@ export default function Message() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "white",
-    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : verticalScale(50), // Адаптовано для Android
+    backgroundColor: "#F5F7FA",
+    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : verticalScale(50),
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#F5F7FA',
   },
   loadingText: {
-    marginTop: verticalScale(10), // Адаптовано розмір
-    fontSize: moderateScale(16), // Адаптовано розмір
-    color: '#333',
+    marginTop: verticalScale(10),
+    fontSize: moderateScale(16),
+    color: '#555',
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: scale(15), // Адаптовано розмір
-    paddingVertical: verticalScale(10), // Адаптовано розмір
+    paddingHorizontal: scale(15),
+    paddingVertical: verticalScale(15),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    borderBottomLeftRadius: moderateScale(20),
+    borderBottomRightRadius: moderateScale(20),
   },
   backButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: moderateScale(25), // Адаптовано розмір
-    width: moderateScale(48), // Адаптовано розмір
-    height: moderateScale(48), // Адаптовано розмір
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
+    borderRadius: moderateScale(25),
+    width: moderateScale(48),
+    height: moderateScale(48),
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   headerTitle: {
-    fontSize: moderateScale(18), // Адаптовано розмір
+    fontSize: moderateScale(20),
     fontFamily: "Mont-Bold",
-    color: "#333",
+    color: "#333333",
   },
   messageList: {
-    paddingVertical: verticalScale(20), // Адаптовано розмір
-    paddingHorizontal: scale(15), // Адаптовано розмір
+    paddingVertical: verticalScale(20),
+    paddingHorizontal: scale(15),
     flexGrow: 1,
   },
   messageGroup: {
-    marginBottom: verticalScale(20), // Адаптовано розмір
+    marginBottom: verticalScale(20),
   },
   dateAndTimestamp: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: verticalScale(10), // Адаптовано розмір
-    paddingHorizontal: scale(5), // Адаптовано розмір
+    marginBottom: verticalScale(8),
+    paddingHorizontal: scale(8),
   },
   dateText: {
-    fontSize: moderateScale(14), // Адаптовано розмір
+    fontSize: moderateScale(13),
     fontWeight: "bold",
-    color: "#666",
+    color: "#777",
   },
   timestampText: {
-    fontSize: moderateScale(14), // Адаптовано розмір
-    color: "#666",
+    fontSize: moderateScale(13),
+    color: "#777",
   },
   messageCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: moderateScale(15), // Адаптовано розмір
-    padding: moderateScale(15), // Адаптовано розмір
+    borderRadius: moderateScale(18),
+    padding: moderateScale(18),
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 3,
     },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 6,
+    overflow: 'hidden',
   },
-  messageCardRead: {
-    opacity: 0.7,
-    backgroundColor: '#F5F5F5',
+  messageCardUnread: {
+    borderLeftWidth: 5,
+    borderLeftColor: '#0EB3EB',
+    paddingLeft: moderateScale(13),
   },
-  messageCardConfirmed: {
-    backgroundColor: '#E6FFE6',
+  messageCardConfirmedBorder: {
+    borderWidth: 1,
     borderColor: '#4CAF50',
-    borderWidth: 1,
   },
-  messageCardRejected: {
-    backgroundColor: '#FFEEEE',
-    borderColor: '#D32F2F',
+  messageCardRejectedBorder: {
     borderWidth: 1,
+    borderColor: '#D32F2F',
   },
   cardTitle: {
-    fontSize: moderateScale(16), // Адаптовано розмір
+    fontSize: moderateScale(17),
     fontFamily: "Mont-SemiBold",
-    marginBottom: verticalScale(5), // Адаптовано розмір
+    marginBottom: verticalScale(8),
     color: "#333",
   },
   cardText: {
-    fontSize: moderateScale(14), // Адаптовано розмір
+    fontSize: moderateScale(14.5),
     fontFamily: "Mont-Regular",
     color: "#555",
-    marginBottom: verticalScale(10), // Адаптовано розмір
-  },
-  bookingInfo: {
-    marginTop: verticalScale(5), // Адаптовано розмір
-    marginBottom: verticalScale(10), // Адаптовано розмір
-    paddingVertical: verticalScale(5), // Адаптовано розмір
-    paddingHorizontal: scale(8), // Адаптовано розмір
-    backgroundColor: '#F0F8FF',
-    borderRadius: moderateScale(8), // Адаптовано розмір
-    borderLeftWidth: 3,
-    borderLeftColor: '#0EB3EB',
-  },
-  bookingDetailsText: {
-    fontSize: moderateScale(13), // Адаптовано розмір
-    fontFamily: "Mont-Regular",
-    color: "#444",
-    marginBottom: verticalScale(2), // Адаптовано розмір
+    marginBottom: verticalScale(12),
+    lineHeight: moderateScale(22),
   },
   bookingActionButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
-    marginTop: verticalScale(10), // Адаптовано розмір
-    gap: scale(10), // Адаптовано розмір (якщо підтримується)
-    flexWrap: 'wrap', // <-- ДОДАНО! Дозволяє кнопкам переноситися на наступний рядок
+    justifyContent: 'space-around',
+    marginTop: verticalScale(15),
+    flexWrap: 'wrap',
+    gap: scale(10),
   },
-  confirmBookingButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: verticalScale(10), // Адаптовано розмір
-    paddingHorizontal: scale(15), // Адаптовано розмір
-    borderRadius: moderateScale(25), // Адаптовано розмір
-    shadowColor: '#000',
+  actionButtonContainer: {
+    borderRadius: moderateScale(25),
+    overflow: 'hidden',
+    flex: 1,
+    minWidth: scale(120),
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 4,
   },
-  confirmBookingButtonText: {
+  actionButtonGradient: {
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(15),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
     color: '#FFFFFF',
-    fontSize: moderateScale(14), // Адаптовано розмір
-    fontFamily: "Mont-SemiBold",
-  },
-  rejectBookingButton: {
-    backgroundColor: '#D32F2F',
-    paddingVertical: verticalScale(10), // Адаптовано розмір
-    paddingHorizontal: scale(15), // Адаптовано розмір
-    borderRadius: moderateScale(25), // Адаптовано розмір
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  rejectBookingButtonText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(14), // Адаптовано розмір
-    fontFamily: "Mont-SemiBold",
-  },
-  markAsReadButton: {
-    backgroundColor: '#0EB3EB',
-    paddingVertical: verticalScale(8), // Адаптовано розмір
-    paddingHorizontal: scale(15), // Адаптовано розмір
-    borderRadius: moderateScale(20), // Адаптовано розмір
-    alignSelf: 'flex-start',
-    marginTop: verticalScale(10), // Адаптовано розмір
-    opacity: 0.8,
-  },
-  markAsReadButtonText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(13), // Адаптовано розмір
+    fontSize: moderateScale(14.5),
     fontFamily: "Mont-SemiBold",
   },
   statusText: {
-    fontSize: moderateScale(14), // Адаптовано розмір
+    fontSize: moderateScale(14),
     fontFamily: "Mont-SemiBold",
-    marginTop: verticalScale(10), // Адаптовано розмір
+    marginTop: verticalScale(15),
     alignSelf: 'flex-start',
-    paddingVertical: verticalScale(5), // Адаптовано розмір
-    paddingHorizontal: scale(10), // Адаптовано розмір
-    borderRadius: moderateScale(10), // Адаптовано розмір
+    paddingVertical: verticalScale(7),
+    paddingHorizontal: scale(12),
+    borderRadius: moderateScale(12),
     borderWidth: 1,
   },
   confirmedText: {
     color: '#2E7D32',
-    backgroundColor: '#E6FFE6',
-    borderColor: '#2E7D32',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderColor: '#4CAF50',
   },
   rejectedText: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: 'rgba(211, 47, 47, 0.1)',
     color: '#D32F2F',
     borderColor: '#D32F2F',
   },
   readStatusText: {
-    fontSize: moderateScale(14), // Адаптовано розмір
+    fontSize: moderateScale(14),
     fontFamily: "Mont-SemiBold",
-    marginTop: verticalScale(10), // Адаптовано розмір
+    marginTop: verticalScale(15),
     alignSelf: 'flex-start',
-    paddingVertical: verticalScale(5), // Адаптовано розмір
-    paddingHorizontal: scale(10), // Адаптовано розмір
-    borderRadius: moderateScale(10), // Адаптовано розмір
+    paddingVertical: verticalScale(7),
+    paddingHorizontal: scale(12),
+    borderRadius: moderateScale(12),
     backgroundColor: '#E0E0E0',
     color: '#757575',
   },
@@ -718,19 +741,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: verticalScale(50), // Адаптовано розмір
+    marginTop: verticalScale(80),
   },
   emptyMessagesText: {
-    fontSize: moderateScale(18), // Адаптовано розмір
+    fontSize: moderateScale(20),
     fontFamily: "Mont-SemiBold",
-    color: "#666",
-    marginBottom: verticalScale(10), // Адаптовано розмір
+    color: "#555",
+    marginBottom: verticalScale(15),
   },
   emptyMessagesSubText: {
-    fontSize: moderateScale(14), // Адаптовано розмір
+    fontSize: moderateScale(15),
     fontFamily: "Mont-Regular",
-    color: "#888",
+    color: "#777",
     textAlign: 'center',
-    paddingHorizontal: scale(20), // Адаптовано розмір
+    paddingHorizontal: scale(30),
+    lineHeight: moderateScale(24),
   },
 });

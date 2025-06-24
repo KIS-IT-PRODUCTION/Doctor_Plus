@@ -8,15 +8,17 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../providers/supabaseClient';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // --- КОНСТАНТИ ТА НАЛАШТУВАННЯ ---
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = (width - 60) / 3; // Ширина елемента для гнучкого розміщення
+const ITEM_WIDTH = (width - 60) / 3;
 
 // !!! ВАЖЛИВО: Замініть цей URL на URL вашої Supabase Edge Function
 const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor';
@@ -28,19 +30,16 @@ const ConsultationTimePatient = ({ route }) => {
   const doctorId = route.params?.doctorId;
   console.log("Booking screen: doctorId:", doctorId);
 
-  // Стейт для даних, що завантажуються/змінюються
   const [patientId, setPatientId] = useState(null);
   const [patientProfile, setPatientProfile] = useState(null);
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [booking, setBooking] = useState(false); // Індикатор завантаження під час бронювання
+  const [booking, setBooking] = useState(false);
 
-  // Словники для швидкого доступу до статусу слотів
   const [doctorAvailableSlotsMap, setDoctorAvailableSlotsMap] = useState({});
   const [allBookedSlotsMap, setAllBookedSlotsMap] = useState({});
   const [myBookingsMap, setMyBookingsMap] = useState({});
 
-  // ЗМІНА: Тепер це масив для множинного вибору
   const [selectedSlots, setSelectedSlots] = useState([]);
 
   // --- ЕФЕКТ: Отримання ID та профілю поточного пацієнта ---
@@ -208,29 +207,24 @@ const ConsultationTimePatient = ({ route }) => {
 
   // --- ФУНКЦІЯ: Обробка натискання на слот ---
   const handleSlotPress = (slot) => {
-    // 1. Якщо лікар не зробив слот доступним, його не можна обрати
     if (!doctorAvailableSlotsMap[slot.id]) {
       Alert.alert(t('not_available'), t('doctor_not_available_at_this_time'));
       console.log(`Slot ${slot.id} is not available by doctor.`);
       return;
     }
 
-    // 2. Якщо слот вже заброньований кимось іншим (і це не моє бронювання), його не можна обрати
     if (allBookedSlotsMap[slot.id] && !myBookingsMap[slot.id]) {
       Alert.alert(t('booked'), t('slot_already_booked_by_other'));
       console.log(`Slot ${slot.id} is already booked by another patient.`);
       return;
     }
 
-    // 3. Логіка для множинного вибору
     setSelectedSlots(prevSelectedSlots => {
       const isAlreadySelected = prevSelectedSlots.some(s => s.id === slot.id);
 
       if (isAlreadySelected) {
-        // Якщо вже вибрано, знімаємо вибір
         return prevSelectedSlots.filter(s => s.id !== slot.id);
       } else {
-        // Якщо не вибрано, додаємо до списку
         return [...prevSelectedSlots, slot];
       }
     });
@@ -330,7 +324,7 @@ const ConsultationTimePatient = ({ route }) => {
         if (availCheckError || !currentAvail) {
           if (availCheckError?.code === 'PGRST116') {
             errors.push(`${t('failed_to_book')} ${slot.time} ${slot.date}: ${t('slot_no_longer_available_by_doctor')}`);
-            continue; // Переходимо до наступного слота
+            continue;
           }
           throw availCheckError || new Error(t('slot_no_longer_available_by_doctor'));
         }
@@ -351,11 +345,11 @@ const ConsultationTimePatient = ({ route }) => {
         if (currentBookings) {
           if (currentBookings.patient_id !== patientId) {
             errors.push(`${t('failed_to_book')} ${slot.time} ${slot.date}: ${t('slot_just_booked_by_another_patient')}`);
-            continue; // Переходимо до наступного слота
+            continue;
           } else {
             console.log(`Slot ${slot.id} is already booked by current patient. Skipping.`);
-            successfulBookingsCount++; // Вважаємо, що "заброньовано", якщо це моє існуюче бронювання
-            continue; // Переходимо до наступного слота
+            successfulBookingsCount++;
+            continue;
           }
         }
 
@@ -367,7 +361,7 @@ const ConsultationTimePatient = ({ route }) => {
             doctor_id: doctorId,
             booking_date: slot.date,
             booking_time_slot: slot.rawTime,
-            status: 'pending', // Встановлюємо початковий статус
+            status: 'pending',
           })
           .select()
           .single();
@@ -392,7 +386,6 @@ const ConsultationTimePatient = ({ route }) => {
           successfulBookingsCount++;
         } else {
           errors.push(`${t('failed_to_send_notification_for_slot')} ${slot.time} ${slot.date}`);
-          // Не збільшуємо successfulBookingsCount, якщо сповіщення не надіслано
         }
       } catch (err) {
         let errorMessage = 'Failed to book slot.';
@@ -404,7 +397,7 @@ const ConsultationTimePatient = ({ route }) => {
         errors.push(`${t('failed_to_book_slot_error')} ${slot.time} ${slot.date}: ${errorMessage}`);
         console.error(`Error booking slot ${slot.id}:`, errorMessage, err);
       }
-    } // End of for loop
+    }
 
     if (successfulBookingsCount > 0) {
       Alert.alert(
@@ -415,8 +408,8 @@ const ConsultationTimePatient = ({ route }) => {
       Alert.alert(t('error'), t('no_slots_could_be_booked') + (errors.length > 0 ? `\n${errors.join('\n')}` : ''));
     }
 
-    setSelectedSlots([]); // Очищаємо вибір після спроби бронювання
-    fetchAvailableSlotsAndBookings(); // Перезавантажуємо слоти, щоб оновити UI
+    setSelectedSlots([]);
+    fetchAvailableSlotsAndBookings();
 
     setBooking(false);
   };
@@ -450,77 +443,82 @@ const ConsultationTimePatient = ({ route }) => {
 
         <TouchableOpacity
           style={styles.bookButton}
-          onPress={bookSelectedSlots} // Змінено на bookSelectedSlots
-          disabled={booking || selectedSlots.length === 0} // Кнопка неактивна під час бронювання або якщо слоти не обрано
+          onPress={bookSelectedSlots}
+          disabled={booking || selectedSlots.length === 0}
         >
           {booking ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.bookButtonText}>{t('book_now')} ({selectedSlots.length})</Text> // Показуємо кількість обраних слотів
+            <Text style={styles.bookButtonText}>{t('book_now')} ({selectedSlots.length})</Text>
           )}
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
         {Array.isArray(scheduleData) && scheduleData.map((dayData, dayIndex) => (
-          <View key={dayIndex} style={styles.dayContainer}>
-            <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
-            <View style={styles.slotsContainer}>
-              {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
-                const isAvailableByDoctor = doctorAvailableSlotsMap[slot.id];
-                const isBookedByOther = allBookedSlotsMap[slot.id] && !myBookingsMap[slot.id];
-                const isMyBooking = myBookingsMap[slot.id];
-                // ЗМІНА: Перевірка, чи поточний слот обраний в масиві selectedSlots
-                const isSelectedForBooking = selectedSlots.some(s => s.id === slot.id);
+          <View key={dayIndex} style={styles.dayCardOuter}>
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)']}
+              style={styles.dayContainerInner}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
+              <View style={styles.slotsContainer}>
+                {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
+                  const isAvailableByDoctor = doctorAvailableSlotsMap[slot.id];
+                  const isBookedByOther = allBookedSlotsMap[slot.id] && !myBookingsMap[slot.id];
+                  const isMyBooking = myBookingsMap[slot.id];
+                  const isSelectedForBooking = selectedSlots.some(s => s.id === slot.id);
 
-                let buttonStyle = [styles.timeSlotButton];
-                let textStyle = [styles.timeSlotText];
-                let isDisabled = true;
-                let slotLabel = slot.time;
+                  let buttonStyle = [styles.timeSlotButton];
+                  let textStyle = [styles.timeSlotText];
+                  let isDisabled = true;
+                  let slotLabel = slot.time;
 
-                if (isMyBooking) {
-                  buttonStyle.push(styles.timeSlotButtonBookedByMe);
-                  textStyle.push(styles.timeSlotTextBookedByMe);
-                  isDisabled = false; // Можна "переобрати" або зняти вибір з мого вже заброньованого
-                  slotLabel = `${slot.time}\n(${t('booked')})`;
-                } else if (isAvailableByDoctor) {
-                  if (isBookedByOther) {
+                  if (isMyBooking) {
+                    // Синій для моїх бронювань
+                    buttonStyle.push(styles.timeSlotButtonBookedByMe);
+                    textStyle.push(styles.timeSlotTextBooked);
+                    isDisabled = false;
+                    slotLabel = `${slot.time}\n(${t('booked')})`;
+                  } else if (isBookedByOther) {
+                    // Більш світлий, прозорий синій для заброньованих іншими
                     buttonStyle.push(styles.timeSlotButtonBookedByOther);
-                    textStyle.push(styles.timeSlotTextBookedByOther);
-                    isDisabled = true; // Не можна обрати
-                    slotLabel = `${slot.time}\n(${t('booked_by_other')})`; // Змінено текст для чіткості
-                  } else {
+                    textStyle.push(styles.timeSlotTextBooked);
+                    isDisabled = true;
+                    slotLabel = `${slot.time}\n(${t('booked_by_other')})`;
+                  } else if (isAvailableByDoctor) {
                     buttonStyle.push(styles.timeSlotButtonAvailable);
                     textStyle.push(styles.timeSlotTextAvailable);
                     isDisabled = false;
+                  } else {
+                    buttonStyle.push(styles.timeSlotButtonUnavailableByDoctor);
+                    textStyle.push(styles.timeSlotTextUnavailableByDoctor);
+                    isDisabled = true;
+                    slotLabel = `${slot.time}\n(${t('unavailable')})`;
                   }
-                } else {
-                  buttonStyle.push(styles.timeSlotButtonUnavailableByDoctor);
-                  textStyle.push(styles.timeSlotTextUnavailableByDoctor);
-                  isDisabled = true;
-                  slotLabel = `${slot.time}\n(${t('unavailable')})`;
-                }
 
-                // Якщо слот вибраний для бронювання (але це не вже моя бронь), застосовуємо стиль вибраного
-                if (isSelectedForBooking && !isMyBooking) {
-                  buttonStyle.push(styles.timeSlotButtonSelected);
-                  textStyle.push(styles.timeSlotTextSelected);
-                }
+                  if (isSelectedForBooking && !isMyBooking) {
+                    buttonStyle.push(styles.timeSlotButtonSelected);
+                    textStyle.push(styles.timeSlotTextSelected);
+                  }
 
-                return (
-                  <TouchableOpacity
-                    key={slot.id}
-                    style={buttonStyle}
-                    onPress={() => handleSlotPress(slot)}
-                    disabled={isDisabled}
-                  >
-                    <Text style={textStyle}>
-                      {slotLabel}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                  return (
+                    <TouchableOpacity
+                      key={slot.id}
+                      style={buttonStyle}
+                      onPress={() => handleSlotPress(slot)}
+                      disabled={isDisabled}
+                    >
+                      <Text style={textStyle}>
+                        {slotLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </LinearGradient>
           </View>
         ))}
       </ScrollView>
@@ -532,27 +530,30 @@ const ConsultationTimePatient = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#F5F7FA',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#F5F7FA',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#333',
+    color: '#555',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     paddingTop: 50,
-    paddingVertical: 10,
+    paddingVertical: 15,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    flexDirection: 'column',
+    borderBottomWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
     alignItems: 'center',
   },
   headerTopRow: {
@@ -563,98 +564,112 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   backButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
+    backgroundColor: 'rgba(14, 179, 235, 0.1)',
     borderRadius: 25,
     width: 48,
     height: 48,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#333333',
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
   },
   bookButton: {
-    backgroundColor: '#0EB3EB',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-    marginTop: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#0EB3EB', 
+    shadowColor: '#0EB3EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
     width: '80%',
+    marginTop: 5,
   },
   bookButtonText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
+    fontSize: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    textAlign: 'center',
   },
   scrollViewContent: {
     paddingHorizontal: 15,
-    paddingBottom: 20,
+    paddingBottom: 30,
   },
-  dayContainer: {
+  dayCardOuter: {
     marginTop: 20,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 15,
-    padding: 15,
+    borderRadius: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  dayContainerInner: {
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    ...Platform.select({
+      ios: {},
+      android: {},
+    }),
   },
   dayHeader: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#CFD8DC',
-    paddingBottom: 5,
+    color: '#222',
+    marginBottom: 15,
+    textAlign: 'center',
   },
   slotsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
   },
   timeSlotButton: {
     width: ITEM_WIDTH,
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 3,
+    elevation: 3,
     justifyContent: 'center',
-    minHeight: 60, // Додано для вирівнювання висоти з двома рядками тексту
+    minHeight: 65,
   },
   timeSlotText: {
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+    lineHeight: 18,
   },
   timeSlotButtonAvailable: {
-    backgroundColor: '#E0E0E0',
-    borderColor: '#BDBDBD',
+    backgroundColor: 'rgba(240, 240, 240, 0.7)',
+    borderColor: 'rgba(224, 224, 224, 0.7)',
   },
   timeSlotTextAvailable: {
     color: '#757575',
   },
   timeSlotButtonSelected: {
-    backgroundColor: '#0EB3EB',
+    backgroundColor: '#0EB3EB', // Яскраво-синій для вибраних (очікують на бронювання)
     borderColor: '#0A8BA6',
     shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 2 },
@@ -666,31 +681,33 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
   },
+  // --- НОВІ/ОНОВЛЕНІ СТИЛІ ДЛЯ СИНІХ ЗАБРОНЬОВАНИХ КНОПОК ---
   timeSlotButtonBookedByOther: {
-    backgroundColor: '#F0F0F0',
-    borderColor: '#D9D9D9',
-    opacity: 0.7,
-  },
-  timeSlotTextBookedByOther: {
-    color: '#A0A0A0',
-    fontWeight: '500',
+    backgroundColor: 'rgba(52, 152, 219, 0.6)', // Синій, але з прозорістю
+    borderColor: 'rgba(41, 128, 185, 0.6)',
+    // shadowColor: '#3498DB', // Додаємо тінь для більшої виразності
+    // shadowOffset: { width: 0, height: 2 },
+    // shadowOpacity: 0.2,
+    // shadowRadius: 3,
+    // elevation: 2,
   },
   timeSlotButtonBookedByMe: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#2E7D32',
-    shadowColor: '#4CAF50',
+    backgroundColor: '#0EB3EB', // Основний синій, як і для обраних (щоб було зрозуміло, що вони ваші)
+    borderColor: '#0A8BA6',
+    shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 4,
   },
-  timeSlotTextBookedByMe: {
+  timeSlotTextBooked: { // Об'єднаний стиль для тексту заброньованих слотів
     color: '#FFFFFF',
     fontWeight: '700',
   },
+  // --- КІНЕЦЬ НОВИХ/ОНОВЛЕНИХ СТИЛІВ ---
   timeSlotButtonUnavailableByDoctor: {
-    backgroundColor: '#F7F7F7',
-    borderColor: '#E0E0E0',
+    backgroundColor: 'rgba(247, 247, 247, 0.3)',
+    borderColor: 'rgba(224, 224, 224, 0.3)',
     opacity: 0.4,
   },
   timeSlotTextUnavailableByDoctor: {

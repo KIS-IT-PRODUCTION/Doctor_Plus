@@ -68,8 +68,8 @@
   "error_general_forgot_password": "Виникла неочікувана помилка під час скидання пароля.",
   "doctor_profile_title": "Налаштування",
   "profile": "Профіль",
-  "profile_doctor": "Профіль лікаря",
-  "profile_doctor_settings": "Налаштування профілю лікаря",
+  "profile_doctor": "Профіль",
+  "profile_doctor_settings": "Налаштування профілю",
   "select_country": "Виберіть країну проживання",
   "select_country_modal_title": "Виберіть країну",
   "select_specialization": "Виберіть спеціалізацію",
@@ -188,7 +188,7 @@
   },
 
   "messages_screen": {
-    "header_title": "Повідомлення (Лікар)",
+    "header_title": "Повідомлення",
     "today": "Сьогодні",
     "yesterday": "Вчора",
     "consultation_confirmation_title": "Підтвердження консультації",
@@ -523,7 +523,7 @@
   "info": "Інформація",
   "loading_schedule": "Завантаження розкладу...",
   "failed_to_load_schedule": "Не вдалося завантажити розклад.",
-  "set_my_availability": "Встановити мою доступність",
+  "set_my_availability": "Доступність",
   "save_schedule": "Зберегти розклад",
   "schedule_saved_successfully": "Розклад успішно збережено!",
   "failed_to_save_schedule": "Не вдалося зберегти розклад.",
@@ -643,3 +643,4 @@
   "no_slots_could_be_booked": "Жоден слот не вдалося забронювати.",
   "failed_to_book": "Не вдалося забронювати"
 }
+

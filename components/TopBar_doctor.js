@@ -140,6 +140,7 @@ const TabBar_doctor = ({ activeTab, onTabPress }) => {
 
 const styles = StyleSheet.create({
   tabBar_doctorContainer: {
+    position: "fixed",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
