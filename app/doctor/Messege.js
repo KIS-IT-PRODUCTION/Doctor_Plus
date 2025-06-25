@@ -205,11 +205,23 @@ export default function Message() {
       // Оновлюємо UI, якщо сповіщення не було додано раніше
       addNewMessage(response.notification.request.content);
 
+<<<<<<< HEAD
       // Перенаправлення або показ Alert залежно від типу сповіщення
       if (data && data.type === 'new_booking' && data.booking_id) {
         // Навігація до екрану деталей бронювання
         console.log("Navigating to BookingDetails for booking_id:", data.booking_id);
         navigation.navigate('BookingDetails', { bookingId: data.booking_id, patientId: data.patient_id, doctorId: data.doctor_id });
+=======
+      if (data && data.type === 'new_booking' && data.patient_name && (data.booking_date || data.date) && (data.booking_time_slot || data.time)) {
+        Alert.alert(
+          t('new_booking_notification_title'),
+          `${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || data.date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || data.time || t('not_specified')}.`,
+          [{ text: t('view_details'), onPress: () => {
+              console.log("Navigate to booking details for booking_id:", data.booking_id);
+            }
+          }]
+        );
+>>>>>>> ecf557a99e2af2cf16bb5aefdf9ba77fcb7a533b
       } else {
           // Загальний Alert для інших типів сповіщень
           Alert.alert(title || t('notification_title_default'), body || t('notification_body_default'), [{ text: t('ok') }]);
@@ -291,19 +303,28 @@ export default function Message() {
 
       const bookingId = message.rawData.booking_id;
       const patientId = message.rawData.patient_id;
+<<<<<<< HEAD
       const bookingDate = message.rawData.booking_date; // Використовуємо booking_date
       const bookingTimeSlot = message.rawData.booking_time_slot; // Використовуємо booking_time_slot
+=======
+      // ОНОВЛЕНО: Надійний запасний варіант для отримання дати та часу
+      const bookingDate = message.rawData.booking_date || message.rawData.date; 
+      const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
+>>>>>>> ecf557a99e2af2cf16bb5aefdf9ba77fcb7a533b
       const doctorFinalName = doctorFullName || t('doctor');
+      const bookingAmount = message.rawData.amount; // Отримуємо суму з rawData
 
-      if (!bookingDate || !bookingTimeSlot) {
-          console.error("Missing booking date or time slot in rawData:", {
-              booking_date: bookingDate ? bookingDate : "missing",
-              booking_time_slot: bookingTimeSlot ? booking_time_slot : "missing",
+      // ОНОВЛЕНО: Перевіряємо, чи є bookingDate та bookingTimeSlot дійсними рядками
+      if (typeof bookingDate !== 'string' || bookingDate.trim() === '' || typeof bookingTimeSlot !== 'string' || bookingTimeSlot.trim() === '') {
+          console.error("Missing or invalid booking date or time slot in rawData. Expected YYYY-MM-DD and HH:MM strings (from booking_date/booking_time_slot or date/time):", {
+              booking_date: bookingDate,
+              booking_time_slot: bookingTimeSlot,
+              rawData: message.rawData // Додано для повнішої діагностики
           });
           Alert.alert(t('error'), t('invalid_booking_data_for_update_date_time'));
           return;
       }
-
+      
       try {
           console.log(`Оновлення бронювання ${bookingId} на статус: ${newStatus} для пацієнта ${patientId}`);
           const { error: updateError } = await supabase
@@ -343,7 +364,7 @@ export default function Message() {
               }
           }
 
-         const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
+          const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
 
           const { data: { session } } = await supabase.auth.getSession();
           const accessToken = session?.access_token;
@@ -360,6 +381,7 @@ export default function Message() {
                   patient_id: patientId,
                   doctor_id: currentDoctorUserId,
                   status: newStatus,
+<<<<<<< HEAD
                   booking_date: bookingDate,
                   booking_time_slot: bookingTimeSlot,
                   // amount: 0, // Не потрібно для лікаря, або встановлюйте 0 якщо обов'язково
@@ -367,6 +389,12 @@ export default function Message() {
                                // то тут потрібно отримати його з booking details або встановити 0 для rejected.
                                // Для лікаря ця функція надсилається після дії лікаря, тому amount має бути
                                // відомий з БД booking, або встановлюємо 0 якщо не оплачується.
+=======
+                  booking_date: bookingDate, // Використовуємо booking_date (або date) з rawData
+                  booking_time_slot: bookingTimeSlot, // Використовуємо booking_time_slot (або time) з rawData
+                  amount: bookingAmount,     // Додано поле amount
+                  is_paid: false,            // Додано поле is_paid зі значенням false
+>>>>>>> ecf557a99e2af2cf16bb5aefdf9ba77fcb7a533b
               },
               doctor_name: doctorFinalName,
           };
@@ -622,13 +650,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: scale(15),
     paddingVertical: verticalScale(15),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    borderBottomLeftRadius: moderateScale(20),
-    borderBottomRightRadius: moderateScale(20),
+   
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.1)",
@@ -637,11 +659,7 @@ const styles = StyleSheet.create({
     height: moderateScale(48),
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+
   },
   headerTitle: {
     fontSize: moderateScale(20),
