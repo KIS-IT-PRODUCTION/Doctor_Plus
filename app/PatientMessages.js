@@ -9,16 +9,17 @@ import {
   Alert,
   TouchableOpacity,
   SafeAreaView,
-  Platform // Для Platform-specific стилів
+  Platform,
+  Linking, // Імпорт Linking для відкриття зовнішніх URL та Deep Linking
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../providers/supabaseClient'; // Переконайтеся, що шлях правильний
+import { supabase } from '../providers/supabaseClient'; // Шлях до вашого supabaseClient
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { Ionicons } from '@expo/vector-icons'; // Імпортуємо Ionicons для іконки стрілки назад
+import { Ionicons } from '@expo/vector-icons'; // Імпорт Ionicons для іконки стрілки назад
 import Icon from '../assets/icon.svg'; // Припустимо, у вас є така іконка (забезпечте шлях та наявність)
 
-// Встановіть обробник для сповіщень, коли додаток активний
+// Встановлення обробника для сповіщень, коли додаток активний
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -35,6 +36,11 @@ export default function PatientMessages() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentPatientId, setCurrentPatientId] = useState(null);
 
+  // ВАЖЛИВО: ЗАМІНІТЬ ЦЕ НА ПУБЛІЧНИЙ URL ВАШОГО БЕКЕНДУ!
+  // Це має бути той URL, який ви отримали від ngrok (якщо тестуєте локально)
+  // або ваш постійний домен бекенду (для продакшну).
+  const BACKEND_URL = 'https://31be-194-44-152-4.ngrok-free.app'; 
+
   // Функція для обробки натискання кнопки "Назад"
   const handleBackPress = () => {
     navigation.goBack();
@@ -43,7 +49,7 @@ export default function PatientMessages() {
   // Отримання ID поточного пацієнта
   useEffect(() => {
     const getUserId = async () => {
-      setLoading(true); // Встановлюємо loading на true на початку
+      setLoading(true); // Встановлюємо loading на true на початку завантаження користувача
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (user) {
@@ -55,8 +61,6 @@ export default function PatientMessages() {
           setLoading(false);
         } else {
           console.warn("PatientMessages: No user session found. User might not be logged in.");
-          // Не показуємо Alert.alert тут, якщо користувача немає - це нормально.
-          // Лише якщо він намагається отримати повідомлення, а ID немає.
           setLoading(false);
         }
       } catch (err) {
@@ -68,10 +72,9 @@ export default function PatientMessages() {
     getUserId();
   }, [t]);
 
+  // Функція для отримання повідомлень з Supabase
   const fetchMessagesFromSupabase = useCallback(async () => {
     if (!currentPatientId) {
-      // Якщо currentPatientId ще не завантажився, просто виходимо,
-      // `loading` буде оброблений верхнім `useEffect`
       setLoading(false);
       setRefreshing(false);
       console.warn("PatientMessages: currentPatientId is null, skipping fetchMessagesFromSupabase.");
@@ -99,6 +102,9 @@ export default function PatientMessages() {
         is_read: msg.is_read,
         type: msg.notification_type,
         rawData: msg.data || {},
+        is_paid: msg.data?.is_paid || false, // Припускаємо, що status оплати є в rawData
+        booking_id: msg.data?.booking_id || null, // Припускаємо, що booking_id є в rawData
+        amount: msg.data?.amount || 0, // Припускаємо, що сума платежу є в rawData
       }));
 
       setMessages(formattedMessages);
@@ -112,6 +118,7 @@ export default function PatientMessages() {
     }
   }, [currentPatientId, t]);
 
+  // Використовуємо useFocusEffect для оновлення при фокусуванні на екрані
   useFocusEffect(
     useCallback(() => {
       // Запускаємо завантаження лише коли currentPatientId вже доступний
@@ -123,11 +130,13 @@ export default function PatientMessages() {
     }, [currentPatientId, fetchMessagesFromSupabase])
   );
 
+  // Функція для оновлення при "pull-to-refresh"
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchMessagesFromSupabase();
   }, [fetchMessagesFromSupabase]);
 
+  // Функція для позначення повідомлення як прочитаного
   const markAsRead = useCallback(async (messageId) => {
     if (!messageId) {
         console.warn("markAsRead: Message ID is missing, cannot mark as read.");
@@ -161,31 +170,119 @@ export default function PatientMessages() {
     }
   }, [t]);
 
+  // НОВА ФУНКЦІЯ: Обробка оплати через LiqPay
+  const handleLiqPayPayment = useCallback(async (bookingId, amount, description, doctorName) => {
+    if (!bookingId || !amount || !description || !currentPatientId) {
+      Alert.alert(t('error'), t('liqpay_missing_params'));
+      return;
+    }
+
+    try {
+      // 1. Отримуємо data та signature від вашого бекенду
+      console.log("Requesting LiqPay parameters from backend:", BACKEND_URL + '/create-liqpay-payment');
+      const response = await fetch(BACKEND_URL + '/create-liqpay-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount,
+          bookingId,
+          description,
+          patientId: currentPatientId,
+          doctorName: doctorName, // Передаємо ім'я лікаря для extra_data на бекенд
+        }),
+      });
+
+      const jsonResponse = await response.json();
+
+      if (!response.ok || !jsonResponse.success) {
+        throw new Error(jsonResponse.error || 'Failed to get LiqPay parameters from backend.');
+      }
+
+      const { data, signature } = jsonResponse;
+
+      // 2. Формуємо URL для LiqPay і відкриваємо його в системному браузері
+      // Використовуємо LiqPay Checkout URL
+      const liqPayUrl = 'https://www.liqpay.ua/api/3/checkout'; // Офіційний URL LiqPay Checkout
+
+      // Створюємо POST-форму, закодовану в URL-параметри для відкриття через Linking
+      // LiqPay Checkout API підтримує цей спосіб
+      const formBody = `data=${encodeURIComponent(data)}&signature=${encodeURIComponent(signature)}`;
+      const fullUrl = `${liqPayUrl}?${formBody}`; // LiqPay може прийняти POST дані через GET параметри
+
+      console.log("Attempting to open LiqPay URL:", fullUrl);
+
+      const supported = await Linking.canOpenURL(fullUrl);
+      if (supported) {
+        await Linking.openURL(fullUrl);
+      } else {
+        Alert.alert(t('error'), `${t('cannot_open_url')}: ${fullUrl}`);
+      }
+
+    } catch (error) {
+      console.error('LiqPay payment initiation error:', error);
+      Alert.alert(t('error'), `${t('liqpay_payment_init_failed')}: ${error.message}`);
+    }
+  }, [currentPatientId, t, BACKEND_URL]); // Додано BACKEND_URL до залежностей
+
+  // Функція для обробки Deep Links, якщо ви повертаєтесь з LiqPay в додаток
+  const handleDeepLink = useCallback(({ url }) => {
+    console.log("App opened via deep link:", url);
+    // Після повернення з LiqPay, оновимо список повідомлень,
+    // щоб перевірити оновлений статус оплати з бекенду (який отримав Call-back)
+    fetchMessagesFromSupabase();
+    // Можна також додати логіку для відображення успішності/неуспішності платежу
+    // на основі `url`, якщо LiqPay включає такі параметри в `result_url`
+  }, [fetchMessagesFromSupabase]);
+
+
+  // useEffect для підписки на сповіщення та Deep Links
   useEffect(() => {
     if (!currentPatientId) return;
 
+    // Слухачі для сповіщень Expo
     const subscription = Notifications.addNotificationReceivedListener(notification => {
       console.log('PatientMessages: Notification received in foreground:', notification);
-      fetchMessagesFromSupabase(); // Оновлюємо список повідомлень
+      fetchMessagesFromSupabase(); // Оновлюємо список повідомлень при отриманні нового сповіщення
     });
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('PatientMessages: Notification response received (user clicked):', response);
       const { title, body, data } = response.notification.request.content;
 
-      fetchMessagesFromSupabase(); // Оновлюємо список повідомлень
+      fetchMessagesFromSupabase(); // Оновлюємо список повідомлень після кліку на сповіщення
 
       if (data && (data.type === 'booking_confirmed' || data.type === 'booking_rejected') && data.booking_id) {
         Alert.alert(
-            title || t('booking_status_update_default_title'), // Використовуємо title з push-сповіщення
-            `${t('doctor')}: ${data.doctor_name || t('not_specified')}\n` +
-            `${t('date')}: ${data.booking_date || t('not_specified')}\n` +
-            `${t('time')}: ${data.booking_time_slot || t('not_specified')}\n\n` +
-            (data.status === 'confirmed' ? t('booking_confirmed_message_full') : t('booking_rejected_message_full')),
-            [{ text: t('ok'), onPress: () => {
-                // Можливо, навігація до деталей бронювання, якщо потрібно
-                // navigation.navigate('BookingDetails', { bookingId: data.booking_id });
-            }}]
+          title || t('booking_status_update_default_title'), // Використовуємо title з push-сповіщення
+          `${t('doctor')}: ${data.doctor_name || t('not_specified')}\n` +
+          `${t('date')}: ${data.booking_date || t('not_specified')}\n` +
+          `${t('time')}: ${data.booking_time_slot || t('not_specified')}\n\n` +
+          (data.status === 'confirmed' ? t('booking_confirmed_message_full') : t('booking_rejected_message_full')),
+          [
+            { text: t('ok'), onPress: () => {
+                // Якщо статус "confirmed", ще не сплачено, є booking_id та сума, запропонувати оплату
+                if (data.status === 'confirmed' && !data.is_paid && data.booking_id && data.amount > 0) {
+                    Alert.alert(
+                        t('payment_required_title'),
+                        t('payment_required_message'),
+                        [
+                            { text: t('cancel'), style: 'cancel' },
+                            {
+                                text: t('pay_now'),
+                                onPress: () => handleLiqPayPayment(
+                                    data.booking_id,
+                                    data.amount,
+                                    `Оплата консультації ${data.doctor_name || ''}`, // Опис для платежу
+                                    data.doctor_name // Ім'я лікаря
+                                )
+                            }
+                        ]
+                    );
+                }
+            }}
+          ]
         );
       } else {
         // Для інших типів сповіщень або якщо дані неповні
@@ -193,11 +290,18 @@ export default function PatientMessages() {
       }
     });
 
+    // Слухач для Deep Links (повернення в додаток після оплати)
+    // ЗМІНЕНО: Тепер Linking.addEventListener повертає об'єкт-підписку, який має метод remove()
+    const linkingSubscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Функція очищення для useEffect: видаляємо слухачі при розмонтуванні компонента
     return () => {
       Notifications.removeNotificationSubscription(subscription);
       Notifications.removeNotificationSubscription(responseSubscription);
+      // ЗМІНЕНО: Видаляємо підписку за допомогою її методу .remove()
+      linkingSubscription.remove(); 
     };
-  }, [currentPatientId, fetchMessagesFromSupabase, navigation, t]); // Додано 'navigation' та 't' до залежностей
+  }, [currentPatientId, fetchMessagesFromSupabase, navigation, t, handleLiqPayPayment, handleDeepLink]); // Додано handleDeepLink до залежностей
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -237,6 +341,9 @@ export default function PatientMessages() {
               const messageDate = new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(message.created_at));
               const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(message.created_at));
 
+              // Визначаємо, чи потрібно показати кнопку "Оплатити"
+              const showPayButton = message.type === 'booking_confirmed' && !message.is_paid && message.booking_id && message.amount > 0;
+
               return (
                 <View key={message.id} style={styles.messageGroup}>
                   {/* Дата та час */}
@@ -259,7 +366,20 @@ export default function PatientMessages() {
                     <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                     <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
 
-                
+                    {/* НОВИЙ БЛОК: Кнопка "Оплатити" */}
+                    {showPayButton && (
+                      <TouchableOpacity
+                        style={styles.payButton}
+                        onPress={() => handleLiqPayPayment(
+                            message.booking_id,
+                            message.amount,
+                            `Оплата консультації з ${message.rawData.doctor_name || 'лікарем'}`, // Опис для LiqPay
+                            message.rawData.doctor_name // Ім'я лікаря для extra_data на бекенді
+                        )}
+                      >
+                        <Text style={styles.payButtonText}>{t('pay_now')} {message.amount} UAH</Text>
+                      </TouchableOpacity>
+                    )}
 
                     {/* Кнопка "Позначити як прочитане" або статус "Прочитано" */}
                     {!message.is_read ? (
@@ -393,41 +513,29 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 10,
   },
-  bookingInfo: {
+  payButton: {
     marginTop: 10,
-    padding: 10,
-    backgroundColor: '#E0F7FA', // Легкий блакитний фон
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#B2EBF2',
+    backgroundColor: '#FFC107', // Жовтий колір
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignSelf: 'stretch', // Розтягуємо на всю ширину картки
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    marginBottom: 10, // Відступ від інших елементів
   },
-  bookingDetailsText: {
-    fontSize: 14,
-    // fontFamily: 'Mont-Regular',
-    color: '#444',
-    marginBottom: 4,
-  },
-  bookingStatusText: {
-    fontSize: 15,
-    // fontFamily: 'Mont-SemiBold',
-    fontWeight: '600',
-    marginTop: 8,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    alignSelf: 'flex-start', // Вирівнювання за лівим краєм
-  },
-  statusConfirmed: {
-    backgroundColor: '#E8F5E9', // Дуже світло-зелений фон
-    color: '#2E7D32', // Темно-зелений текст
-  },
-  statusRejected: {
-    backgroundColor: '#FFEBEE', // Дуже світло-червоний фон
-    color: '#D32F2F', // Темно-червоний текст
+  payButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   markAsReadButton: {
     marginTop: 15,
-    backgroundColor: '#0EB3EB', // Яскраво-синій
+    backgroundColor: '#0EB3EB',
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 25,
@@ -441,32 +549,28 @@ const styles = StyleSheet.create({
   markAsReadButtonText: {
     color: '#fff',
     fontSize: 14,
-    // fontFamily: 'Mont-SemiBold',
     fontWeight: '600',
   },
   readStatusText: {
     marginTop: 15,
     fontSize: 14,
-    // fontFamily: 'Mont-Regular',
     color: '#888',
-    textAlign: 'right', // Вирівнювання праворуч для тексту "Прочитано"
+    textAlign: 'right',
   },
   emptyMessagesContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50, // Відступ зверху/знизу
+    paddingVertical: 50,
   },
   emptyMessagesText: {
     fontSize: 18,
-    // fontFamily: 'Mont-SemiBold',
     fontWeight: '600',
     color: '#777',
     marginBottom: 10,
   },
   emptyMessagesSubText: {
     fontSize: 14,
-    // fontFamily: 'Mont-Regular',
     color: '#999',
     textAlign: 'center',
     paddingHorizontal: 30,

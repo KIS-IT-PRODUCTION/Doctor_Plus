@@ -197,10 +197,10 @@ export default function Message() {
 
       addNewMessage(response.notification.request.content);
 
-      if (data && data.type === 'new_booking' && data.patient_name && data.booking_date && data.booking_time_slot) {
+      if (data && data.type === 'new_booking' && data.patient_name && (data.booking_date || data.date) && (data.booking_time_slot || data.time)) {
         Alert.alert(
           t('new_booking_notification_title'),
-          `${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || t('not_specified')}.`,
+          `${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || data.date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || data.time || t('not_specified')}.`,
           [{ text: t('view_details'), onPress: () => {
               console.log("Navigate to booking details for booking_id:", data.booking_id);
             }
@@ -285,19 +285,23 @@ export default function Message() {
 
       const bookingId = message.rawData.booking_id;
       const patientId = message.rawData.patient_id;
-      const bookingDate = message.rawData.date;
-      const bookingTimeSlot = message.rawData.time;
+      // ОНОВЛЕНО: Надійний запасний варіант для отримання дати та часу
+      const bookingDate = message.rawData.booking_date || message.rawData.date; 
+      const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
       const doctorFinalName = doctorFullName || t('doctor');
+      const bookingAmount = message.rawData.amount; // Отримуємо суму з rawData
 
-      if (!bookingDate || !bookingTimeSlot) {
-          console.error("Missing booking date or time slot in rawData:", {
-              booking_date: bookingDate ? bookingDate : "missing",
-              booking_time_slot: bookingTimeSlot ? booking_time_slot : "missing",
+      // ОНОВЛЕНО: Перевіряємо, чи є bookingDate та bookingTimeSlot дійсними рядками
+      if (typeof bookingDate !== 'string' || bookingDate.trim() === '' || typeof bookingTimeSlot !== 'string' || bookingTimeSlot.trim() === '') {
+          console.error("Missing or invalid booking date or time slot in rawData. Expected YYYY-MM-DD and HH:MM strings (from booking_date/booking_time_slot or date/time):", {
+              booking_date: bookingDate,
+              booking_time_slot: bookingTimeSlot,
+              rawData: message.rawData // Додано для повнішої діагностики
           });
           Alert.alert(t('error'), t('invalid_booking_data_for_update_date_time'));
           return;
       }
-
+      
       try {
           console.log(`Оновлення бронювання ${bookingId} на статус: ${newStatus} для пацієнта ${patientId}`);
           const { error: updateError } = await supabase
@@ -339,7 +343,7 @@ export default function Message() {
           }
           // --- КІНЕЦЬ НОВОЇ ЛОГІКИ ---
 
-         const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
+          const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
 
           const { data: { session } } = await supabase.auth.getSession();
           const accessToken = session?.access_token;
@@ -356,8 +360,10 @@ export default function Message() {
                   patient_id: patientId,
                   doctor_id: currentDoctorUserId,
                   status: newStatus,
-                  booking_date: bookingDate,
-                  booking_time_slot: bookingTimeSlot,
+                  booking_date: bookingDate, // Використовуємо booking_date (або date) з rawData
+                  booking_time_slot: bookingTimeSlot, // Використовуємо booking_time_slot (або time) з rawData
+                  amount: bookingAmount,     // Додано поле amount
+                  is_paid: false,            // Додано поле is_paid зі значенням false
               },
               doctor_name: doctorFinalName,
           };
@@ -589,13 +595,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: scale(15),
     paddingVertical: verticalScale(15),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    borderBottomLeftRadius: moderateScale(20),
-    borderBottomRightRadius: moderateScale(20),
+   
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.1)",
@@ -604,11 +604,7 @@ const styles = StyleSheet.create({
     height: moderateScale(48),
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+
   },
   headerTitle: {
     fontSize: moderateScale(20),
