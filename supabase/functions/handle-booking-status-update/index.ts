@@ -6,26 +6,17 @@ import { Expo } from 'https://esm.sh/expo-server-sdk@3.7.0';
 
 // Якщо у вас є файл з типізацією бази даних, розкоментуйте та вкажіть правильний шлях:
 // import { Database } from '../_shared/database.types.ts'; 
-// Якщо ні, залиште createClient без generic типу (<Database>).
 
 const expo = new Expo();
 
-// Отримання змінних оточення Supabase.
-// Важливо: ці змінні повинні бути налаштовані в Supabase Dashboard -> Edge Functions -> Secrets
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// Перевірка, чи змінні оточення встановлені перед ініціалізацією клієнта.
-// Ця перевірка спрацює при розгортанні або першому запуску функції.
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("ENVIRONMENT_ERROR: SUPABASE_URL або SUPABASE_SERVICE_ROLE_KEY не встановлені. Переконайтеся, що змінні оточення правильно налаштовані для цієї Edge Function.");
-  // Кидаємо помилку, щоб функція не запускалася у неконфігурованому стані
   throw new Error("Supabase environment variables (URL or Service Role Key) are not set.");
 }
 
-// Функція для отримання Expo Push Token з таблиці profiles
-// Використовує клієнт Supabase, ініціалізований Service Role Key,
-// що дозволяє обходити RLS, якщо це необхідно для доступу до push_token.
 async function getPatientExpoPushToken(supabaseClient: any, patientId: string): Promise<string | null> {
     if (!patientId) {
         console.warn("getPatientExpoPushToken: patientId is null or undefined.");
@@ -34,13 +25,13 @@ async function getPatientExpoPushToken(supabaseClient: any, patientId: string): 
 
     try {
         const { data: profile, error } = await supabaseClient
-            .from('profiles') // Переконайтеся, що це правильна таблиця, де зберігається push_token пацієнта
-            .select('push_token') // Переконайтеся, що це правильний стовпець для push-токену
-            .eq('id', patientId) // Припускаємо, що 'id' в 'profiles' відповідає user_id пацієнта з auth.users
+            .from('profiles')
+            .select('push_token')
+            .eq('id', patientId)
             .single();
 
         if (error) {
-            if (error.code === 'PGRST116') { // PGRST116 - No rows found for single() query
+            if (error.code === 'PGRST116') {
                 console.warn(`getPatientExpoPushToken: No profile found for patient ${patientId}.`);
             } else {
                 console.error(`getPatientExpoPushToken: Error fetching Expo Push Token for patient ${patientId}:`, error.message);
@@ -48,7 +39,6 @@ async function getPatientExpoPushToken(supabaseClient: any, patientId: string): 
             return null;
         }
 
-        // Перевірка на profile та profile.push_token
         if (profile && profile.push_token) {
             return profile.push_token;
         }
@@ -61,35 +51,28 @@ async function getPatientExpoPushToken(supabaseClient: any, patientId: string): 
     }
 }
 
-// Основний обробник Edge Function
 serve(async (req) => {
-    // Заголовки CORS для дозволу запитів з вашого React Native додатка
     const corsHeaders = {
-        'Access-Control-Allow-Origin': '*', // В продакшені краще вказати конкретний домен
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Content-Type': 'application/json', // Завжди повертаємо JSON
+        'Content-Type': 'application/json',
     };
 
-    // Обробка OPTIONS-запитів (CORS preflight)
     if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders, status: 204 }); // 204 No Content for preflight
+        return new Response('ok', { headers: corsHeaders, status: 204 });
     }
 
-    // Перевірка, що метод запиту є POST
     if (req.method !== 'POST') {
         console.warn(`Invalid request method: ${req.method}. Only POST is allowed.`);
         return new Response(JSON.stringify({ error: 'Method Not Allowed. Only POST requests are accepted.' }), { status: 405, headers: corsHeaders });
     }
 
-    // Ініціалізація Supabase Admin клієнта.
-    // Це дозволить виконувати операції з базою даних, ігноруючи Row Level Security (RLS).
-    // Це є стандартною та безпечною практикою для бекенд-функцій.
     const supabaseAdmin = createClient(
         SUPABASE_URL,
         SUPABASE_SERVICE_ROLE_KEY,
         {
             auth: {
-                persistSession: false, // Важливо для серверних функцій, щоб не зберігати сесію
+                persistSession: false,
                 autoRefreshToken: false,
                 detectSessionInUrl: false,
             }
@@ -97,7 +80,6 @@ serve(async (req) => {
     );
 
     try {
-        // Отримання тіла запиту
         let requestBody: any;
         try {
             requestBody = await req.json();
@@ -112,15 +94,18 @@ serve(async (req) => {
         const doctor_name_from_client = requestBody.doctor_name;
 
         // **Детальна валідація вхідних даних**
+        // ДОДАНО: Перевірка на наявність 'amount' у запиті для підтверджених бронювань
         if (
             !booking ||
-            typeof booking !== 'object' || // Перевірка, чи booking є об'єктом
-            !('id' in booking) || typeof booking.id !== 'string' || booking.id.trim() === '' || // booking_id
-            !('patient_id' in booking) || typeof booking.patient_id !== 'string' || booking.patient_id.trim() === '' || // patient_id
-            !('doctor_id' in booking) || typeof booking.doctor_id !== 'string' || booking.doctor_id.trim() === '' || // doctor_id
-            !('status' in booking) || typeof booking.status !== 'string' || !['confirmed', 'rejected'].includes(booking.status.toLowerCase()) || // status
-            !('booking_date' in booking) || typeof booking.booking_date !== 'string' || booking.booking_date.trim() === '' || // booking_date
-            !('booking_time_slot' in booking) || typeof booking.booking_time_slot !== 'string' || booking.booking_time_slot.trim() === '' // booking_time_slot
+            typeof booking !== 'object' ||
+            !('id' in booking) || typeof booking.id !== 'string' || booking.id.trim() === '' ||
+            !('patient_id' in booking) || typeof booking.patient_id !== 'string' || booking.patient_id.trim() === '' ||
+            !('doctor_id' in booking) || typeof booking.doctor_id !== 'string' || booking.doctor_id.trim() === '' ||
+            !('status' in booking) || typeof booking.status !== 'string' || !['confirmed', 'rejected'].includes(booking.status.toLowerCase()) ||
+            !('booking_date' in booking) || typeof booking.booking_date !== 'string' || booking.booking_date.trim() === '' ||
+            !('booking_time_slot' in booking) || typeof booking.booking_time_slot !== 'string' || booking.booking_time_slot.trim() === '' ||
+            // Якщо статус 'confirmed', amount має бути присутнім і бути числом
+            (booking.status.toLowerCase() === 'confirmed' && (!('amount' in booking) || typeof booking.amount !== 'number' || booking.amount <= 0))
         ) {
             const missingFields: string[] = [];
             if (!booking || typeof booking !== 'object') missingFields.push('booking object');
@@ -130,6 +115,8 @@ serve(async (req) => {
             if (!('status' in booking) || typeof booking.status !== 'string' || !['confirmed', 'rejected'].includes(booking.status.toLowerCase())) missingFields.push('booking.status (string, "confirmed" or "rejected")');
             if (!('booking_date' in booking) || typeof booking.booking_date !== 'string' || booking.booking_date.trim() === '') missingFields.push('booking.booking_date (string, non-empty)');
             if (!('booking_time_slot' in booking) || typeof booking.booking_time_slot !== 'string' || booking.booking_time_slot.trim() === '') missingFields.push('booking.booking_time_slot (string, non-empty)');
+            if (booking.status?.toLowerCase() === 'confirmed' && (!('amount' in booking) || typeof booking.amount !== 'number' || booking.amount <= 0)) missingFields.push('booking.amount (number > 0, required for confirmed bookings)');
+
 
             console.warn(`Invalid booking data received. Missing or invalid fields: ${missingFields.join(', ')}`);
             return new Response(
@@ -138,9 +125,9 @@ serve(async (req) => {
             );
         }
 
-        const { id: booking_id, patient_id, doctor_id, status, booking_date, booking_time_slot } = booking;
+        const { id: booking_id, patient_id, doctor_id, status, booking_date, booking_time_slot, amount } = booking; // ДОДАНО: amount
 
-        // Перевірка на дійсність UUID
+
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(booking_id) || !uuidRegex.test(patient_id) || !uuidRegex.test(doctor_id)) {
             console.warn(`Invalid UUID format for one of the IDs: booking_id(${booking_id}), patient_id(${patient_id}), doctor_id(${doctor_id})`);
@@ -152,13 +139,12 @@ serve(async (req) => {
 
         let doctor_full_name = doctor_name_from_client;
 
-        // Якщо ім'я лікаря не було передано з клієнта або воно є дефолтним/пустим, спробувати отримати з БД
         if (!doctor_full_name || doctor_full_name.trim() === '' || doctor_full_name === 'Doctor' || doctor_full_name === 'Лікар') {
             console.log(`Doctor name not provided or invalid from client. Attempting to fetch from DB for doctor_id: ${doctor_id}`);
             const { data: doctorProfile, error: doctorProfileError } = await supabaseAdmin
-                .from('profile_doctor') // Припускаємо, що таблиця називається 'profile_doctor'
+                .from('profile_doctor')
                 .select('full_name')
-                .eq('user_id', doctor_id) // Переконайтеся, що це правильний стовпець, який зберігає user_id лікаря
+                .eq('user_id', doctor_id)
                 .single();
 
             if (doctorProfileError) {
@@ -167,7 +153,7 @@ serve(async (req) => {
                 } else {
                     console.error(`Error fetching doctor profile for ${doctor_id}:`, doctorProfileError?.message || 'Unknown error');
                 }
-                doctor_full_name = 'Невідомий лікар'; // Запасне значення
+                doctor_full_name = 'Невідомий лікар';
             } else if (doctorProfile?.full_name) {
                 doctor_full_name = doctorProfile.full_name;
                 console.log(`Doctor name fetched from DB: ${doctor_full_name}`);
@@ -182,13 +168,12 @@ serve(async (req) => {
         let title: string;
         let body: string;
         let notification_type: string;
-        let patientAlertBody: string; // Коротший текст для Alert
+        let patientAlertBody: string;
 
-        // Визначення вмісту сповіщення залежно від статусу
         switch (status.toLowerCase()) {
             case 'confirmed':
                 title = `Ваше бронювання підтверджено! ✅`;
-                body = `Лікар ${doctor_full_name} підтвердив вашу консультацію на ${booking_date} о ${booking_time_slot}. Чекаємо на вас!`;
+                body = `Лікар ${doctor_full_name} підтвердив вашу консультацію на ${booking_date} о ${booking_time_slot}. Сума до сплати: ${amount} UAH. Чекаємо на вас!`; // ДОДАНО: сума в тексті
                 notification_type = 'booking_confirmed';
                 patientAlertBody = `Ваш запис до лікаря ${doctor_full_name} на ${booking_date} о ${booking_time_slot} підтверджено.`;
                 break;
@@ -211,6 +196,7 @@ serve(async (req) => {
             .from('patient_notifications')
             .insert({
                 patient_id: patient_id,
+                booking_id: booking_id, // **ВАЖЛИВО: Нове поле booking_id**
                 title: title,
                 body: body,
                 notification_type: notification_type,
@@ -220,17 +206,19 @@ serve(async (req) => {
                     booking_date: booking_date,
                     booking_time_slot: booking_time_slot,
                     status: status,
+                    // ДОДАНО: amount для сповіщень про підтвердження
+                    ...(notification_type === 'booking_confirmed' && { amount: amount }),
                 },
-                is_read: false, // Встановлюємо як непрочитане за замовчуванням
+                // is_read: false, // ВИДАЛЕНО: Якщо поле is_read видалено з таблиці БД
             })
-            .select() // Важливо для повернення вставлених даних
+            .select()
             .single();
 
         if (insertError) {
             console.error('Error saving patient notification:', insertError.message, insertError.details);
-            if (insertError.code === '23503') { // PostgreSQL Foreign Key Violation
+            if (insertError.code === '23503') {
                 return new Response(
-                    JSON.stringify({ error: `Patient profile (ID: ${patient_id}) does not exist in public.profiles. Cannot save notification.` }),
+                    JSON.stringify({ error: `Patient profile (ID: ${patient_id}) does not exist or Foreign Key constraint failed. Cannot save notification.` }),
                     { status: 404, headers: corsHeaders }
                 );
             }
@@ -241,21 +229,19 @@ serve(async (req) => {
         }
         console.log(`Notification saved successfully with ID: ${notification.id}`);
 
-
         // 2. Отримання Expo Push Token пацієнта
         const patientPushToken = await getPatientExpoPushToken(supabaseAdmin, patient_id);
 
         if (patientPushToken && Expo.isExpoPushToken(patientPushToken)) {
             console.log(`Found valid Expo Push Token for patient ${patient_id}. Attempting to send push notification.`);
-            // 3. Формування та відправка push-сповіщення через Expo
             const messages = [];
             messages.push({
                 to: patientPushToken,
                 sound: 'default',
                 title: title,
-                body: patientAlertBody, // Використовуємо коротший текст для тіла сповіщення
+                body: patientAlertBody,
                 data: {
-                    db_id: notification.id, // ID сповіщення в базі даних, може бути корисним для відстеження
+                    db_id: notification.id,
                     type: notification_type,
                     booking_id: booking_id,
                     status: status,
@@ -263,10 +249,11 @@ serve(async (req) => {
                     booking_date: booking_date,
                     booking_time_slot: booking_time_slot,
                     patient_id: patient_id,
+                    // ДОДАНО: amount для push-сповіщень про підтвердження
+                    ...(notification_type === 'booking_confirmed' && { amount: amount }),
                 },
             });
 
-            // Відправка за допомогою Expo chunkPushNotifications для обробки великої кількості токенів
             const chunks = expo.chunkPushNotifications(messages);
             const tickets = [];
             for (const chunk of chunks) {
@@ -276,21 +263,13 @@ serve(async (req) => {
                     tickets.push(...ticketChunk);
                 } catch (pushError: any) {
                     console.error('Error sending push notification chunk via Expo:', pushError?.message || pushError);
-                    // Продовжуємо навіть при помилці відправки, оскільки бронювання оновлено і сповіщення в БД збережено.
                 }
             }
 
-            // Можна додати логіку для обробки квитанцій Expo (наприклад, видалення недійсних токенів)
-            // if (tickets.length > 0) {
-            //     // Логіка для expo.getPushNotificationReceiptsAsync(ticketIds);
-            // }
-
         } else {
             console.warn(`Invalid or missing Expo Push Token for patient ${patient_id}. Push notification will not be sent.`);
-            // Це не помилка, яка зупиняє процес, оскільки бронювання вже оновлено і сповіщення в БД збережено.
         }
 
-        // Успішна відповідь, якщо все оброблено.
         return new Response(
             JSON.stringify({ success: true, message: 'Booking status updated and patient notification processed.' }),
             { status: 200, headers: corsHeaders }

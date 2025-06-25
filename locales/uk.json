@@ -641,6 +641,15 @@
   "successfully_booked_slots": "Успішно заброньовано слотів",
   "failed_slots": "Невдалі слоти",
   "no_slots_could_be_booked": "Жоден слот не вдалося забронювати.",
-  "failed_to_book": "Не вдалося забронювати"
+  "failed_to_book": "Не вдалося забронювати",
+  "pay_now": "Оплатити",
+  "you_paid": "Ви оплатили",
+  "payment_success_title": "Оплата успішна!",
+  "payment_success_message": "Вашу оплату успішно оброблено.",
+  "payment_failure_title": "Помилка оплати!",
+  "payment_failure_message": "На жаль, вашу оплату не вдалося обробити. Спробуйте ще раз або зверніться до підтримки.",
+  "payment_notification_title": "Оновлення статусу оплати",
+  "payment_successful_notification_body": "Оплата успішна!",
+  "payment_failed_notification_body": "Оплата не пройшла."
 }
 

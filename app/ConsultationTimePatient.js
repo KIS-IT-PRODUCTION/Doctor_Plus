@@ -20,10 +20,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
 
-// !!! ВАЖЛИВО: Замініть цей URL на URL вашої Supabase Edge Function
 const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor';
 
-// --- ОСНОВНИЙ КОМПОНЕНТ ---
 const ConsultationTimePatient = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -42,7 +40,6 @@ const ConsultationTimePatient = ({ route }) => {
 
   const [selectedSlots, setSelectedSlots] = useState([]);
 
-  // --- ЕФЕКТ: Отримання ID та профілю поточного пацієнта ---
   useEffect(() => {
     const getPatientSessionAndProfile = async () => {
       setLoading(true);
@@ -88,7 +85,6 @@ const ConsultationTimePatient = ({ route }) => {
     getPatientSessionAndProfile();
   }, [t, navigation]);
 
-  // --- КОЛБЕК: Генерація структури розкладу ---
   const generateSchedule = useCallback(() => {
     const today = new Date();
     const days = [];
@@ -131,7 +127,6 @@ const ConsultationTimePatient = ({ route }) => {
     return days;
   }, [i18n.language]);
 
-  // --- КОЛБЕК: Завантаження доступних та заброньованих слотів ---
   const fetchAvailableSlotsAndBookings = useCallback(async () => {
     if (!doctorId || !patientId) {
       console.warn("Missing doctorId or patientId. Cannot fetch slots for booking.");
@@ -142,7 +137,6 @@ const ConsultationTimePatient = ({ route }) => {
     setLoading(true);
     console.log(`Fetching available and booked slots for doctorId: ${doctorId} and patientId: ${patientId}`);
     try {
-      // 1. Завантажуємо слоти, які лікар зробив доступними ('doctor_availability')
       const { data: doctorAvailData, error: doctorAvailError } = await supabase
         .from('doctor_availability')
         .select('date, time_slot')
@@ -162,7 +156,6 @@ const ConsultationTimePatient = ({ route }) => {
       setDoctorAvailableSlotsMap(availMap);
       console.log("Doctor's available slots map:", availMap);
 
-      // 2. Завантажуємо всі заброньовані слоти для цього лікаря ('patient_bookings')
       const { data: bookedData, error: bookedError } = await supabase
         .from('patient_bookings')
         .select('booking_date, booking_time_slot, patient_id')
@@ -198,14 +191,12 @@ const ConsultationTimePatient = ({ route }) => {
     }
   }, [doctorId, patientId, t, generateSchedule]);
 
-  // --- ЕФЕКТ: Виклик функції завантаження даних, коли доступні ID ---
   useEffect(() => {
     if (doctorId && patientId && patientProfile?.full_name) {
       fetchAvailableSlotsAndBookings();
     }
   }, [doctorId, patientId, patientProfile, fetchAvailableSlotsAndBookings]);
 
-  // --- ФУНКЦІЯ: Обробка натискання на слот ---
   const handleSlotPress = (slot) => {
     if (!doctorAvailableSlotsMap[slot.id]) {
       Alert.alert(t('not_available'), t('doctor_not_available_at_this_time'));
@@ -233,8 +224,9 @@ const ConsultationTimePatient = ({ route }) => {
 
 
   // --- ФУНКЦІЯ: Виклик Edge Function для надсилання сповіщення лікарю ---
-  const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId) => {
-    console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId });
+  // Додано параметр `amount`
+  const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId, amount) => {
+    console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId, amount });
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token || '';
@@ -251,7 +243,8 @@ const ConsultationTimePatient = ({ route }) => {
           booking_date: bookingDate,
           booking_time_slot: bookingTimeSlot,
           booking_id: bookingId,
-          patient_id: patientId
+          patient_id: patientId,
+          amount: amount // <-- Передаємо amount
         }),
       });
 
@@ -308,6 +301,11 @@ const ConsultationTimePatient = ({ route }) => {
     const errors = [];
     const patientFullName = patientProfile.full_name;
 
+    // !!! Тимчасовий amount для тестування !!!
+    // У реальному додатку ця сума має приходити звідкись (з вибору послуги, профілю лікаря тощо).
+    // Або бути результатом інтеграції з платіжною системою.
+    const TEST_BOOKING_AMOUNT = 100.00; // Наприклад, 100 грн. Змініть це на реальну логіку.
+
     for (const slot of selectedSlots) {
       try {
         console.log(`Attempting to book slot ${slot.id} for doctorId: ${doctorId}, patientId: ${patientId}`);
@@ -362,6 +360,7 @@ const ConsultationTimePatient = ({ route }) => {
             booking_date: slot.date,
             booking_time_slot: slot.rawTime,
             status: 'pending',
+            amount: TEST_BOOKING_AMOUNT, // <-- Додаємо amount сюди
           })
           .select()
           .single();
@@ -378,7 +377,8 @@ const ConsultationTimePatient = ({ route }) => {
           slot.date,
           slot.rawTime,
           newBookingId,
-          patientId
+          patientId,
+          TEST_BOOKING_AMOUNT // <-- Передаємо amount до Edge Function
         );
 
         if (notificationSent) {
@@ -414,12 +414,10 @@ const ConsultationTimePatient = ({ route }) => {
     setBooking(false);
   };
 
-  // --- Обробник натискання кнопки "Назад" ---
   const handleBackPress = () => {
     navigation.goBack();
   };
 
-  // --- Відображення індикатора завантаження, поки дані завантажуються ---
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -429,7 +427,6 @@ const ConsultationTimePatient = ({ route }) => {
     );
   }
 
-  // --- Рендеринг UI ---
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -477,13 +474,11 @@ const ConsultationTimePatient = ({ route }) => {
                   let slotLabel = slot.time;
 
                   if (isMyBooking) {
-                    // Синій для моїх бронювань
                     buttonStyle.push(styles.timeSlotButtonBookedByMe);
                     textStyle.push(styles.timeSlotTextBooked);
                     isDisabled = false;
                     slotLabel = `${slot.time}\n(${t('booked')})`;
                   } else if (isBookedByOther) {
-                    // Більш світлий, прозорий синій для заброньованих іншими
                     buttonStyle.push(styles.timeSlotButtonBookedByOther);
                     textStyle.push(styles.timeSlotTextBooked);
                     isDisabled = true;
@@ -526,7 +521,6 @@ const ConsultationTimePatient = ({ route }) => {
   );
 };
 
-// --- СТИЛІ ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -587,7 +581,7 @@ const styles = StyleSheet.create({
   bookButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#0EB3EB', 
+    backgroundColor: '#0EB3EB',
     shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -669,7 +663,7 @@ const styles = StyleSheet.create({
     color: '#757575',
   },
   timeSlotButtonSelected: {
-    backgroundColor: '#0EB3EB', // Яскраво-синій для вибраних (очікують на бронювання)
+    backgroundColor: '#0EB3EB',
     borderColor: '#0A8BA6',
     shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 2 },
@@ -681,18 +675,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
   },
-  // --- НОВІ/ОНОВЛЕНІ СТИЛІ ДЛЯ СИНІХ ЗАБРОНЬОВАНИХ КНОПОК ---
   timeSlotButtonBookedByOther: {
-    backgroundColor: 'rgba(52, 152, 219, 0.6)', // Синій, але з прозорістю
+    backgroundColor: 'rgba(52, 152, 219, 0.6)',
     borderColor: 'rgba(41, 128, 185, 0.6)',
-    // shadowColor: '#3498DB', // Додаємо тінь для більшої виразності
-    // shadowOffset: { width: 0, height: 2 },
-    // shadowOpacity: 0.2,
-    // shadowRadius: 3,
-    // elevation: 2,
   },
   timeSlotButtonBookedByMe: {
-    backgroundColor: '#0EB3EB', // Основний синій, як і для обраних (щоб було зрозуміло, що вони ваші)
+    backgroundColor: '#0EB3EB',
     borderColor: '#0A8BA6',
     shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 2 },
@@ -700,11 +688,10 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 4,
   },
-  timeSlotTextBooked: { // Об'єднаний стиль для тексту заброньованих слотів
+  timeSlotTextBooked: {
     color: '#FFFFFF',
     fontWeight: '700',
   },
-  // --- КІНЕЦЬ НОВИХ/ОНОВЛЕНИХ СТИЛІВ ---
   timeSlotButtonUnavailableByDoctor: {
     backgroundColor: 'rgba(247, 247, 247, 0.3)',
     borderColor: 'rgba(224, 224, 224, 0.3)',

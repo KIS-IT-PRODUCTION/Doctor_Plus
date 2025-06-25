@@ -864,6 +864,15 @@
   "Chile": "Chile",
   "Montenegro": "Montenegro",
   "Sri Lanka": "Sri Lanka",
-  "Jamaica": "Jamaica"
+  "Jamaica": "Jamaica",
+   "pay_now": "Pay now",
+  "you_paid": "You paid",
+  "payment_success_title": "Payment successful!",
+  "payment_success_message": "Your payment has been processed successfully.",
+  "payment_failure_title": "Payment failed!",
+  "payment_failure_message": "Unfortunately, your payment could not be processed. Please try again or contact support.",
+  "payment_notification_title": "Payment Status Update",
+  "payment_successful_notification_body": "Payment successful!",
+  "payment_failed_notification_body": "Payment failed."
 
 }
