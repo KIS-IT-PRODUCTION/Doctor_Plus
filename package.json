@@ -45,16 +45,14 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-vector-icons": "^10.2.0",
     "react-native-web": "^0.20.0",
-<<<<<<< HEAD
-=======
     "react-native-webview": "^13.15.0",
->>>>>>> ecf557a99e2af2cf16bb5aefdf9ba77fcb7a533b
     "ws": "^8.17.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
     "react-native-svg-transformer": "^1.5.1",
+    "@react-native-community/cli": "latest",
     "supabase": "^2.24.3",
     "tsconfig": "^7.0.0",
     "typescript": "~5.8.3"

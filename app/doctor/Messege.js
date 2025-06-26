@@ -12,11 +12,11 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg";
+import Icon from "../../assets/icon.svg"; // Переконайтеся, що шлях правильний
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
-import { supabase } from '../../providers/supabaseClient';
+import { supabase } from '../../providers/supabaseClient'; // Переконайтеся, що шлях правильний
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -51,10 +51,11 @@ export default function Message() {
     const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(now);
 
     setMessages(prevMessages => {
-      // Використовуємо db_id для перевірки дублікатів, якщо він є
+      // Use db_id to check for duplicates if it exists
       const isDuplicate = prevMessages.some(msg =>
         (data && data.db_id && msg.db_id === data.db_id) ||
-        // Додаткова перевірка, якщо db_id немає (наприклад, для тестових сповіщень)
+        // Additional check if db_id is not present (e.g., for test notifications or simple alerts)
+        // This fallback should be used less often with robust db_id handling
         (msg.title === title && msg.body === body && msg.date === messageDate && msg.time === messageTime && msg.type === (data.type || 'general'))
       );
 
@@ -63,20 +64,21 @@ export default function Message() {
         return prevMessages;
       }
 
-      // Переконаємося, що статус завжди нижнього регістру та має значення за замовчуванням
-      const messageStatus = (data && data.status) ? String(data.status).toLowerCase() : 'pending';
+      // Ensure status is always lowercase and has a default value for bookings
+      const messageStatus = (data && data.payment_status) ? String(data.payment_status).toLowerCase() : ((data && data.status) ? String(data.status).toLowerCase() : 'pending');
+      const messageType = (data && data.type) || 'general'; // Get the type of the notification
 
       return [
         {
           id: data && data.db_id ? data.db_id : (Date.now().toString() + Math.random().toString(36).substring(2, 9)),
-          db_id: data && data.db_id ? data.db_id : null, // Зберігаємо db_id, якщо він є
+          db_id: data && data.db_id ? data.db_id : null, // Store db_id if it exists
           title: title,
           body: body,
           date: messageDate,
           time: messageTime,
-          is_read: (data && data.is_read) || false, // is_read має бути в data, якщо воно не вставляється окремо
-          type: (data && data.type) || 'general',
-          rawData: { ...data, status: messageStatus } || {}, // Зберігаємо всі rawData
+          is_read: (data && data.is_read) || false, // is_read should be in data if not inserted separately
+          type: messageType, // Use the extracted type
+          rawData: { ...data, status: messageStatus } || {}, // Store all rawData, status key might be 'payment_status' or 'status'
         },
         ...prevMessages,
       ];
@@ -109,18 +111,20 @@ export default function Message() {
 
       const formattedMessages = data.map(notif => {
         const rawData = notif.data || {};
-        const messageStatus = (rawData.status) ? String(rawData.status).toLowerCase() : 'pending';
+        // Prioritize payment_status if it exists, otherwise use status
+        const messageStatus = (rawData.payment_status) ? String(rawData.payment_status).toLowerCase() : ((rawData.status) ? String(rawData.status).toLowerCase() : 'pending');
+        const messageType = rawData.type || 'general'; // Get type from rawData
 
         return {
           id: notif.id,
-          db_id: notif.id, // ID з бази даних
+          db_id: notif.id, // Database ID
           title: notif.title,
           body: notif.body,
           date: new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at)),
           time: new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(notif.created_at)),
-          is_read: notif.is_read, // Зчитуємо is_read з БД
-          type: rawData.type || 'general',
-          rawData: { ...rawData, status: messageStatus }, // Передаємо всі rawData
+          is_read: notif.is_read, // Read is_read from DB
+          type: messageType, // Use the extracted type
+          rawData: { ...rawData, status: messageStatus }, // Pass all rawData, ensuring consistent 'status' key
         };
       });
 
@@ -176,54 +180,73 @@ export default function Message() {
       if (currentDoctorUserId) {
         fetchMessagesFromSupabase(currentDoctorUserId);
       }
+      // Re-fetch messages when currentDoctorUserId changes or when the screen gains focus.
+      // This helps ensure messages are up-to-date after any DB changes.
       return () => {}; // Cleanup function, if needed
     }, [currentDoctorUserId, fetchMessagesFromSupabase])
   );
 
   useEffect(() => {
-    // Налаштовуємо обробник сповіщень для фонового та переднього плану
+    // Configure notification handler for background and foreground
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowAlert: true, // Показувати сповіщення, коли додаток активний
-        shouldPlaySound: true, // Відтворювати звук
-        shouldSetBadge: true, // Оновлювати бейдж додатку
+        shouldShowAlert: true, // Show notification when app is active
+        shouldPlaySound: true, // Play sound
+        shouldSetBadge: true, // Update app badge
       }),
     });
 
-    // Слухач для сповіщень, отриманих на передньому плані
+    // Listener for notifications received in the foreground
     notificationReceivedListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Сповіщення отримано на передньому плані (Message.js):', notification);
-      addNewMessage(notification.request.content); // Додаємо до списку повідомлень у UI
-      // Тут можна додатково оновити бейдж або показати інший UI-елемент
+      console.log('Notification received in foreground (Message.js):', notification);
+      // Ensure db_id is passed to addNewMessage to prevent duplicates
+      const notificationContentWithDbId = {
+        ...notification.request.content,
+        data: {
+          ...notification.request.content.data,
+          db_id: notification.request.content.data?.id // Assuming 'id' from notification data is db_id
+        }
+      };
+      addNewMessage(notificationContentWithDbId); // Add to message list in UI
     });
 
-    // Слухач для натискань на сповіщення
+    // Listener for notification clicks
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Користувач натиснув на сповіщення (Message.js):', response);
+      console.log('User clicked on notification (Message.js):', response);
       const { title, body, data } = response.notification.request.content;
 
-      // Оновлюємо UI, якщо сповіщення не було додано раніше
-      addNewMessage(response.notification.request.content);
+      // Update UI if the notification hasn't been added before
+      const notificationContentWithDbId = {
+        ...response.notification.request.content,
+        data: {
+          ...response.notification.request.content.data,
+          db_id: response.notification.request.content.data?.id // Assuming 'id' from notification data is db_id
+        }
+      };
+      addNewMessage(notificationContentWithDbId);
 
-<<<<<<< HEAD
-      // Перенаправлення або показ Alert залежно від типу сповіщення
+      // Redirect or show Alert depending on the notification type
       if (data && data.type === 'new_booking' && data.booking_id) {
-        // Навігація до екрану деталей бронювання
+        // Navigate to booking details screen
         console.log("Navigating to BookingDetails for booking_id:", data.booking_id);
-        navigation.navigate('BookingDetails', { bookingId: data.booking_id, patientId: data.patient_id, doctorId: data.doctor_id });
-=======
-      if (data && data.type === 'new_booking' && data.patient_name && (data.booking_date || data.date) && (data.booking_time_slot || data.time)) {
         Alert.alert(
           t('new_booking_notification_title'),
           `${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || data.date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || data.time || t('not_specified')}.`,
           [{ text: t('view_details'), onPress: () => {
-              console.log("Navigate to booking details for booking_id:", data.booking_id);
+              navigation.navigate('BookingDetails', { bookingId: data.booking_id, patientId: data.patient_id, doctorId: data.doctor_id });
             }
           }]
         );
->>>>>>> ecf557a99e2af2cf16bb5aefdf9ba77fcb7a533b
-      } else {
-          // Загальний Alert для інших типів сповіщень
+      } else if (data && (data.type === 'payment_received' || data.type === 'payment_update_doctor')) {
+        // Alert for payment notifications
+        Alert.alert(
+          title || t('payment_notification_title_default'),
+          `${t('payment_status')}: ${data.payment_status || t('not_specified')}\n${t('amount')}: ${data.amount || 'N/A'} ${data.currency || ''}\n${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || data.date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || data.time || t('not_specified')}.`,
+          [{ text: t('ok') }]
+        );
+      }
+      else {
+          // General Alert for other notification types
           Alert.alert(title || t('notification_title_default'), body || t('notification_body_default'), [{ text: t('ok') }]);
       }
     });
@@ -231,21 +254,27 @@ export default function Message() {
     // Cleanup function
     return () => {
       if (notificationReceivedListener.current) {
-        Notifications.removeNotificationSubscription(notificationReceivedListener.current); // Правильний метод для видалення підписки
+        Notifications.removeNotificationSubscription(notificationReceivedListener.current);
       }
       if (notificationResponseListener.current) {
-        Notifications.removeNotificationSubscription(notificationResponseListener.current); // Правильний метод для видалення підписки
+        Notifications.removeNotificationSubscription(notificationResponseListener.current);
       }
     };
-  }, [t, addNewMessage, navigation]); // Додано navigation до залежностей
+  }, [t, addNewMessage, navigation]);
 
   const markAsReadAndStatus = useCallback(async (messageId, newStatus = null) => {
+    // Optimistic UI update
     setMessages(prevMessages =>
       prevMessages.map(msg => {
         if (msg.id === messageId) {
           const updatedRawData = { ...msg.rawData };
           if (newStatus) {
-            updatedRawData.status = newStatus;
+            // Ensure status or payment_status is updated correctly
+            if (updatedRawData.type === 'payment_received' || updatedRawData.type === 'payment_update_doctor') {
+                updatedRawData.payment_status = newStatus;
+            } else {
+                updatedRawData.status = newStatus;
+            }
           }
           return { ...msg, is_read: true, rawData: updatedRawData };
         }
@@ -268,7 +297,15 @@ export default function Message() {
         }
 
         const existingRawData = currentNotification.data || {};
-        updateObject.data = { ...existingRawData, status: newStatus };
+        const updatedDataForDB = { ...existingRawData };
+
+        // Update the correct status key based on notification type
+        if (existingRawData.type === 'payment_received' || existingRawData.type === 'payment_update_doctor') {
+            updatedDataForDB.payment_status = newStatus;
+        } else {
+            updatedDataForDB.status = newStatus;
+        }
+        updateObject.data = updatedDataForDB;
       }
 
       const { error } = await supabase
@@ -277,10 +314,10 @@ export default function Message() {
         .eq('id', messageId);
 
       if (error) {
-        console.error("Error marking notification as read or updating status:", error.message);
+        console.error("Error marking notification as read or updating status in DB:", error.message);
         Alert.alert(t('error'), t('failed_to_update_notification_status'));
       } else {
-        console.log(`Notification ${messageId} marked as read and status updated to ${newStatus} in DB.`);
+        console.log(`Notification ${messageId} marked as read and status updated to ${newStatus || 'N/A'} in DB.`);
       }
     } catch (error) {
       console.error("Network error marking notification as read or updating status:", error.message);
@@ -303,44 +340,39 @@ export default function Message() {
 
       const bookingId = message.rawData.booking_id;
       const patientId = message.rawData.patient_id;
-<<<<<<< HEAD
-      const bookingDate = message.rawData.booking_date; // Використовуємо booking_date
-      const bookingTimeSlot = message.rawData.booking_time_slot; // Використовуємо booking_time_slot
-=======
-      // ОНОВЛЕНО: Надійний запасний варіант для отримання дати та часу
-      const bookingDate = message.rawData.booking_date || message.rawData.date; 
+      // Use booking_date and booking_time_slot first, fallback to date and time
+      const bookingDate = message.rawData.booking_date || message.rawData.date;
       const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
->>>>>>> ecf557a99e2af2cf16bb5aefdf9ba77fcb7a533b
       const doctorFinalName = doctorFullName || t('doctor');
-      const bookingAmount = message.rawData.amount; // Отримуємо суму з rawData
+      const bookingAmount = message.rawData.amount; // Get amount from rawData if available
 
-      // ОНОВЛЕНО: Перевіряємо, чи є bookingDate та bookingTimeSlot дійсними рядками
+      // Check if bookingDate and bookingTimeSlot are valid strings
       if (typeof bookingDate !== 'string' || bookingDate.trim() === '' || typeof bookingTimeSlot !== 'string' || bookingTimeSlot.trim() === '') {
           console.error("Missing or invalid booking date or time slot in rawData. Expected YYYY-MM-DD and HH:MM strings (from booking_date/booking_time_slot or date/time):", {
               booking_date: bookingDate,
               booking_time_slot: bookingTimeSlot,
-              rawData: message.rawData // Додано для повнішої діагностики
+              rawData: message.rawData
           });
           Alert.alert(t('error'), t('invalid_booking_data_for_update_date_time'));
           return;
       }
-      
+
       try {
-          console.log(`Оновлення бронювання ${bookingId} на статус: ${newStatus} для пацієнта ${patientId}`);
+          console.log(`Updating booking ${bookingId} to status: ${newStatus} for patient ${patientId}`);
           const { error: updateError } = await supabase
-              .from('patient_bookings') // або 'bookings', якщо це єдина таблиця для бронювань
+              .from('patient_bookings') // or 'bookings' if it's the single table for bookings
               .update({ status: newStatus })
               .eq('id', bookingId);
 
           if (updateError) {
-              console.error("Помилка оновлення статусу бронювання в Supabase:", updateError.message);
+              console.error("Error updating booking status in Supabase:", updateError.message);
               throw updateError;
           }
 
-          console.log(`Бронювання ${bookingId} успішно оновлено до ${newStatus}`);
+          console.log(`Booking ${bookingId} successfully updated to ${newStatus}`);
 
           if (newStatus === 'rejected') {
-              console.log(`Знімаємо 50 балів з лікаря ${currentDoctorUserId} через відхилення бронювання.`);
+              console.log(`Deducting 50 points from doctor ${currentDoctorUserId} due to rejected booking.`);
               const { data: doctorProfile, error: fetchProfileError } = await supabase
                   .from('profile_doctor')
                   .select('doctor_points')
@@ -348,7 +380,7 @@ export default function Message() {
                   .single();
 
               if (fetchProfileError) {
-                  console.error("Помилка при отриманні балів лікаря:", fetchProfileError.message);
+                  console.error("Error fetching doctor points:", fetchProfileError.message);
               } else if (doctorProfile) {
                   const newPoints = Math.max(0, (doctorProfile.doctor_points || 0) - 50);
                   const { error: updatePointsError } = await supabase
@@ -357,9 +389,9 @@ export default function Message() {
                       .eq('user_id', currentDoctorUserId);
 
                   if (updatePointsError) {
-                      console.error("Помилка при оновленні балів лікаря:", updatePointsError.message);
+                      console.error("Error updating doctor points:", updatePointsError.message);
                   } else {
-                      console.log(`Бали лікаря ${currentDoctorUserId} оновлено до ${newPoints}`);
+                      console.log(`Doctor points for ${currentDoctorUserId} updated to ${newPoints}`);
                   }
               }
           }
@@ -381,49 +413,38 @@ export default function Message() {
                   patient_id: patientId,
                   doctor_id: currentDoctorUserId,
                   status: newStatus,
-<<<<<<< HEAD
                   booking_date: bookingDate,
                   booking_time_slot: bookingTimeSlot,
-                  // amount: 0, // Не потрібно для лікаря, або встановлюйте 0 якщо обов'язково
-                               // Якщо handle-booking-status-update очікує amount для 'confirmed',
-                               // то тут потрібно отримати його з booking details або встановити 0 для rejected.
-                               // Для лікаря ця функція надсилається після дії лікаря, тому amount має бути
-                               // відомий з БД booking, або встановлюємо 0 якщо не оплачується.
-=======
-                  booking_date: bookingDate, // Використовуємо booking_date (або date) з rawData
-                  booking_time_slot: bookingTimeSlot, // Використовуємо booking_time_slot (або time) з rawData
-                  amount: bookingAmount,     // Додано поле amount
-                  is_paid: false,            // Додано поле is_paid зі значенням false
->>>>>>> ecf557a99e2af2cf16bb5aefdf9ba77fcb7a533b
+                  amount: 0,
+                  is_paid: false,
               },
               doctor_name: doctorFinalName,
           };
 
-          // Якщо статус "confirmed", вам потрібно отримати суму з booking, щоб передати її в Edge Function
+          // If status is "confirmed", fetch the actual amount from the booking
           if (newStatus === 'confirmed') {
               const { data: bookingDetails, error: bookingFetchError } = await supabase
-                  .from('patient_bookings') // Або ваша основна таблиця бронювань
-                  .select('amount') // Припустимо, у вас є колонка 'amount'
+                  .from('patient_bookings')
+                  .select('amount, is_paid')
                   .eq('id', bookingId)
                   .single();
 
               if (bookingFetchError) {
-                  console.error("Помилка отримання суми бронювання:", bookingFetchError.message);
+                  console.error("Error getting booking amount or is_paid status:", bookingFetchError.message);
                   Alert.alert(t('error'), t('failed_to_fetch_booking_amount'));
                   return;
               }
               if (bookingDetails && bookingDetails.amount !== undefined) {
                   payload.booking.amount = bookingDetails.amount;
+                  payload.booking.is_paid = bookingDetails.is_paid;
               } else {
-                  console.warn("Сума бронювання не знайдена, встановлюємо 0 для Edge Function.");
-                  payload.booking.amount = 0; // Встановіть значення за замовчуванням
+                  console.warn("Booking amount/is_paid not found, setting amount to 0 and is_paid to false for Edge Function.");
+                  payload.booking.amount = 0;
+                  payload.booking.is_paid = false;
               }
-          } else {
-              payload.booking.amount = 0; // Якщо не 'confirmed', amount не потрібен для пацієнта
           }
 
-
-          console.log("Виклик Edge Function handle-booking-status-update з даними:", JSON.stringify(payload, null, 2)); // Логуємо повний payload
+          console.log("Calling Edge Function handle-booking-status-update with data:", JSON.stringify(payload, null, 2));
 
           const response = await fetch(edgeFunctionUrl, {
               method: 'POST',
@@ -444,20 +465,22 @@ export default function Message() {
                       errorText = JSON.stringify(errorData);
                   }
               } catch (parseError) {
-                  console.warn("Не вдалося розпарсити відповідь помилки від Edge Function (можливо, не JSON):", parseError);
+                  console.warn("Failed to parse error response from Edge Function (possibly not JSON):", parseError);
               }
-              console.error('Помилка виклику Edge Function (відповідь не ОК):', errorText);
+              console.error('Error calling Edge Function (response not OK):', errorText);
               Alert.alert(t('error'), `${t('failed_to_send_notification')}: ${errorText}`);
               return;
           }
 
-          console.log('Edge Function викликана успішно. Відповідь:', await response.json());
+          console.log('Edge Function called successfully. Response:', await response.json());
           Alert.alert(t('success'), newStatus === 'confirmed' ? t('booking_confirmed_successfully_message') : t('booking_rejected_successfully_message'));
 
           if (message.db_id) {
+            // Pass the original message type to ensure markAsReadAndStatus updates the correct status key
             await markAsReadAndStatus(message.db_id, newStatus);
           } else {
             console.warn("Message does not have db_id, cannot update status in doctor_notifications table.");
+            // Fallback for UI update if no db_id
             setMessages(prevMessages =>
               prevMessages.map(msg =>
                 msg.id === message.id ? { ...msg, is_read: true, rawData: { ...msg.rawData, status: newStatus } } : msg
@@ -465,10 +488,10 @@ export default function Message() {
             );
           }
       } catch (error) {
-          console.error("Помилка обробки бронювання (загальна помилка fetch або DB update):", error.message);
+          console.error("Error processing booking (general fetch or DB update error):", error.message);
           Alert.alert(t('error'), `${t('failed_to_process_booking')}: ${error.message}`);
       }
-  }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus, navigation]); // Додано navigation до залежностей
+  }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus, navigation]);
 
 
   const handleConfirmBooking = useCallback(async (message) => {
@@ -525,10 +548,47 @@ export default function Message() {
           </View>
         ) : (
           messages.map((message) => {
-            const isConfirmed = message.rawData.status === 'confirmed';
-            const isRejected = message.rawData.status === 'rejected';
-            const isNewBooking = message.type === 'new_booking';
-            const isPendingBooking = isNewBooking && message.rawData.status === 'pending';
+            const isConfirmedBooking = message.type === 'new_booking' && message.rawData.status === 'confirmed';
+            const isRejectedBooking = message.type === 'new_booking' && message.rawData.status === 'rejected';
+            const isPendingBooking = message.type === 'new_booking' && message.rawData.status === 'pending';
+            
+            const isPaymentReceived = message.type === 'payment_received' && message.rawData.is_paid === true;
+            const isPaymentUpdate = message.type === 'payment_update_doctor'; // Covers 'failed', 'pending', etc.
+            const isPaymentFailed = isPaymentUpdate && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined');
+            const isPaymentPending = isPaymentUpdate && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
+            
+            // Determine gradient colors and border style based on message type and status
+            let cardColors = ['#FFFFFF', '#FDFDFD']; // Default light gradient
+            let cardBorderStyle = {};
+            let showActions = false; // Flag to control action buttons visibility
+            let showStatusText = false; // Flag to control status text visibility
+
+            if (isPendingBooking) {
+                cardColors = ['#E0F7FA', '#B2EBF2']; // Light blue for new, pending bookings
+                cardBorderStyle = styles.messageCardPendingBorder;
+                showActions = true;
+            } else if (isConfirmedBooking || isPaymentReceived) {
+                cardColors = ['#E8F5E9', '#C8E6C9']; // Light green for confirmed bookings and successful payments
+                cardBorderStyle = styles.messageCardConfirmedBorder;
+                showStatusText = true;
+            } else if (isRejectedBooking || isPaymentFailed) {
+                cardColors = ['#FFEBEE', '#FFCDD2']; // Light red for rejected bookings and failed payments
+                cardBorderStyle = styles.messageCardRejectedBorder;
+                showStatusText = true;
+            } else if (isPaymentPending) {
+                cardColors = ['#FFFDE7', '#FFF9C4']; // Light yellow for pending payments
+                cardBorderStyle = styles.messageCardWarningBorder;
+                showStatusText = true;
+            } else {
+                // General notifications, distinguish read/unread
+                if (!message.is_read) {
+                    cardColors = ['#FFFFFF', '#F0F8FF']; // Slightly off-white for unread general
+                    cardBorderStyle = styles.messageCardUnreadBorder;
+                } else {
+                    cardColors = ['#F8F8F8', '#ECECEC']; // Greyish for read general
+                }
+            }
+
 
             return (
               <View key={message.id} style={styles.messageGroup}>
@@ -537,68 +597,94 @@ export default function Message() {
                   <Text style={styles.timestampText}>{message.time}</Text>
                 </View>
                 <LinearGradient
-                  colors={
-                    isPendingBooking
-                      ? ['#FFFFFF', '#F0F8FF']
-                      : isConfirmed
-                      ? ['#E6FFE6', '#D4FAD4']
-                      : isRejected
-                      ? ['#FFEEEE', '#FAD4D4']
-                      : message.is_read
-                      ? ['#F8F8F8', '#ECECEC']
-                      : ['#FFFFFF', '#FDFDFD']
-                  }
+                  colors={cardColors}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[
                     styles.messageCard,
-                    isConfirmed && styles.messageCardConfirmedBorder,
-                    isRejected && styles.messageCardRejectedBorder,
-                    !message.is_read && styles.messageCardUnread,
+                    cardBorderStyle, // Apply the determined border style
+                    !message.is_read && styles.messageCardUnreadLeftBar, // Keep the left bar for unread
                   ]}
                 >
                   <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                   <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
 
-                  {isNewBooking ? (
-                      isPendingBooking ? (
-                          <View style={styles.bookingActionButtons}>
-                              <TouchableOpacity
-                                  onPress={() => handleConfirmBooking(message)}
-                                  style={styles.actionButtonContainer}
+                  {/* Render content based on type and status */}
+                  {isPendingBooking && showActions && (
+                      <View style={styles.bookingActionButtons}>
+                          <TouchableOpacity
+                              onPress={() => handleConfirmBooking(message)}
+                              style={styles.actionButtonContainer}
+                          >
+                              <LinearGradient
+                                  colors={['#4CAF50', '#2E7D32']}
+                                  style={styles.actionButtonGradient}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
                               >
-                                  <LinearGradient
-                                      colors={['#4CAF50', '#2E7D32']}
-                                      style={styles.actionButtonGradient}
-                                      start={{ x: 0, y: 0 }}
-                                      end={{ x: 1, y: 0 }}
-                                  >
-                                      <Text style={styles.actionButtonText}>{t('confirm_booking')}</Text>
-                                  </LinearGradient>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                  onPress={() => handleRejectBooking(message)}
-                                  style={styles.actionButtonContainer}
+                                  <Text style={styles.actionButtonText}>{t('confirm_booking')}</Text>
+                              </LinearGradient>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                              onPress={() => handleRejectBooking(message)}
+                              style={styles.actionButtonContainer}
+                          >
+                              <LinearGradient
+                                  colors={['#D32F2F', '#B71C1C']}
+                                  style={styles.actionButtonGradient}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
                               >
-                                  <LinearGradient
-                                      colors={['#D32F2F', '#B71C1C']}
-                                      style={styles.actionButtonGradient}
-                                      start={{ x: 0, y: 0 }}
-                                      end={{ x: 1, y: 0 }}
-                                  >
-                                      <Text style={styles.actionButtonText}>{t('reject_booking')}</Text>
-                                  </LinearGradient>
-                              </TouchableOpacity>
-                          </View>
-                      ) : (
-                          <Text style={[
-                              styles.statusText,
-                              isConfirmed ? styles.confirmedText : styles.rejectedText
-                          ]}>
-                              {isConfirmed ? t('confirmed_read') : t('rejected_read')}
-                          </Text>
-                      )
-                  ) : (
+                                  <Text style={styles.actionButtonText}>{t('reject_booking')}</Text>
+                              </LinearGradient>
+                          </TouchableOpacity>
+                      </View>
+                  )}
+
+                  {(isConfirmedBooking || isRejectedBooking) && showStatusText && (
+                      <Text style={[
+                          styles.statusText,
+                          isConfirmedBooking ? styles.confirmedText : styles.rejectedText
+                      ]}>
+                          {isConfirmedBooking ? t('confirmed_read') : t('rejected_read')}
+                      </Text>
+                  )}
+
+                  {(isPaymentReceived || isPaymentUpdate) && (
+                    <View>
+                      <Text style={styles.paymentDetailsText}>
+                        {t('patient')}: {message.rawData.patient_name || t('not_specified')}
+                      </Text>
+                      <Text style={styles.paymentDetailsText}>
+                        {t('booking_date_time')}: {message.rawData.booking_date || message.rawData.date} {message.rawData.booking_time_slot || message.rawData.time}
+                      </Text>
+                      <Text style={[
+                          styles.paymentStatusText,
+                          isPaymentReceived ? styles.paidStatusText : (isPaymentFailed ? styles.failedStatusText : styles.pendingStatusText)
+                      ]}>
+                          {t('payment_status')}: {isPaymentReceived ? t('paid') : (isPaymentFailed ? t('failed') : t('pending'))}
+                          {message.rawData.amount ? ` (${message.rawData.amount} ${message.rawData.currency || 'UAH'})` : ''}
+                      </Text>
+                       {!message.is_read && ( // Only show mark as read for payment notifications if unread
+                          <TouchableOpacity
+                              onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
+                              style={styles.actionButtonContainer}
+                          >
+                              <LinearGradient
+                                  colors={['#0EB3EB', '#0A8BA6']}
+                                  style={styles.actionButtonGradient}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                               >
+                                  <Text style={styles.actionButtonText}>{t('mark_as_read')}</Text>
+                              </LinearGradient>
+                          </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  {/* For general messages (not booking/payment related) */}
+                  {!isPendingBooking && !isConfirmedBooking && !isRejectedBooking && !isPaymentReceived && !isPaymentUpdate && (
                       !message.is_read ? (
                           <TouchableOpacity
                               onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
@@ -643,6 +729,7 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(10),
     fontSize: moderateScale(16),
     color: '#555',
+    fontFamily: "Mont-Regular",
   },
   header: {
     flexDirection: "row",
@@ -650,7 +737,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: scale(15),
     paddingVertical: verticalScale(15),
-   
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.1)",
@@ -659,7 +745,6 @@ const styles = StyleSheet.create({
     height: moderateScale(48),
     justifyContent: "center",
     alignItems: "center",
-
   },
   headerTitle: {
     fontSize: moderateScale(20),
@@ -682,11 +767,12 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: moderateScale(13),
-    fontWeight: "bold",
+    fontFamily: "Mont-SemiBold",
     color: "#777",
   },
   timestampText: {
     fontSize: moderateScale(13),
+    fontFamily: "Mont-Regular",
     color: "#777",
   },
   messageCard: {
@@ -700,20 +786,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 5,
     elevation: 6,
-    overflow: 'hidden',
+    overflow: 'hidden', // Ensures gradient doesn't go outside border radius
   },
-  messageCardUnread: {
+  messageCardUnreadLeftBar: { // Keep this for the left blue bar
     borderLeftWidth: 5,
     borderLeftColor: '#0EB3EB',
-    paddingLeft: moderateScale(13),
+    paddingLeft: moderateScale(13), // Adjust padding to make space for the bar
+  },
+  // New border styles for different message types/statuses
+  messageCardPendingBorder: {
+    borderWidth: 1,
+    borderColor: '#0EB3EB', // Blue for pending bookings
   },
   messageCardConfirmedBorder: {
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: '#4CAF50', // Green for confirmed/paid
   },
   messageCardRejectedBorder: {
     borderWidth: 1,
-    borderColor: '#D32F2F',
+    borderColor: '#D32F2F', // Red for rejected/failed
+  },
+  messageCardWarningBorder: {
+    borderWidth: 1,
+    borderColor: '#FFA000', // Orange for payment updates/pending
   },
   cardTitle: {
     fontSize: moderateScale(17),
@@ -725,87 +820,89 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14.5),
     fontFamily: "Mont-Regular",
     color: "#555",
-    marginBottom: verticalScale(12),
-    lineHeight: moderateScale(22),
+    marginBottom: verticalScale(10),
   },
   bookingActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: verticalScale(15),
-    flexWrap: 'wrap',
-    gap: scale(10),
   },
   actionButtonContainer: {
-    borderRadius: moderateScale(25),
+    borderRadius: moderateScale(10),
     overflow: 'hidden',
     flex: 1,
-    minWidth: scale(120),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
+    marginHorizontal: scale(5),
   },
   actionButtonGradient: {
     paddingVertical: verticalScale(12),
-    paddingHorizontal: scale(15),
     alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: moderateScale(10),
   },
   actionButtonText: {
     color: '#FFFFFF',
-    fontSize: moderateScale(14.5),
+    fontSize: moderateScale(14),
     fontFamily: "Mont-SemiBold",
   },
   statusText: {
+    marginTop: verticalScale(10),
     fontSize: moderateScale(14),
     fontFamily: "Mont-SemiBold",
-    marginTop: verticalScale(15),
-    alignSelf: 'flex-start',
-    paddingVertical: verticalScale(7),
-    paddingHorizontal: scale(12),
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
+    textAlign: 'center',
   },
   confirmedText: {
-    color: '#2E7D32',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderColor: '#4CAF50',
+    color: '#4CAF50', // Green
   },
   rejectedText: {
-    backgroundColor: 'rgba(211, 47, 47, 0.1)',
-    color: '#D32F2F',
-    borderColor: '#D32F2F',
+    color: '#D32F2F', // Red
   },
   readStatusText: {
-    fontSize: moderateScale(14),
-    fontFamily: "Mont-SemiBold",
-    marginTop: verticalScale(15),
-    alignSelf: 'flex-start',
-    paddingVertical: verticalScale(7),
-    paddingHorizontal: scale(12),
-    borderRadius: moderateScale(12),
-    backgroundColor: '#E0E0E0',
-    color: '#757575',
+    marginTop: verticalScale(10),
+    fontSize: moderateScale(12),
+    fontFamily: "Mont-Regular",
+    color: '#888',
+    textAlign: 'right',
   },
   emptyMessagesContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: verticalScale(80),
+    marginTop: verticalScale(50),
   },
   emptyMessagesText: {
-    fontSize: moderateScale(20),
-    fontFamily: "Mont-SemiBold",
-    color: "#555",
-    marginBottom: verticalScale(15),
+    fontSize: moderateScale(18),
+    fontFamily: 'Mont-Bold',
+    color: '#777',
+    marginBottom: verticalScale(10),
   },
   emptyMessagesSubText: {
-    fontSize: moderateScale(15),
-    fontFamily: "Mont-Regular",
-    color: "#777",
+    fontSize: moderateScale(14),
+    fontFamily: 'Mont-Regular',
+    color: '#999',
     textAlign: 'center',
     paddingHorizontal: scale(30),
-    lineHeight: moderateScale(24),
+  },
+  // Payment specific styles
+  paymentDetailsText: {
+    fontSize: moderateScale(13.5),
+    fontFamily: "Mont-Regular",
+    color: '#666',
+    marginBottom: verticalScale(3),
+  },
+  paymentStatusText: {
+    fontSize: moderateScale(14.5),
+    fontFamily: "Mont-SemiBold",
+    marginTop: verticalScale(8),
+  },
+  paidStatusText: {
+    color: '#4CAF50', // Green for paid
+  },
+  unpaidStatusText: { // Fallback, could be pending or failed if not explicitly paid
+    color: '#FFA000', // Orange
+  },
+  failedStatusText: { // Specific for failed payments
+    color: '#D32F2F', // Red
+  },
+  pendingStatusText: { // Specific for pending payments
+    color: '#0EB3EB', // Blue
   },
 });
