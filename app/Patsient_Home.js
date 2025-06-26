@@ -488,11 +488,8 @@ const Patsient_Home = () => {
                   <Text style={styles.languageText}>
                     {displayedLanguageCode}
                   </Text>
-                  <Ionicons
-                    name="chevron-down-outline"
-                    size={16}
-                    color="white"
-                  />
+                  <Ionicons name="globe-outline" size={16} color="white" />
+                  
                 </View>
               </TouchableOpacity>
               <TouchableOpacity
@@ -761,8 +758,8 @@ const styles = StyleSheet.create({
     right: 10,
     backgroundColor: "#E04D53",
     borderRadius: 1000,
-    width: 16,
-    height: 16,
+    width: 17,
+    height: 17,
     justifyContent: "center",
     alignItems: "center",
     borderColor: "white",

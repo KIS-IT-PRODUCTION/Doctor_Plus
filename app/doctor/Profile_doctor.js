@@ -14,8 +14,8 @@ import {
   RefreshControl,
   LayoutAnimation,
   UIManager,
-  View, // <--- Важливо: додайте View, якщо його немає, для обгортки Text
-  Text, // <--- Важливо: додайте Text, якщо його немає
+  View,
+  Text,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,11 +26,13 @@ import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TabBar_doctor from "../../components/TopBar_doctor";
 import NetInfo from "@react-native-community/netinfo";
-import { LinearGradient } from 'expo-linear-gradient'; // <-- ДОДАНО: Імпорт LinearGradient
 
 const { width } = Dimensions.get("window");
 const isLargeScreen = width > 768;
-
+const scale = (size) => (width / 375) * size;
+const verticalScale = (size) => (height / 812) * size; // Припустимо, що height визначено
+const moderateScale = (size, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 if (
   Platform.OS === "android" &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -134,6 +136,27 @@ async function registerForPushNotificationsAsync(userId) {
 
   return token;
 }
+
+// Функція для перетворення doctor_points у кількість зірочок (від 0 до 5)
+const getStarRating = (points) => {
+  if (points === null || points === undefined || isNaN(points)) {
+    return 0; // Якщо балів немає або вони не валідні
+  }
+  if (points >= 1000) {
+    return 5;
+  } else if (points >= 800) {
+    return 4;
+  } else if (points >= 600) {
+    return 3;
+  } else if (points >= 400) {
+    return 2;
+  } else if (points >= 200) {
+    return 1;
+  } else {
+    return 0;
+  }
+};
+
 
 const ValueBox = ({ children }) => {
   const { t } = useTranslation();
@@ -477,7 +500,7 @@ const Profile_doctor = ({ route }) => {
         const { data, error: fetchError } = await supabase
           .from("anketa_doctor")
           .select(
-            "*, diploma_url, certificate_photo_url, consultation_cost, experience_years"
+            "*, diploma_url, certificate_photo_url, consultation_cost, experience_years, profile_doctor(doctor_points)" // <--- ЗМІНИ ТУТ
           )
           .eq("user_id", idToFetch)
           .single();
@@ -576,9 +599,9 @@ const Profile_doctor = ({ route }) => {
         typeof err === "object" &&
         err !== null &&
         "message" in err &&
-        typeof err.message === "string"
+        typeof e.message === "string"
       ) {
-        errorMessage = err.message;
+        errorMessage = e.message;
       }
       console.warn(
         "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
@@ -668,12 +691,7 @@ const Profile_doctor = ({ route }) => {
 
   if (shouldShowFullScreenState) {
     return (
-      // Обертаємо SafeAreaView в LinearGradient для фону
-      
         <SafeAreaView style={styles.fullscreenContainer}>
-        
-
-          {/* Показуємо іконки та текст помилки, якщо є помилка, немає даних, минув таймаут АБО НЕМАЄ ІНТЕРНЕТУ */}
           {(!loadingInitial || error || loadingTimeoutExpired || !isConnected || (!doctor && !loadingInitial)) && (
             <View style={styles.errorContainer}>
               {(!isConnected || error || !doctor) && (
@@ -686,34 +704,27 @@ const Profile_doctor = ({ route }) => {
                   : error || t("doctor_not_found")}
               </Text>
 
-              {/* Кнопки "Повторити" та "Назад" показуємо, якщо немає з'єднання АБО є помилка/таймаут */}
               {(!isConnected || error || loadingTimeoutExpired || (!doctor && !loadingInitial)) && (
                 <>
                   <TouchableOpacity
-                    style={styles.retryButton} // Сам TouchableOpacity
+                    style={styles.retryButton}
                     onPress={onRetry}
                   >
-                    
                       <Text style={styles.retryButtonText}>{t("retry")}</Text>
-                    
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.backToHomeButton} // Сам TouchableOpacity
+                    style={styles.backToHomeButton}
                     onPress={onBackToHome}
                   >
-                   
                       <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
-                    
                   </TouchableOpacity>
                 </>
               )}
             </View>
           )}
         </SafeAreaView>
-       // <-- Закриття LinearGradient для fullscreenContainer
     );
   }
-  // **** КІНЕЦЬ УМОВ РЕНДЕРИНГУ ****
 
   // Якщо ми дійшли сюди, значить `doctor` не null, і ми можемо відображати профіль
   const {
@@ -728,28 +739,28 @@ const Profile_doctor = ({ route }) => {
     achievements,
     certificate_photo_url,
     diploma_url,
+    profile_doctor // Додаємо, якщо doctor_points приходить як вкладений об'єкт
   } = doctor;
 
+  const doctorPoints = profile_doctor?.doctor_points; // Отримуємо doctor_points з вкладеного об'єкта
+
   return (
-    // Обертаємо SafeAreaView в LinearGradient для фону основного екрану
-   
       <SafeAreaView style={styles.container}>
         {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.languageSelectButton} // Сам TouchableOpacity
+            style={styles.languageSelectButton}
             onPress={openLanguageModal}
           >
-           
               <Text style={styles.languageButtonText}>
                 {displayedLanguageCode}
               </Text>
-              <Ionicons name="chevron-down-outline" size={16} color="white" />
+            <Ionicons name="globe-outline" size={16} color="white" />
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
           <TouchableOpacity
-            style={styles.notificationButton} // Сам TouchableOpacity
+            style={styles.notificationButton}
             onPress={() => navigation.navigate("Messege")}
           >
               <Ionicons name="notifications-outline" size={24} color="white" />
@@ -770,7 +781,7 @@ const Profile_doctor = ({ route }) => {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={onRefresh} // Викликаємо onRefresh при протягуванні
+              onRefresh={onRefresh}
               colors={["#0EB3EB", "#3F51B5"]}
               tintColor={"#0EB3EB"}
             />
@@ -815,11 +826,13 @@ const Profile_doctor = ({ route }) => {
               <View style={styles.infoRowDynamic}>
                 <Text style={styles.label}>{t("rating")}:</Text>
                 <ValueBox>
-                  <Ionicons name="star" size={18} color="#FFD700" />
-                  <Ionicons name="star" size={18} color="#FFD700" />
-                  <Ionicons name="star" size={18} color="#FFD700" />
-                  <Ionicons name="star" size={18} color="#FFD700" />
-                  <Ionicons name="star-half" size={18} color="#FFD700" />
+                  {/* ДИНАМІЧНИЙ РЕНДЕРИНГ ЗІРОЧОК */}
+                  {Array.from({ length: getStarRating(doctorPoints) }).map((_, i) => (
+                    <Ionicons key={`star-full-${i}`} name="star" size={18} color="#FFD700" />
+                  ))}
+                  {Array.from({ length: 5 - getStarRating(doctorPoints) }).map((_, i) => (
+                    <Ionicons key={`star-outline-${i}`} name="star-outline" size={18} color="#ccc" />
+                  ))}
                 </ValueBox>
               </View>
               <View style={styles.infoRowDynamic}>
@@ -855,27 +868,23 @@ const Profile_doctor = ({ route }) => {
 
           {/* Action Buttons */}
           <TouchableOpacity
-            style={styles.actionButton} // Сам TouchableOpacity
+            style={styles.actionButton}
             onPress={handleChooseConsultationTime}
           >
-            
               <Ionicons name="time-outline" size={24} color="white" style={styles.buttonIcon} />
               <Text style={styles.actionButtonText}>
                 {t("choose_consultation_time")}
               </Text>
-            
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionButton} // Сам TouchableOpacity
+            style={styles.actionButton}
             onPress={handleProfileDoctorSettingsPress}
           >
-            
               <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
               <Text style={styles.actionButtonText}>
                 {t("profile_doctor_settings")}
               </Text>
-            
           </TouchableOpacity>
 
           <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
@@ -924,15 +933,12 @@ const Profile_doctor = ({ route }) => {
                   onError={() => {
                     setLoadingCertificate(false);
                     setCertificateError(true);
-                    console.error(
-                      "Error loading certificate image:",
-                      certificate_photo_url
-                    );
+                    console.error("Error loading certificate image:", certificate_photo_url);
                   }}
                 />
               </View>
             ) : (
-              <Text style={styles.noImageText}>{t("no_certificate_photo")}</Text>
+              <Text style={styles.sectionContent}>{t("not_provided")}</Text>
             )}
           </View>
 
@@ -956,18 +962,15 @@ const Profile_doctor = ({ route }) => {
                   onError={() => {
                     setLoadingDiploma(false);
                     setDiplomaError(true);
-                    console.error(
-                      "Error loading diploma image:",
-                      diploma_url
-                    );
+                    console.error("Error loading diploma image:", diploma_url);
                   }}
                 />
               </View>
             ) : (
-              <Text style={styles.noImageText}>{t("no_diploma_photo")}</Text>
+              <Text style={styles.sectionContent}>{t("not_provided")}</Text>
             )}
           </View>
-    
+
           {/* Language Modal */}
           <Modal
             animationType="fade"
@@ -975,116 +978,118 @@ const Profile_doctor = ({ route }) => {
             visible={isLanguageModalVisible}
             onRequestClose={closeLanguageModal}
           >
-            <TouchableWithoutFeedback onPress={closeLanguageModal}>
-              <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback>
-                  <View style={styles.languageModalContent}>
-                    <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
-                    <ScrollView style={styles.modalScrollView}>
-                      {languagesForModal.map((lang) => (
-                        <TouchableOpacity
-                          key={lang.code}
-                          style={styles.languageOption}
-                          onPress={() => handleLanguageSelect(lang.code)}
-                        >
-                          <Text style={styles.languageOptionText}>
-                            {t(lang.nameKey)}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
+            <Pressable style={styles.centeredView} onPress={closeLanguageModal}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalView}>
+                  <Text style={styles.modalTitle}>{t("select_language")}</Text>
+                  {languagesForModal.map((lang) => (
+                    <TouchableOpacity
+                      key={lang.code}
+                      style={styles.languageOption}
+                      onPress={() => handleLanguageSelect(lang.code)}
+                    >
+                      <Text
+                        style={[
+                          styles.languageOptionText,
+                          i18n.language === lang.code &&
+                          styles.languageOptionTextSelected,
+                        ]}
+                      >
+                        {lang.emoji} {t(lang.nameKey)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  <Pressable style={styles.closeButton} onPress={closeLanguageModal}>
+                    <Text style={styles.closeButtonText}>{t("close")}</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </Pressable>
           </Modal>
         </ScrollView>
-          <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
+          <TabBar_doctor activeTab={activeTab} handleTabPress={handleTabPress} />
       </SafeAreaView>
-     // <-- Закриття LinearGradient для основного контейнера
   );
 };
 
-// Зі стилями, які я надав у попередній відповіді
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0F2F5",
-    paddingTop: Platform.OS === 'android' ? 30 : 10,
+    backgroundColor: '#F0F2F5', // Світлий фон за замовчуванням
+    paddingTop: Platform.OS === 'android' ? 30 : 10, // Додано padding для Android
   },
-  // Додаємо стиль для градієнтного фону всього екрану
-  containerGradient: {
-    flex: 1,
-  },
+  // containerGradient: { // Цей стиль не використовується, якщо немає LinearGradient
+  //   flex: 1,
+  // },
   fullscreenContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent", // Фон буде від градієнта
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F2F5', // Світлий фон для екрану помилки/завантаження
   },
   loadingContainer: {
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "white",
-    borderRadius: 20, // Більше заокруглення
-    padding: 40, // Більший відступ
+    borderRadius: 20,
+    padding: 40,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 }, // Більш виражена тінь
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
-    shadowRadius: 10, // Більший радіус розмиття
+    shadowRadius: 10,
     elevation: 10,
   },
   loadingText: {
-    marginTop: 20, // Більший відступ
-    fontSize: 19, // Трохи більший шрифт
-    color: "#444", // Темніший колір
-    fontFamily: "Mont-Regular",
+    marginTop: 20,
+    fontSize: 19,
+    color: "#444",
+    // fontFamily: "Mont-Regular", // Закоментував, якщо немає спеціального шрифту
     fontWeight: "500",
   },
   errorContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 30, // Більший відступ
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
     backgroundColor: "#FFEBEE",
-    borderRadius: 20, // Більше заокруглення
-    marginHorizontal: 25, // Більший горизонтальний відступ
+    borderRadius: 20,
+    marginHorizontal: 25,
     shadowColor: "#EF5350",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 10,
-    borderWidth: 1, // Додаємо тонку рамку
-    borderColor: '#EF9A9A', // Колір рамки
+    borderWidth: 1,
+    borderColor: '#EF9A9A',
   },
   errorText: {
-    fontSize: 19, // Трохи більший шрифт
+    fontSize: 19,
     color: "#D32F2F",
     textAlign: "center",
-    marginBottom: 30, // Більший відступ
-    fontFamily: "Mont-SemiBold",
-    lineHeight: 28, // Покращений міжрядковий інтервал
+    marginBottom: 30,
+    // fontFamily: "Mont-SemiBold", // Закоментував
+    lineHeight: 28,
   },
   retryButton: {
     borderRadius: 30,
     marginTop: 20,
-    overflow: 'hidden', // Для градієнта
+    overflow: 'hidden',
     shadowColor: "#0EB3EB",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
-  },
-  retryButtonGradient: { // Додано для градієнта
-    paddingVertical: 16,
-    paddingHorizontal: 35,
+    backgroundColor: '#0EB3EB', // Додано для відсутності градієнта
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    minWidth: 150,
     alignItems: 'center',
-    justifyContent: 'center',
   },
+
   retryButtonText: {
     color: "#FFF",
     fontSize: 18,
     fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold", // Закоментував
   },
   noDoctorContainer: {
     flex: 1,
@@ -1103,11 +1108,11 @@ const styles = StyleSheet.create({
     borderColor: '#B2EBF2',
   },
   noDoctorText: {
-    fontSize: 20, // Більший шрифт
+    fontSize: 20,
     textAlign: "center",
     color: "#000000",
-    marginTop: 25, // Більший відступ
-    fontFamily: "Mont-SemiBold",
+    marginTop: 25,
+    // fontFamily: "Mont-SemiBold", // Закоментував
     lineHeight: 28,
   },
   backToHomeButton: {
@@ -1119,21 +1124,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 7,
     elevation: 7,
-  },
-  backToHomeButtonGradient: { // Додано для градієнта
-    paddingVertical: 16,
-    paddingHorizontal: 35,
+    backgroundColor: '#6c757d', // Додано для відсутності градієнта
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    minWidth: 150,
     alignItems: 'center',
-    justifyContent: 'center',
   },
+
   backToHomeButtonText: {
     color: "#FFF",
     fontSize: 18,
     fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold", // Закоментував
   },
-header: {
-    flexDirection: "row",
+  header: {
+     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between", // Keeps elements on the ends (like buttons)
     paddingBottom: 10,
@@ -1145,94 +1150,84 @@ header: {
     paddingBottom: 20,
   },
   languageSelectButton: {
-    borderRadius: 25, // Більш заокруглені кути
-    paddingVertical: 8, // Перенесено в градієнт
-    paddingHorizontal: 16, // Більший горизонтальний відступ
-    backgroundColor: "#0EB3EB", // Колір фону кнопки
-    flexDirection: "row",
-        zIndex: 1,
+    borderRadius: 25,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+                backgroundColor: "rgb(14, 180, 235)",
 
+ // Замінено на фіксований колір
+    flexDirection: "row",
+    zIndex: 1,
     alignItems: "center",
-    overflow: 'hidden', // Для градієнта
+    // overflow: 'hidden', // Залишаємо, якщо потрібно обрізати
     shadowColor: "#0EB3EB",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 5,
     elevation: 5,
   },
- 
   languageButtonContent: {
     flexDirection: "row",
     alignItems: "center",
   },
   languageButtonText: {
     fontSize: 15,
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold", // Закоментував
     color: "white",
-    marginRight: 8, // Більший відступ
+    marginRight: 8,
   },
-   headerTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#212121",
-    textAlign: "center", // This centers the text content horizontally within its own bounds
-    fontFamily: "Mont-Bold",
+  headerTitle: {
+    fontFamily: "Mont-SemiBold", // Закоментував
+    fontSize: moderateScale(20),
+    textAlign: "center",
     alignItems: "center",
-    justifyContent: "center", // This centers the text content horizontally within its own bounds
+    justifyContent: "center",
     position: "absolute",
     left: 0,
     top: 0,
-    paddingVertical: 10, // Adds some vertical padding
+    paddingVertical: 10,
     right: 0,
     bottom: 0,
-
   },
   notificationButton: {
-    width: width * 0.13, // Трохи більший розмір
-    height: width * 0.13,
-    borderRadius: width * 0.065,
-    backgroundColor: "#0EB3EB", // Колір фону кнопки
+    width: width * 0.12,
+    height: width * 0.12,
+    backgroundColor: "rgb(14, 180, 235)",
+    borderRadius: width * 0.06,
     justifyContent: "center",
     alignItems: "center",
-    overflow: 'hidden', // Для градієнта
-    shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 5,
   },
   notificationBadge: {
     position: "absolute",
-    top: 3, // Трохи зміщено
-    right: 3, // Трохи зміщено
-    backgroundColor: "#FF5252", // Яскравіший червоний
-    borderRadius: 12, // Більш заокруглений
-    width: 24, // Більший розмір
-    height: 24,
+    top: 5,
+    right: 10,
+    backgroundColor: "#E04D53",
+    borderRadius: 1000,
+    width: 18,
+    height: 18,
     justifyContent: "center",
     alignItems: "center",
     borderColor: "white",
-    borderWidth: 2, // Товстіша рамка
+    borderWidth: 1,
   },
   notificationNumber: {
     color: "white",
-    fontSize: 13, // Трохи більший шрифт
-    fontFamily: "Mont-Bold",
+    fontSize: 10,
   },
   scrollView: {
     flex: 1,
   },
   scrollViewContent: {
     paddingHorizontal: 15,
-    paddingVertical: 25, // Більший відступ
-    paddingBottom: 70, // Більший відступ знизу
+    paddingVertical: 25,
+    paddingBottom: 70,
   },
   doctorMainInfo: {
     alignItems: "center",
-    marginBottom: 25, // Більший відступ
+    marginBottom: 25,
     backgroundColor: "white",
-    borderRadius: 20, // Більше заокруглення
-    padding: 25, // Більший відступ
+    borderRadius: 20,
+    padding: 25,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -1240,25 +1235,26 @@ header: {
     elevation: 6,
   },
   avatarContainer: {
-    width: 130, // Більший аватар
+    width: 130,
     height: 130,
-    borderRadius: 70,
+    borderRadius: 65, // Змінено на 65 для круглого
     overflow: "hidden",
-    marginBottom: 20, // Більший відступ
+    marginBottom: 20,
     backgroundColor: "#E3F2FD",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1, // Товстіша рамка
-    borderColor: "#0EB3EB", // Яскравіший синій
+    borderWidth: 1,
+    borderColor: "#0EB3EB",
     shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 6 }, // Більш виражена тінь
-    shadowOpacity: 0.5, // Більша прозорість тіні
-    shadowRadius: 10, // Більший радіус розмиття
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
     elevation: 10,
   },
   avatar: {
     width: "100%",
     height: "100%",
+    borderRadius: 65, // Додано для обрізки
     resizeMode: "cover",
   },
   avatarLoadingIndicator: {
@@ -1266,38 +1262,38 @@ header: {
   },
   doctorDetails: {
     width: "100%",
-    paddingHorizontal: 10, // Більший відступ
+    paddingHorizontal: 10,
   },
   doctorName: {
-    fontSize: 20, // Більший шрифт
+    fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 25, // Більший відступ
+    marginBottom: 25,
     color: "#212121",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold", // Закоментував
   },
   infoRowDynamic: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12, // Більший відступ
-    paddingVertical: 15, // Більший вертикальний відступ
-    paddingHorizontal: 20, // Більший горизонтальний відступ
-    borderRadius: 15, // Більше заокруглення
-    backgroundColor: "white", // Білий фон
-    borderWidth: 0, // Прибираємо рамку
-    shadowColor: "#000", // Додаємо тінь
+    marginBottom: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 15,
+    backgroundColor: "white",
+    borderWidth: 0,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   label: {
-    fontSize: 16, // Трохи більший шрифт
+    fontSize: 16,
     color: "#555",
-    fontFamily: "Mont-SemiBold",
+    // fontFamily: "Mont-SemiBold", // Закоментував
     flexShrink: 0,
-    marginRight: 15, // Більший відступ
+    marginRight: 5,
   },
   valueBox: {
     flexShrink: 1,
@@ -1306,16 +1302,16 @@ header: {
     justifyContent: "flex-end",
   },
   valueText: {
-    fontSize: 16, // Трохи більший шрифт
+    fontSize: 16,
     color: "#333",
     textAlign: "right",
-    fontFamily: "Mont-Regular",
+    // fontFamily: "Mont-Regular", // Закоментував
   },
   noValueText: {
     color: "#999",
     fontStyle: "italic",
     textAlign: "right",
-    fontFamily: "Mont-Regular",
+    // fontFamily: "Mont-Regular", // Закоментував
   },
   flagsContainer: {
     flexDirection: "row",
@@ -1323,21 +1319,20 @@ header: {
     justifyContent: "flex-end",
   },
   flagText: {
-    fontSize: 22, // Більший розмір прапора
-    marginLeft: 8, // Більший відступ
+    fontSize: 22,
+    marginLeft: 8,
   },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16, // Більший вертикальний відступ
-    paddingHorizontal: 30, // Більший горизонтальний відступ
-    height: 60, // Більша висота кнопки
-    borderRadius: 18, // Заокругленіші кути
-    marginBottom: 18, // Більший відступ
-    marginHorizontal: 20, // Більший горизонтальний відступ
-    backgroundColor: "#0EB3EB", // Колір фону кнопки
-    overflow: 'hidden', // Для градієнта
+    paddingVertical: 16,
+    paddingHorizontal: 30,
+    height: 60,
+    borderRadius: 18,
+    marginBottom: 18,
+    marginHorizontal: 20,
+    backgroundColor: "#0EB3EB",
     shadowColor: "#0EB3EB",
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.4,
@@ -1346,32 +1341,32 @@ header: {
   },
   actionButtonText: {
     color: "white",
-    fontSize: 16, // Більший шрифт
+    fontSize: 16,
     fontWeight: "bold",
-    fontFamily: "Mont-Bold",
-    marginLeft: 10, // Більший відступ між іконкою та текстом
-    textAlign: "center", // Центруємо текст
-    flex: 1, // Дозволяємо тексту займати весь прості
+    // fontFamily: "Mont-Bold", // Закоментував
+    marginLeft: 10,
+    textAlign: "center",
+    flex: 1,
   },
   buttonIcon: {
     // Стилі для іконки, якщо потрібно, але колір і розмір зазвичай передаються в JSX
   },
   sectionTitleLink: {
-    fontSize: 20, // Більший шрифт
+    fontSize: 20,
     fontWeight: "bold",
     color: "#0EB3EB",
     textAlign: "center",
-    marginTop: 30, // Більший відступ
-    marginBottom: 20, // Більший відступ
-    fontFamily: "Mont-Bold",
+    marginTop: 30,
+    marginBottom: 20,
+    // fontFamily: "Mont-Bold", // Закоментував
     textDecorationLine: "none",
   },
   sectionContainer: {
     backgroundColor: "white",
-    borderRadius: 20, // Більше заокруглення
-    padding: 25, // Більший відступ
-    marginBottom: 20, // Більший відступ
-    borderWidth: 0, // Прибираємо рамку
+    borderRadius: 20,
+    padding: 25,
+    marginBottom: 20,
+    borderWidth: 0,
     marginHorizontal: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -1380,34 +1375,34 @@ header: {
     elevation: 6,
   },
   sectionHeader: {
-    fontSize: 18, // Більший шрифт
+    fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 12, // Більший відступ
+    marginBottom: 12,
     color: "#333",
-    fontFamily: "Mont-SemiBold",
-    borderBottomWidth: 0, // Прибираємо рамку
+    // fontFamily: "Mont-SemiBold", // Закоментував
+    borderBottomWidth: 0,
     paddingBottom: 0,
-    textAlign: 'center', // Центруємо заголовок секції
+    textAlign: 'center',
   },
   sectionContent: {
-    fontSize: 16, // Трохи більший шрифт
+    fontSize: 16,
     color: "#555",
-    lineHeight: 26, // Покращений міжрядковий інтервал
-    fontFamily: "Mont-Regular",
-    marginTop: 10, // Більший відступ
+    lineHeight: 26,
+    // fontFamily: "Mont-Regular", // Закоментував
+    marginTop: 10,
   },
   imageWrapper: {
     width: "100%",
-    height: 250, // Більша висота
+    height: 250,
     backgroundColor: "#F0F8FF",
-    borderRadius: 15, // Більше заокруглення
+    borderRadius: 15,
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#B3E0F2",
-    marginTop: 15, // Більший відступ
-    shadowColor: "#000", // Додаємо тінь
+    marginTop: 15,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1422,68 +1417,74 @@ header: {
     position: "absolute",
   },
   noImageText: {
-    fontSize: 16, // Трохи більший шрифт
+    fontSize: 16,
     color: "#999",
     textAlign: "center",
     fontStyle: "italic",
-    fontFamily: "Mont-Regular",
-    paddingVertical: 25, // Більший відступ
+    // fontFamily: "Mont-Regular", // Закоментував
+    paddingVertical: 25,
   },
-  modalOverlay: {
+  centeredView: { // Залишено для модального вікна
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.2)", // Більш прозорий фон модального вікна
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  languageModalContent: {
-    backgroundColor: "white",
-    borderRadius: 25, // Більше заокруглення
-    padding: 35, // Більший відступ
-    alignItems: "center",
-    shadowColor: "#000",
-    borderColor: "#0EB3EB",
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 12,
-    width: "90%", // Трохи ширше
-    maxHeight: "75%", // Трохи вище
+  modalView: { // Залишено для модального вікна
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  modalTitle: {
-    fontSize: 24, // Більший шрифт
-    fontWeight: "bold",
-    marginBottom: 30, // Більший відступ
-    color: "#333",
-    fontFamily: "Mont-Bold",
+  modalTitle: { // Залишено для модального вікна
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
   },
-  modalScrollView: {
-    maxHeight: 300, // Більша висота
-    width: "100%",
+  modalScrollView: { // Додано для модального вікна, якщо багато мов
+    maxHeight: 200, // Обмеження висоти для скролу
+    width: '100%',
   },
-  languageOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 18, // Більший відступ
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(14, 179, 235, 0.15)", // Темніша лінія
-    width: "100%",
-    justifyContent: "flex-start", // Вирівнюємо ліворуч
-    paddingLeft: 10, // Відступ зліва
+  languageOption: { // Залишено для модального вікна
+    paddingVertical: 10,
+    width: 200,
+    alignItems: 'center',
   },
-  languageOptionText: {
-    fontSize: 18, // Більший шрифт
-    color: "#444",
-    fontFamily: "Mont-Regular",
-    marginLeft: 15, // Більший відступ
+  languageOptionText: { // Залишено для модального вікна
+    fontSize: 18,
+    color: '#555',
   },
-
-  textStyle: {
+  languageOptionTextSelected: { // Залишено для модального вікна
+    fontWeight: 'bold',
+    color: '#0EB3EB',
+  },
+  closeButton: { // Залишено для модального вікна
+    marginTop: 20,
+    backgroundColor: '#0EB3EB',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  closeButtonText: { // Залишено для модального вікна
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  textStyle: { // Залишено для модального вікна, якщо використовується
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
-    fontSize: 16, // Трохи більший шрифт
-    fontFamily: "Mont-Bold",
+    fontSize: 16,
   },
 });
 

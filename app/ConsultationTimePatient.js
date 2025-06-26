@@ -37,6 +37,9 @@ const ConsultationTimePatient = ({ route }) => {
   const [doctorAvailableSlotsMap, setDoctorAvailableSlotsMap] = useState({});
   const [allBookedSlotsMap, setAllBookedSlotsMap] = useState({});
   const [myBookingsMap, setMyBookingsMap] = useState({});
+  
+  // Зміни тут: Новий стан для зберігання ціни консультації лікаря
+  const [doctorConsultationCost, setDoctorConsultationCost] = useState(null); 
 
   const [selectedSlots, setSelectedSlots] = useState([]);
 
@@ -74,6 +77,29 @@ const ConsultationTimePatient = ({ route }) => {
           Alert.alert(t('error'), t('failed_to_get_patient_profile_data'));
           navigation.goBack();
         }
+
+        // Зміни тут: Отримання consultation_cost лікаря
+        const { data: doctorProfileData, error: doctorProfileError } = await supabase
+          .from('anketa_doctor')
+          .select('consultation_cost')
+          .eq('user_id', doctorId)
+          .single();
+
+        if (doctorProfileError) {
+          console.error("Error fetching doctor consultation cost:", doctorProfileError);
+          // Можливо, ви захочете встановити ціну за замовчуванням або повідомити користувача
+          setDoctorConsultationCost(0); // Встановлюємо 0 або значення за замовчуванням
+          Alert.alert(t('error'), t('failed_to_get_doctor_cost'));
+        } else if (doctorProfileData) {
+          setDoctorConsultationCost(doctorProfileData.consultation_cost);
+          console.log("Doctor consultation cost:", doctorProfileData.consultation_cost);
+        } else {
+          // Якщо лікаря знайдено, але вартість відсутня
+          setDoctorConsultationCost(0); // Або інше значення за замовчуванням
+          console.warn("Doctor profile found, but consultation_cost is null/undefined.");
+        }
+
+
       } catch (err) {
         console.error("Error getting user session or patient profile:", err.message);
         Alert.alert(t('error'), t('failed_to_get_user_info_or_profile'));
@@ -83,7 +109,7 @@ const ConsultationTimePatient = ({ route }) => {
       }
     };
     getPatientSessionAndProfile();
-  }, [t, navigation]);
+  }, [t, navigation, doctorId]); // Додаємо doctorId в залежності
 
   const generateSchedule = useCallback(() => {
     const today = new Date();
@@ -192,10 +218,12 @@ const ConsultationTimePatient = ({ route }) => {
   }, [doctorId, patientId, t, generateSchedule]);
 
   useEffect(() => {
+    // Тригер для завантаження доступних слотів та бронювань
     if (doctorId && patientId && patientProfile?.full_name) {
       fetchAvailableSlotsAndBookings();
     }
   }, [doctorId, patientId, patientProfile, fetchAvailableSlotsAndBookings]);
+
 
   const handleSlotPress = (slot) => {
     if (!doctorAvailableSlotsMap[slot.id]) {
@@ -295,20 +323,32 @@ const ConsultationTimePatient = ({ route }) => {
       console.error("Patient full_name is missing from profile. Cannot send notification.");
       return;
     }
+    
+    // Зміни тут: Перевіряємо, чи отримано ціну консультації
+    if (doctorConsultationCost === null) {
+      Alert.alert(t('error'), t('consultation_cost_not_loaded_yet'));
+      // Можливо, перезапустити завантаження або попросити користувача повторити спробу
+      await fetchDoctorDataAndCost(); // Спробувати завантажити ще раз
+      return;
+    }
+    // Якщо cost === 0, можна запитати підтвердження, чи це безкоштовно
+    if (doctorConsultationCost === 0) {
+      Alert.alert(t('attention'), t('this_consultation_is_free_confirm_booking'));
+      // Або додати діалог підтвердження
+    }
+
 
     setBooking(true);
     let successfulBookingsCount = 0;
     const errors = [];
     const patientFullName = patientProfile.full_name;
 
-    // !!! Тимчасовий amount для тестування !!!
-    // У реальному додатку ця сума має приходити звідкись (з вибору послуги, профілю лікаря тощо).
-    // Або бути результатом інтеграції з платіжною системою.
-    const TEST_BOOKING_AMOUNT = 100.00; // Наприклад, 100 грн. Змініть це на реальну логіку.
+    // Зміни тут: Використовуємо doctorConsultationCost замість TEST_BOOKING_AMOUNT
+    const bookingAmount = doctorConsultationCost; 
 
     for (const slot of selectedSlots) {
       try {
-        console.log(`Attempting to book slot ${slot.id} for doctorId: ${doctorId}, patientId: ${patientId}`);
+        console.log(`Attempting to book slot ${slot.id} for doctorId: ${doctorId}, patientId: ${patientId} with amount: ${bookingAmount}`);
 
         // 1. Перевірка доступності слота в останній момент
         const { data: currentAvail, error: availCheckError } = await supabase
@@ -360,7 +400,7 @@ const ConsultationTimePatient = ({ route }) => {
             booking_date: slot.date,
             booking_time_slot: slot.rawTime,
             status: 'pending',
-            amount: TEST_BOOKING_AMOUNT, // <-- Додаємо amount сюди
+            amount: bookingAmount, // <-- Використовуємо doctorConsultationCost
           })
           .select()
           .single();
@@ -378,7 +418,7 @@ const ConsultationTimePatient = ({ route }) => {
           slot.rawTime,
           newBookingId,
           patientId,
-          TEST_BOOKING_AMOUNT // <-- Передаємо amount до Edge Function
+          bookingAmount // <-- Передаємо bookingAmount до Edge Function
         );
 
         if (notificationSent) {
@@ -409,7 +449,7 @@ const ConsultationTimePatient = ({ route }) => {
     }
 
     setSelectedSlots([]);
-    fetchAvailableSlotsAndBookings();
+    fetchAvailableSlotsAndBookings(); // Оновити стан слотів після бронювання
 
     setBooking(false);
   };
@@ -446,7 +486,10 @@ const ConsultationTimePatient = ({ route }) => {
           {booking ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.bookButtonText}>{t('book_now')} ({selectedSlots.length})</Text>
+            <Text style={styles.bookButtonText}>
+              {t('book_now')} ({selectedSlots.length})
+              {doctorConsultationCost !== null && doctorConsultationCost !== undefined ? ` - $${doctorConsultationCost.toFixed(2)}` : ''}
+            </Text>
           )}
         </TouchableOpacity>
       </View>

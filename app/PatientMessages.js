@@ -481,10 +481,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(20),
-    fontFamily: 'Mont-Bold',
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
   },
   headerIconContainer: {
     width: moderateScale(50),

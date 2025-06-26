@@ -192,7 +192,8 @@ const Profile = ({ route }) => {
 
   const handleChooseConsultationTime = () => {
     if (doctorId) {
-      navigation.navigate("ConsultationTimePatient", { doctorId: doctorId });
+      // Fix: Use the 'doctorId' constant that is already extracted from route.params
+      navigation.navigate('ConsultationTimePatient', { doctorId: doctorId });
     } else {
       Alert.alert(t("error"), t("doctor_id_missing_for_consultation"));
     }

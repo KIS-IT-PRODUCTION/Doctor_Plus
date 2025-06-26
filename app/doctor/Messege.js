@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  RefreshControl, // Import RefreshControl
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../../assets/icon.svg"; // Переконайтеся, що шлях правильний
@@ -33,6 +34,7 @@ export default function Message() {
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // New state for RefreshControl
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
 
@@ -85,14 +87,17 @@ export default function Message() {
     });
   }, [t]);
 
-  const fetchMessagesFromSupabase = useCallback(async (doctorUserId) => {
+  const fetchMessagesFromSupabase = useCallback(async (doctorUserId, isRefreshing = false) => {
     if (!doctorUserId) {
       console.warn("Doctor user ID is missing, cannot fetch notifications.");
-      setLoading(false);
+      if (!isRefreshing) setLoading(false);
+      else setRefreshing(false);
       return;
     }
 
-    setLoading(true);
+    if (!isRefreshing) setLoading(true);
+    else setRefreshing(true);
+
     console.log("Fetching notifications for doctor (user ID):", doctorUserId);
     try {
       const { data, error } = await supabase
@@ -134,9 +139,20 @@ export default function Message() {
       console.error("Error fetching messages from Supabase:", error.message);
       Alert.alert(t('error'), `${t('failed_to_load_messages')}: ${error.message}`);
     } finally {
-      setLoading(false);
+      if (!isRefreshing) setLoading(false);
+      else setRefreshing(false);
     }
   }, [t]);
+
+  // Handle pull-to-refresh
+  const onRefresh = useCallback(() => {
+    if (currentDoctorUserId) {
+      fetchMessagesFromSupabase(currentDoctorUserId, true);
+    } else {
+      setRefreshing(false);
+    }
+  }, [currentDoctorUserId, fetchMessagesFromSupabase]);
+
 
   useEffect(() => {
     const getDoctorData = async () => {
@@ -348,7 +364,7 @@ export default function Message() {
 
       // Check if bookingDate and bookingTimeSlot are valid strings
       if (typeof bookingDate !== 'string' || bookingDate.trim() === '' || typeof bookingTimeSlot !== 'string' || bookingTimeSlot.trim() === '') {
-          console.error("Missing or invalid booking date or time slot in rawData. Expected YYYY-MM-DD and HH:MM strings (from booking_date/booking_time_slot or date/time):", {
+          console.error("Missing or invalid booking date or time slot in rawData. ExpectedYYYY-MM-DD and HH:MM strings (from booking_date/booking_time_slot or date/time):", {
               booking_date: bookingDate,
               booking_time_slot: bookingTimeSlot,
               rawData: message.rawData
@@ -517,7 +533,7 @@ export default function Message() {
   }, [t, updateBookingStatusAndNotify]);
 
 
-  if (loading) {
+  if (loading && !refreshing) { // Only show full loading screen if not refreshing
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0EB3EB" />
@@ -540,8 +556,18 @@ export default function Message() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.messageList}>
-        {messages.length === 0 ? (
+      <ScrollView
+        contentContainerStyle={styles.messageList}
+        refreshControl={ // Add RefreshControl here
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#0EB3EB"]} // Color of the refresh indicator
+            tintColor="#0EB3EB" // For iOS
+          />
+        }
+      >
+        {messages.length === 0 && !loading ? ( // Only show empty message if not loading
           <View style={styles.emptyMessagesContainer}>
             <Text style={styles.emptyMessagesText}>{t("messages_screen.no_messages")}</Text>
             <Text style={styles.emptyMessagesSubText}>{t("messages_screen.waiting_for_bookings")}</Text>
@@ -551,34 +577,39 @@ export default function Message() {
             const isConfirmedBooking = message.type === 'new_booking' && message.rawData.status === 'confirmed';
             const isRejectedBooking = message.type === 'new_booking' && message.rawData.status === 'rejected';
             const isPendingBooking = message.type === 'new_booking' && message.rawData.status === 'pending';
-            
+
             const isPaymentReceived = message.type === 'payment_received' && message.rawData.is_paid === true;
             const isPaymentUpdate = message.type === 'payment_update_doctor'; // Covers 'failed', 'pending', etc.
             const isPaymentFailed = isPaymentUpdate && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined');
             const isPaymentPending = isPaymentUpdate && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
-            
+
             // Determine gradient colors and border style based on message type and status
             let cardColors = ['#FFFFFF', '#FDFDFD']; // Default light gradient
             let cardBorderStyle = {};
             let showActions = false; // Flag to control action buttons visibility
-            let showStatusText = false; // Flag to control status text visibility
+            let showStatusText = false; // Flag to control status text visibility for confirmed/rejected bookings
 
             if (isPendingBooking) {
                 cardColors = ['#E0F7FA', '#B2EBF2']; // Light blue for new, pending bookings
                 cardBorderStyle = styles.messageCardPendingBorder;
                 showActions = true;
-            } else if (isConfirmedBooking || isPaymentReceived) {
-                cardColors = ['#E8F5E9', '#C8E6C9']; // Light green for confirmed bookings and successful payments
+            } else if (isConfirmedBooking) { // Specific check for confirmed booking
+                cardColors = ['#E8F5E9', '#C8E6C9']; // Light green for confirmed bookings
                 cardBorderStyle = styles.messageCardConfirmedBorder;
                 showStatusText = true;
-            } else if (isRejectedBooking || isPaymentFailed) {
-                cardColors = ['#FFEBEE', '#FFCDD2']; // Light red for rejected bookings and failed payments
+            } else if (isRejectedBooking) { // Specific check for rejected booking
+                cardColors = ['#FFEBEE', '#FFCDD2']; // Light red for rejected bookings
                 cardBorderStyle = styles.messageCardRejectedBorder;
                 showStatusText = true;
-            } else if (isPaymentPending) {
+            } else if (isPaymentReceived) { // Specific check for successful payment
+                cardColors = ['#E8F5E9', '#C8E6C9']; // Light green for successful payments
+                cardBorderStyle = styles.messageCardConfirmedBorder; // Reusing confirmed border for paid
+            } else if (isPaymentFailed) { // Specific check for failed payment
+                cardColors = ['#FFEBEE', '#FFCDD2']; // Light red for failed payments
+                cardBorderStyle = styles.messageCardRejectedBorder; // Reusing rejected border for failed
+            } else if (isPaymentPending) { // Specific check for pending payment
                 cardColors = ['#FFFDE7', '#FFF9C4']; // Light yellow for pending payments
                 cardBorderStyle = styles.messageCardWarningBorder;
-                showStatusText = true;
             } else {
                 // General notifications, distinguish read/unread
                 if (!message.is_read) {
@@ -683,25 +714,21 @@ export default function Message() {
                     </View>
                   )}
 
-                  {/* For general messages (not booking/payment related) */}
-                  {!isPendingBooking && !isConfirmedBooking && !isRejectedBooking && !isPaymentReceived && !isPaymentUpdate && (
-                      !message.is_read ? (
-                          <TouchableOpacity
-                              onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
-                              style={styles.actionButtonContainer}
-                          >
-                              <LinearGradient
-                                  colors={['#0EB3EB', '#0A8BA6']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                               >
-                                  <Text style={styles.actionButtonText}>{t('mark_as_read')}</Text>
-                              </LinearGradient>
-                          </TouchableOpacity>
-                      ) : (
-                          <Text style={styles.readStatusText}>{t('read')}</Text>
-                      )
+                  {/* For general messages (not booking/payment related) and if it's not handled above */}
+                  {!isPendingBooking && !isConfirmedBooking && !isRejectedBooking && !isPaymentReceived && !isPaymentUpdate && !message.is_read && (
+                    <TouchableOpacity
+                        onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
+                        style={styles.actionButtonContainer}
+                    >
+                        <LinearGradient
+                            colors={['#0EB3EB', '#0A8BA6']}
+                            style={styles.actionButtonGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        >
+                            <Text style={styles.actionButtonText}>{t('mark_as_read')}</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
                   )}
                 </LinearGradient>
               </View>
@@ -716,30 +743,20 @@ export default function Message() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
-    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : verticalScale(50),
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-  },
-  loadingText: {
-    marginTop: verticalScale(10),
-    fontSize: moderateScale(16),
-    color: '#555',
-    fontFamily: "Mont-Regular",
+    backgroundColor: "#fff",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: scale(15),
-    paddingVertical: verticalScale(15),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: verticalScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    backgroundColor: "#fff",
   },
   backButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
+    backgroundColor: "rgba(14, 179, 235, 0.2)",
     borderRadius: moderateScale(25),
     width: moderateScale(48),
     height: moderateScale(48),
@@ -747,162 +764,167 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(20),
-    fontFamily: "Mont-Bold",
-    color: "#333333",
+    color: "#333",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  loadingText: {
+    marginTop: moderateScale(10),
+    fontFamily: "Inter-Regular",
+    fontSize: moderateScale(16),
+    color: "#555",
+  },
+  emptyMessagesContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: verticalScale(50),
+    paddingHorizontal: moderateScale(20),
+  },
+  emptyMessagesText: {
+    fontFamily: "Inter-SemiBold",
+    fontSize: moderateScale(18),
+    color: "#777",
+    textAlign: "center",
+  },
+  emptyMessagesSubText: {
+    fontFamily: "Inter-Regular",
+    fontSize: moderateScale(14),
+    color: "#999",
+    textAlign: "center",
+    marginTop: verticalScale(10),
   },
   messageList: {
-    paddingVertical: verticalScale(20),
-    paddingHorizontal: scale(15),
-    flexGrow: 1,
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: moderateScale(16),
+    flexGrow: 1, // Ensures ScrollView takes full height to enable pull-to-refresh
   },
   messageGroup: {
-    marginBottom: verticalScale(20),
+    marginBottom: verticalScale(15),
   },
   dateAndTimestamp: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: verticalScale(8),
-    paddingHorizontal: scale(8),
+    alignItems: "center",
+    marginBottom: verticalScale(5),
+    paddingHorizontal: moderateScale(5),
   },
   dateText: {
-    fontSize: moderateScale(13),
-    fontFamily: "Mont-SemiBold",
-    color: "#777",
+    fontFamily: "Inter-SemiBold",
+    fontSize: moderateScale(12),
+    color: "#555",
   },
   timestampText: {
-    fontSize: moderateScale(13),
-    fontFamily: "Mont-Regular",
+    fontFamily: "Inter-Regular",
+    fontSize: moderateScale(11),
     color: "#777",
   },
   messageCard: {
-    borderRadius: moderateScale(18),
-    padding: moderateScale(18),
+    borderRadius: moderateScale(12),
+    padding: moderateScale(15),
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    elevation: 6,
-    overflow: 'hidden', // Ensures gradient doesn't go outside border radius
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    position: 'relative',
+    overflow: 'hidden', // Ensures the gradient and border are within bounds
   },
-  messageCardUnreadLeftBar: { // Keep this for the left blue bar
-    borderLeftWidth: 5,
-    borderLeftColor: '#0EB3EB',
-    paddingLeft: moderateScale(13), // Adjust padding to make space for the bar
+  messageCardUnreadLeftBar: {
+    borderLeftWidth: moderateScale(6),
+    borderLeftColor: '#0EB3EB', // A distinct color for unread messages
   },
-  // New border styles for different message types/statuses
+  // Border styles for different statuses
   messageCardPendingBorder: {
-    borderWidth: 1,
-    borderColor: '#0EB3EB', // Blue for pending bookings
+    borderWidth: moderateScale(1),
+    borderColor: '#0EB3EB',
   },
   messageCardConfirmedBorder: {
-    borderWidth: 1,
-    borderColor: '#4CAF50', // Green for confirmed/paid
+    borderWidth: moderateScale(1),
+    borderColor: '#4CAF50',
   },
   messageCardRejectedBorder: {
-    borderWidth: 1,
-    borderColor: '#D32F2F', // Red for rejected/failed
+    borderWidth: moderateScale(1),
+    borderColor: '#D32F2F',
   },
   messageCardWarningBorder: {
-    borderWidth: 1,
-    borderColor: '#FFA000', // Orange for payment updates/pending
+    borderWidth: moderateScale(1),
+    borderColor: '#FFA000',
+  },
+  messageCardUnreadBorder: {
+    borderWidth: moderateScale(1),
+    borderColor: '#A7D9F5', // Lighter blue for general unread
   },
   cardTitle: {
-    fontSize: moderateScale(17),
-    fontFamily: "Mont-SemiBold",
-    marginBottom: verticalScale(8),
+    fontFamily: "Inter-SemiBold",
+    fontSize: moderateScale(16),
+    marginBottom: verticalScale(5),
     color: "#333",
   },
   cardText: {
-    fontSize: moderateScale(14.5),
-    fontFamily: "Mont-Regular",
+    fontFamily: "Inter-Regular",
+    fontSize: moderateScale(14),
     color: "#555",
-    marginBottom: verticalScale(10),
+    lineHeight: verticalScale(20),
   },
   bookingActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: verticalScale(15),
+    width: '100%',
   },
   actionButtonContainer: {
-    borderRadius: moderateScale(10),
+    borderRadius: moderateScale(8),
     overflow: 'hidden',
-    flex: 1,
-    marginHorizontal: scale(5),
+    flex: 1, // Take equal space
+    marginHorizontal: moderateScale(5),
   },
   actionButtonGradient: {
-    paddingVertical: verticalScale(12),
+    paddingVertical: verticalScale(10),
     alignItems: 'center',
-    borderRadius: moderateScale(10),
+    justifyContent: 'center',
   },
   actionButtonText: {
-    color: '#FFFFFF',
+    fontFamily: "Inter-SemiBold",
     fontSize: moderateScale(14),
-    fontFamily: "Mont-SemiBold",
+    color: "#fff",
   },
   statusText: {
-    marginTop: verticalScale(10),
+    fontFamily: "Inter-Bold",
     fontSize: moderateScale(14),
-    fontFamily: "Mont-SemiBold",
-    textAlign: 'center',
-  },
-  confirmedText: {
-    color: '#4CAF50', // Green
-  },
-  rejectedText: {
-    color: '#D32F2F', // Red
-  },
-  readStatusText: {
     marginTop: verticalScale(10),
-    fontSize: moderateScale(12),
-    fontFamily: "Mont-Regular",
-    color: '#888',
     textAlign: 'right',
   },
-  emptyMessagesContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: verticalScale(50),
+  confirmedText: {
+    color: '#4CAF50', // Green for confirmed
   },
-  emptyMessagesText: {
-    fontSize: moderateScale(18),
-    fontFamily: 'Mont-Bold',
-    color: '#777',
-    marginBottom: verticalScale(10),
+  rejectedText: {
+    color: '#D32F2F', // Red for rejected
   },
-  emptyMessagesSubText: {
-    fontSize: moderateScale(14),
-    fontFamily: 'Mont-Regular',
-    color: '#999',
-    textAlign: 'center',
-    paddingHorizontal: scale(30),
-  },
-  // Payment specific styles
   paymentDetailsText: {
-    fontSize: moderateScale(13.5),
-    fontFamily: "Mont-Regular",
-    color: '#666',
-    marginBottom: verticalScale(3),
+    fontFamily: "Inter-Regular",
+    fontSize: moderateScale(13),
+    color: "#666",
+    marginTop: verticalScale(5),
   },
   paymentStatusText: {
-    fontSize: moderateScale(14.5),
-    fontFamily: "Mont-SemiBold",
-    marginTop: verticalScale(8),
+    fontFamily: "Inter-SemiBold",
+    fontSize: moderateScale(14),
+    marginTop: verticalScale(5),
   },
   paidStatusText: {
-    color: '#4CAF50', // Green for paid
+    color: '#4CAF50',
   },
-  unpaidStatusText: { // Fallback, could be pending or failed if not explicitly paid
-    color: '#FFA000', // Orange
+  failedStatusText: {
+    color: '#D32F2F',
   },
-  failedStatusText: { // Specific for failed payments
-    color: '#D32F2F', // Red
-  },
-  pendingStatusText: { // Specific for pending payments
-    color: '#0EB3EB', // Blue
+  pendingStatusText: {
+    color: '#FFA000',
   },
 });
