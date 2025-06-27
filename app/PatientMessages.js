@@ -101,7 +101,7 @@ export default function PatientMessages() {
           created_at,
           is_read,
           notification_type,
-          data
+          data // Важливо: вибираємо всю колонку 'data'
         `)
         .eq('patient_id', currentPatientId)
         .order('created_at', { ascending: false });
@@ -121,6 +121,7 @@ export default function PatientMessages() {
         is_paid: msg.data?.is_paid || false,
         booking_id: msg.data?.booking_id || null,
         amount: msg.data?.amount || 0,
+        meet_link: msg.data?.meet_link || null, // Зміни тут: Отримуємо meet_link з rawData
       }));
 
       setMessages(formattedMessages);
@@ -261,6 +262,26 @@ export default function PatientMessages() {
     }
   }, [currentPatientId, t, LIQPAY_INIT_FUNCTION_URL, LIQPAY_CALLBACK_FUNCTION_URL]);
 
+  // Зміни тут: НОВА ФУНКЦІЯ: Обробка натискання кнопки "Приєднатися до зустрічі"
+  const handleJoinMeet = useCallback(async (meetLink) => {
+    if (!meetLink) {
+      Alert.alert(t('error'), t('meet_link_missing')); // Додайте цей ключ перекладу
+      return;
+    }
+    try {
+      const supported = await Linking.canOpenURL(meetLink);
+      if (supported) {
+        await Linking.openURL(meetLink);
+      } else {
+        Alert.alert(t('error'), `${t('cannot_open_meet_link')}: ${meetLink}`); // Додайте цей ключ перекладу
+      }
+    } catch (error) {
+      console.error("Error opening Google Meet link:", error);
+      Alert.alert(t('error'), `${t('error_opening_meet_link')}: ${error.message}`); // Додайте цей ключ перекладу
+    }
+  }, [t]);
+
+
   // Функція для обробки Deep Links (повернення в додаток після оплати)
   const handleDeepLink = useCallback(({ url }) => {
     console.log("Додаток відкрито через deep link:", url);
@@ -300,20 +321,31 @@ export default function PatientMessages() {
             [
               { text: t('ok'), onPress: () => {
                   if (data.status === 'confirmed' && !data.is_paid && data.booking_id && data.amount > 0) {
+                    Alert.alert(
+                      t('payment_required_title'),
+                      t('payment_required_message'),
+                      [
+                          { text: t('cancel'), style: 'cancel' },
+                          {
+                              text: t('pay_now'),
+                              onPress: () => handleLiqPayPayment(
+                                  data.booking_id,
+                                  data.amount,
+                                  `Оплата консультації ${data.doctor_name || ''}`,
+                                  data.doctor_name
+                              )
+                          }
+                      ]
+                    );
+                  }
+                  // Зміни тут: Якщо оплачено і є посилання на Meet, запропонувати приєднатися
+                  if (data.status === 'confirmed' && data.is_paid && data.meet_link) {
                       Alert.alert(
-                          t('payment_required_title'),
-                          t('payment_required_message'),
+                          t('consultation_ready_title'), // Додайте цей ключ перекладу
+                          t('consultation_ready_message'), // Додайте цей ключ перекладу
                           [
                               { text: t('cancel'), style: 'cancel' },
-                              {
-                                  text: t('pay_now'),
-                                  onPress: () => handleLiqPayPayment(
-                                      data.booking_id,
-                                      data.amount,
-                                      `Оплата консультації ${data.doctor_name || ''}`,
-                                      data.doctor_name
-                                  )
-                              }
+                              { text: t('join_meet_call'), onPress: () => handleJoinMeet(data.meet_link) }
                           ]
                       );
                   }
@@ -371,7 +403,9 @@ export default function PatientMessages() {
               const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(message.created_at));
 
               const showPayButton = message.type === 'booking_confirmed' && !message.is_paid && message.booking_id && message.amount > 0;
-              const isPaid = message.is_paid; // Використовуємо is_paid для відображення статусу оплати
+              const isPaid = message.is_paid;
+              // Зміни тут: Перевірка на наявність посилання на Meet
+              const showJoinMeetButton = isPaid && message.meet_link && (message.type === 'booking_confirmed' || message.type === 'payment_success');
 
               return (
                 <View key={message.id} style={styles.messageGroup}>
@@ -382,57 +416,62 @@ export default function PatientMessages() {
 
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    // Якщо повідомлення оплачене, воно не повинно бути клікабельним для загальних дій
                     onPress={() => {
                         console.log("Card pressed:", message.id);
-                        // Тут можна додати логіку для переходу на детальний екран повідомлення,
-                        // якщо потрібно, або інші дії.
+                        // Автоматично позначати як прочитане при натисканні на картку
+                        if (!message.is_read) {
+                            markSingleAsRead(message.id);
+                        }
                     }}
-                    disabled={false} // Кнопка "Позначити як прочитане" дозволяє клікати навіть оплачені
+                    disabled={false}
                     style={[
                         styles.messageCard,
-                        message.is_read && !isPaid && styles.messageCardRead, // Сірий фон для прочитаних (але не оплачених)
+                        message.is_read && !isPaid && styles.messageCardRead,
                         message.type === 'booking_confirmed' && styles.messageCardConfirmed,
                         message.type === 'booking_rejected' && styles.messageCardRejected,
-                        isPaid && styles.messageCardPaid, // Зелений фон для оплачених
+                        isPaid && styles.messageCardPaid,
                     ]}
                   >
                     <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                     <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
 
-                    {/* БЛОК: Кнопка "Оплатити" / "Оплачено" */}
+                    {/* БЛОК: Кнопка "Оплатити" / "Оплачено" / "Приєднатися" */}
                     {showPayButton ? (
-                      <TouchableOpacity
-                        style={styles.payButton}
-                        onPress={() => {
-                            handleLiqPayPayment(
-                                message.booking_id,
-                                message.amount,
-                                `Оплата консультації з ${message.rawData.doctor_name || 'лікарем'}`,
-                                message.rawData.doctor_name
-                            );
-                        }}
-                      >
-                        <Text style={styles.payButtonText}>{t('pay_now')} {message.amount} {t('uah')}</Text>
-                      </TouchableOpacity>
-                    ) : isPaid ? ( // Якщо повідомлення оплачене
+                        <TouchableOpacity
+                            style={styles.payButton}
+                            onPress={() => {
+                                handleLiqPayPayment(
+                                    message.booking_id,
+                                    message.amount,
+                                    `Оплата консультації з ${message.rawData.doctor_name || 'лікарем'}`,
+                                    message.rawData.doctor_name
+                                );
+                            }}
+                        >
+                            <Text style={styles.payButtonText}>{t('pay_now')} {message.amount} {t('uah')}</Text>
+                        </TouchableOpacity>
+                    ) : showJoinMeetButton ? ( // Зміни тут: Кнопка "Приєднатися"
+                        <TouchableOpacity
+                            style={styles.joinMeetButton} // Новий стиль
+                            onPress={() => handleJoinMeet(message.meet_link)}
+                        >
+                            <Ionicons name="videocam-outline" size={moderateScale(20)} color="#FFFFFF" style={styles.joinMeetIcon} />
+                            <Text style={styles.joinMeetButtonText}>{t('join_meet_call')}</Text>
+                        </TouchableOpacity>
+                    ) : isPaid ? (
                         <View style={styles.paidButton}>
                             <Text style={styles.paidButtonText}>{t('paid')}</Text>
                         </View>
-                    ) : null
-                    }
+                    ) : null}
 
                     <View style={styles.messageActionsRow}>
-                        {/* Відображення статусу (Оплачено або Прочитано) */}
                         {isPaid ? (
                             <Text style={styles.readStatusText}>{t('paid')}</Text>
                         ) : message.is_read ? (
                             <Text style={styles.readStatusText}>{t('read')}</Text>
-                        ) : null
-                        }
+                        ) : null}
 
-                        {/* Кнопка "Позначити як прочитане" */}
-                        {!message.is_read && ( // *** ЗМІНЕНО ТУТ: Видалено перевірку !isPaid ***
+                        {!message.is_read && (
                             <TouchableOpacity
                                 style={styles.markAsReadButton}
                                 onPress={() => markSingleAsRead(message.id)}
@@ -481,7 +520,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontFamily: "Mont-SemiBold",
+    fontFamily: "Mont-SemiBold", // Якщо шрифт Mont-SemiBold доступний
     fontSize: moderateScale(20),
     color: "#333",
   },
@@ -501,7 +540,7 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(10),
     fontSize: moderateScale(16),
     color: '#555',
-    fontFamily: 'Mont-Regular',
+    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   messageList: {
     paddingVertical: verticalScale(20),
@@ -521,13 +560,13 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: moderateScale(14),
     fontWeight: '600',
-    fontFamily: 'Mont-SemiBold',
+    fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
     color: '#666',
   },
   timestampText: {
     fontSize: moderateScale(14),
     color: '#888',
-    fontFamily: 'Mont-Regular',
+    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   messageCard: {
     backgroundColor: '#FFFFFF',
@@ -560,7 +599,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: moderateScale(18),
     fontWeight: 'bold',
-    fontFamily: 'Mont-Bold',
+    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
     color: '#333',
     marginBottom: verticalScale(8),
   },
@@ -569,7 +608,7 @@ const styles = StyleSheet.create({
     color: '#555',
     lineHeight: verticalScale(22),
     marginBottom: verticalScale(10),
-    fontFamily: 'Mont-Regular',
+    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   payButton: {
     marginTop: verticalScale(10),
@@ -590,7 +629,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    fontFamily: 'Mont-Bold',
+    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
   },
   paidButton: {
     marginTop: verticalScale(10),
@@ -606,9 +645,36 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    fontFamily: 'Mont-Bold',
+    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
   },
-  // Нові стилі для розміщення кнопки "Позначити як прочитане"
+  // Зміни тут: Нові стилі для кнопки "Приєднатися до зустрічі"
+  joinMeetButton: {
+    marginTop: verticalScale(10),
+    backgroundColor: '#34A853', // Колір Google Meet
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: moderateScale(20),
+    borderRadius: moderateScale(25),
+    alignSelf: 'stretch',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: verticalScale(1) },
+    shadowOpacity: 0.2,
+    shadowRadius: moderateScale(2),
+    elevation: 2,
+    marginBottom: verticalScale(10),
+  },
+  joinMeetButtonText: {
+    color: '#fff',
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
+    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
+    marginLeft: moderateScale(8),
+  },
+  joinMeetIcon: {
+    // Стилі для іконки, якщо потрібні додаткові налаштування
+  },
   messageActionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -618,21 +684,21 @@ const styles = StyleSheet.create({
   readStatusText: {
     fontSize: moderateScale(14),
     color: '#888',
-    fontFamily: 'Mont-Regular',
+    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   markAsReadButton: {
-    backgroundColor: 'transparent', // Прозорий фон
+    backgroundColor: 'transparent',
     paddingVertical: verticalScale(8),
     paddingHorizontal: moderateScale(12),
     borderRadius: moderateScale(20),
-    borderColor: '#0EB3EB', // Блакитна рамка
+    borderColor: '#0EB3EB',
     borderWidth: 1,
-    alignSelf: 'flex-end', // Вирівнювання вправо
+    alignSelf: 'flex-end',
   },
   markAsReadButtonText: {
-    color: '#0EB3EB', // Блакитний текст
+    color: '#0EB3EB',
     fontSize: moderateScale(13),
-    fontFamily: 'Mont-SemiBold',
+    fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
   },
   emptyMessagesContainer: {
     flex: 1,
@@ -645,13 +711,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#777',
     marginBottom: verticalScale(10),
-    fontFamily: 'Mont-SemiBold',
+    fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
   },
   emptyMessagesSubText: {
     fontSize: moderateScale(14),
     color: '#999',
     textAlign: 'center',
     paddingHorizontal: moderateScale(30),
-    fontFamily: 'Mont-Regular',
+    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
 });
