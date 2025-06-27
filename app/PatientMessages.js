@@ -101,7 +101,7 @@ export default function PatientMessages() {
           created_at,
           is_read,
           notification_type,
-          data // Важливо: вибираємо всю колонку 'data'
+          data
         `)
         .eq('patient_id', currentPatientId)
         .order('created_at', { ascending: false });
@@ -116,12 +116,12 @@ export default function PatientMessages() {
         body: msg.body,
         created_at: msg.created_at,
         is_read: msg.is_read,
-        type: msg.notification_type,
+        type: msg.notification_type, // Використовуємо notification_type
         rawData: msg.data || {},
         is_paid: msg.data?.is_paid || false,
         booking_id: msg.data?.booking_id || null,
         amount: msg.data?.amount || 0,
-        meet_link: msg.data?.meet_link || null, // Зміни тут: Отримуємо meet_link з rawData
+        meet_link: msg.data?.meet_link || null, // Отримуємо meet_link з rawData
       }));
 
       setMessages(formattedMessages);
@@ -265,7 +265,7 @@ export default function PatientMessages() {
   // Зміни тут: НОВА ФУНКЦІЯ: Обробка натискання кнопки "Приєднатися до зустрічі"
   const handleJoinMeet = useCallback(async (meetLink) => {
     if (!meetLink) {
-      Alert.alert(t('error'), t('meet_link_missing')); // Додайте цей ключ перекладу
+      Alert.alert(t('error'), t('meet_link_missing'));
       return;
     }
     try {
@@ -273,11 +273,11 @@ export default function PatientMessages() {
       if (supported) {
         await Linking.openURL(meetLink);
       } else {
-        Alert.alert(t('error'), `${t('cannot_open_meet_link')}: ${meetLink}`); // Додайте цей ключ перекладу
+        Alert.alert(t('error'), `${t('cannot_open_meet_link')}: ${meetLink}`);
       }
     } catch (error) {
       console.error("Error opening Google Meet link:", error);
-      Alert.alert(t('error'), `${t('error_opening_meet_link')}: ${error.message}`); // Додайте цей ключ перекладу
+      Alert.alert(t('error'), `${t('error_opening_meet_link')}: ${error.message}`);
     }
   }, [t]);
 
@@ -286,7 +286,10 @@ export default function PatientMessages() {
   const handleDeepLink = useCallback(({ url }) => {
     console.log("Додаток відкрито через deep link:", url);
     console.log("Викликаю fetchMessagesFromSupabase після deep link.");
-    fetchMessagesFromSupabase();
+    // Додайте затримку перед оновленням, щоб дати БД синхронізуватися
+    setTimeout(() => {
+        fetchMessagesFromSupabase();
+    }, 1000); // Затримка 1 секунда, можна налаштувати
   }, [fetchMessagesFromSupabase]);
 
   // useEffect для підписки на сповіщення та Deep Links
@@ -302,15 +305,27 @@ export default function PatientMessages() {
       console.log('PatientMessages: Отримано відповідь на сповіщення (користувач натиснув):', response);
       const { title, body, data } = response.notification.request.content;
 
-      fetchMessagesFromSupabase(); // Оновити повідомлення після взаємодії зі сповіщенням
+      // Оновити повідомлення після взаємодії зі сповіщенням
+      // Викликаємо fetchMessagesFromSupabase для отримання найновіших даних,
+      // оскільки це сповіщення могло змінити стан в БД.
+      fetchMessagesFromSupabase();
 
-      if (data && (data.type === 'booking_confirmed' || data.type === 'booking_rejected' || data.type === 'payment_success') && data.booking_id) {
+      if (data && (data.type === 'booking_confirmed' || data.type === 'booking_rejected' || data.type === 'payment_success' || data.type === 'meet_link_update') && data.booking_id) {
         if (data.type === 'payment_success') {
           Alert.alert(
             title || t('payment_success_notification_title'),
             body || t('payment_success_notification_body'),
             [{ text: t('ok') }]
           );
+        } else if (data.type === 'meet_link_update') { // Обробка сповіщення про оновлення Meet-посилання
+            Alert.alert(
+                t('consultation_link_ready_title'), // Додайте цей ключ перекладу
+                `${t('consultation_link_ready_message', { doctorName: data.doctor_name, date: data.booking_date, time: data.booking_time_slot })}`, // Додайте цей ключ перекладу
+                [
+                    { text: t('cancel'), style: 'cancel' },
+                    { text: t('join_meet_call'), onPress: () => handleJoinMeet(data.meet_link) }
+                ]
+            );
         } else {
           Alert.alert(
             title || t('booking_status_update_default_title'),
@@ -339,10 +354,12 @@ export default function PatientMessages() {
                     );
                   }
                   // Зміни тут: Якщо оплачено і є посилання на Meet, запропонувати приєднатися
+                  // Цей блок тепер обробляє випадки, коли посилання надходить разом з підтвердженням
+                  // або пізніше через окреме сповіщення "meet_link_update".
                   if (data.status === 'confirmed' && data.is_paid && data.meet_link) {
                       Alert.alert(
-                          t('consultation_ready_title'), // Додайте цей ключ перекладу
-                          t('consultation_ready_message'), // Додайте цей ключ перекладу
+                          t('consultation_ready_title'),
+                          t('consultation_ready_message'),
                           [
                               { text: t('cancel'), style: 'cancel' },
                               { text: t('join_meet_call'), onPress: () => handleJoinMeet(data.meet_link) }
@@ -365,7 +382,7 @@ export default function PatientMessages() {
       Notifications.removeNotificationSubscription(responseSubscription);
       linkingSubscription.remove();
     };
-  }, [currentPatientId, fetchMessagesFromSupabase, navigation, t, handleLiqPayPayment, handleDeepLink]);
+  }, [currentPatientId, fetchMessagesFromSupabase, navigation, t, handleLiqPayPayment, handleDeepLink, handleJoinMeet]); // Додано handleJoinMeet в залежності
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -404,8 +421,11 @@ export default function PatientMessages() {
 
               const showPayButton = message.type === 'booking_confirmed' && !message.is_paid && message.booking_id && message.amount > 0;
               const isPaid = message.is_paid;
-              // Зміни тут: Перевірка на наявність посилання на Meet
-              const showJoinMeetButton = isPaid && message.meet_link && (message.type === 'booking_confirmed' || message.type === 'payment_success');
+
+              // Логіка для відображення кнопки "Приєднатися"
+              // Вона показується, якщо бронювання підтверджено АБО це оновлення посилання, І ОПЛАЧЕНО, І Є ПОСИЛАННЯ
+              const showJoinMeetButton = (message.type === 'booking_confirmed' || message.type === 'meet_link_update') && isPaid && message.meet_link;
+
 
               return (
                 <View key={message.id} style={styles.messageGroup}>
@@ -430,10 +450,22 @@ export default function PatientMessages() {
                         message.type === 'booking_confirmed' && styles.messageCardConfirmed,
                         message.type === 'booking_rejected' && styles.messageCardRejected,
                         isPaid && styles.messageCardPaid,
+                        message.type === 'meet_link_update' && styles.messageCardMeetLinkUpdate, // Новий стиль для оновлень Meet Link
                     ]}
                   >
                     <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                     <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
+
+                    {/* ДОДАНО: Відображення посилання Meet, якщо воно є */}
+                    {message.meet_link && (
+                        <View style={styles.meetLinkContainer}>
+                            <Ionicons name="videocam-outline" size={moderateScale(18)} color="#34A853" />
+                            <Text style={styles.meetLinkText} onPress={() => handleJoinMeet(message.meet_link)}>
+                                {t('meet_link')}: {message.meet_link}
+                            </Text>
+                        </View>
+                    )}
+
 
                     {/* БЛОК: Кнопка "Оплатити" / "Оплачено" / "Приєднатися" */}
                     {showPayButton ? (
@@ -458,7 +490,7 @@ export default function PatientMessages() {
                             <Ionicons name="videocam-outline" size={moderateScale(20)} color="#FFFFFF" style={styles.joinMeetIcon} />
                             <Text style={styles.joinMeetButtonText}>{t('join_meet_call')}</Text>
                         </TouchableOpacity>
-                    ) : isPaid ? (
+                    ) : isPaid ? ( // Якщо оплачено, але немає Meet посилання (ще не надіслано)
                         <View style={styles.paidButton}>
                             <Text style={styles.paidButtonText}>{t('paid')}</Text>
                         </View>
@@ -520,7 +552,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontFamily: "Mont-SemiBold", // Якщо шрифт Mont-SemiBold доступний
+    // fontFamily: "Mont-SemiBold", // Якщо шрифт Mont-SemiBold доступний
     fontSize: moderateScale(20),
     color: "#333",
   },
@@ -540,7 +572,7 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(10),
     fontSize: moderateScale(16),
     color: '#555',
-    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
+    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   messageList: {
     paddingVertical: verticalScale(20),
@@ -560,13 +592,13 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: moderateScale(14),
     fontWeight: '600',
-    fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
+    // fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
     color: '#666',
   },
   timestampText: {
     fontSize: moderateScale(14),
     color: '#888',
-    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
+    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   messageCard: {
     backgroundColor: '#FFFFFF',
@@ -596,10 +628,14 @@ const styles = StyleSheet.create({
     borderLeftColor: '#2E7D32',
     opacity: 1,
   },
+  // НОВИЙ СТИЛЬ: для повідомлення про оновлення Meet Link
+  messageCardMeetLinkUpdate: {
+    borderLeftColor: '#9C27B0', // Фіолетовий колір, як у лікаря
+  },
   cardTitle: {
     fontSize: moderateScale(18),
     fontWeight: 'bold',
-    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
+    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
     color: '#333',
     marginBottom: verticalScale(8),
   },
@@ -608,7 +644,27 @@ const styles = StyleSheet.create({
     color: '#555',
     lineHeight: verticalScale(22),
     marginBottom: verticalScale(10),
-    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
+    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
+  },
+  // НОВІ СТИЛІ: для контейнера Meet-посилання
+  meetLinkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: verticalScale(5),
+    marginBottom: verticalScale(10),
+    padding: moderateScale(10),
+    backgroundColor: '#F0FFF0', // Світло-зелений фон
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#A8DDA8', // Зелена рамка
+  },
+  meetLinkText: {
+    fontSize: moderateScale(14),
+    color: '#34A853', // Темно-зелений колір тексту
+    marginLeft: moderateScale(8),
+    textDecorationLine: 'underline', // Підкреслення
+    flexShrink: 1, // Дозволяє тексту скорочуватися
+    // fontFamily: 'Mont-Regular',
   },
   payButton: {
     marginTop: verticalScale(10),
@@ -629,7 +685,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
+    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
   },
   paidButton: {
     marginTop: verticalScale(10),
@@ -645,9 +701,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
+    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
   },
-  // Зміни тут: Нові стилі для кнопки "Приєднатися до зустрічі"
   joinMeetButton: {
     marginTop: verticalScale(10),
     backgroundColor: '#34A853', // Колір Google Meet
@@ -669,7 +724,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
+    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
     marginLeft: moderateScale(8),
   },
   joinMeetIcon: {
@@ -684,7 +739,7 @@ const styles = StyleSheet.create({
   readStatusText: {
     fontSize: moderateScale(14),
     color: '#888',
-    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
+    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   markAsReadButton: {
     backgroundColor: 'transparent',
@@ -698,7 +753,7 @@ const styles = StyleSheet.create({
   markAsReadButtonText: {
     color: '#0EB3EB',
     fontSize: moderateScale(13),
-    fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
+    // fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
   },
   emptyMessagesContainer: {
     flex: 1,
@@ -711,13 +766,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#777',
     marginBottom: verticalScale(10),
-    fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
+    // fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
   },
   emptyMessagesSubText: {
     fontSize: moderateScale(14),
     color: '#999',
     textAlign: 'center',
     paddingHorizontal: moderateScale(30),
-    fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
+    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
 });

@@ -1,5 +1,3 @@
-// supabase/functions/handle-booking-status-update/index.ts
-
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Expo } from 'https://esm.sh/expo-server-sdk@3.7.0';
@@ -26,7 +24,7 @@ async function getPatientExpoPushToken(supabaseClient: any, patientId: string): 
     try {
         const { data: profile, error } = await supabaseClient
             .from('profiles')
-            .select('push_token')
+            .select('notification_token')
             .eq('id', patientId)
             .single();
 
@@ -39,11 +37,11 @@ async function getPatientExpoPushToken(supabaseClient: any, patientId: string): 
             return null;
         }
 
-        if (profile && profile.push_token) {
-            return profile.push_token;
+        if (profile && profile.notification_token) {
+            return profile.notification_token;
         }
 
-        console.warn(`getPatientExpoPushToken: Patient ${patientId} has a profile but no push_token found.`);
+        console.warn(`getPatientExpoPushToken: Patient ${patientId} has a profile but no notification_token found.`);
         return null;
     } catch (e: any) {
         console.error(`getPatientExpoPushToken: Unexpected error for patient ${patientId}:`, e.message || e);
@@ -237,7 +235,7 @@ serve(async (req) => {
             const messages = [];
             messages.push({
                 to: patientPushToken,
-                sound: 'default',
+                sound: 'Гетьмана Петра Дорошенка вулиця.mp3', 
                 title: title,
                 body: patientAlertBody,
                 data: {

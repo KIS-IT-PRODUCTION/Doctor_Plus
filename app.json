@@ -40,6 +40,12 @@
         "tabletBackgroundColor": "#ffffff",
         "darkModeImage": "./assets/icon.png",
         "darkModeBackgroundColor": "#ffffff"
+      },
+      "notification": {  
+        "icon": "./assets/icon.png", 
+        "sounds": [
+          "./assets/sms_meow.mp3" 
+        ]
       }
     },
     "android": {
@@ -67,7 +73,13 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "notification": { 
+        "icon": "./assets/icon.png", 
+        "sounds": [
+          "./assets/sms_meow.mp3" 
+        ]
+      }
     },
     "web": {
       "favicon": "./assets/icon.png"

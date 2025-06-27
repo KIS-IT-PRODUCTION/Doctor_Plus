@@ -10,16 +10,19 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
-  RefreshControl, // Import RefreshControl
+  RefreshControl,
+  TextInput,
+  Linking, // Додано для відкриття посилань
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg"; // Переконайтеся, що шлях правильний
+import Icon from "../../assets/icon.svg";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
-import { supabase } from '../../providers/supabaseClient'; // Переконайтеся, що шлях правильний
+import { supabase } from '../../providers/supabaseClient';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
+import Modal from 'react-native-modal';
 
 const { width, height } = Dimensions.get("window");
 
@@ -34,9 +37,15 @@ export default function Message() {
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false); // New state for RefreshControl
+  const [refreshing, setRefreshing] = useState(false);
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
+
+  // Нові стани для модального вікна Meet
+  const [isMeetModalVisible, setMeetModalVisible] = useState(false);
+  const [selectedBookingForMeet, setSelectedBookingForMeet] = useState(null);
+  const [meetLinkInput, setMeetLinkInput] = useState(''); // Для введення посилання
+  const [isMeetLinkSubmitting, setIsMeetLinkSubmitting] = useState(false); // Для індикатора завантаження
 
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
@@ -133,6 +142,39 @@ export default function Message() {
         };
       });
 
+      // Fetch meet_link for 'new_booking' type messages from 'patient_bookings'
+      // This is crucial because doctor_notifications might not always have the meet_link if it's added later
+      const bookingIdsToFetch = formattedMessages
+        .filter(msg => msg.type === 'new_booking' && msg.rawData.booking_id && !msg.rawData.meet_link)
+        .map(msg => msg.rawData.booking_id);
+
+      if (bookingIdsToFetch.length > 0) {
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from('patient_bookings')
+          .select('id, meet_link, status, is_paid') // Also fetch status and is_paid to ensure consistency
+          .in('id', bookingIdsToFetch);
+
+        if (bookingsError) {
+          console.error("Error fetching meet_links from patient_bookings:", bookingsError.message);
+          // Continue without meet links if there's an error
+        } else if (bookingsData) {
+          const bookingsMap = new Map(bookingsData.map(b => [b.id, b]));
+
+          formattedMessages.forEach(msg => {
+            if (msg.type === 'new_booking' && msg.rawData.booking_id) {
+              const bookingDetails = bookingsMap.get(msg.rawData.booking_id);
+              if (bookingDetails) {
+                // Update rawData with meet_link and ensure status/is_paid are consistent
+                msg.rawData.meet_link = bookingDetails.meet_link || null;
+                // Prefer the status from patient_bookings if available and it's more definitive
+                msg.rawData.status = bookingDetails.status ? String(bookingDetails.status).toLowerCase() : msg.rawData.status;
+                msg.rawData.is_paid = bookingDetails.is_paid !== undefined ? bookingDetails.is_paid : msg.rawData.is_paid;
+              }
+            }
+          });
+        }
+      }
+
       setMessages(formattedMessages);
 
     } catch (error) {
@@ -224,6 +266,10 @@ export default function Message() {
         }
       };
       addNewMessage(notificationContentWithDbId); // Add to message list in UI
+      // If it's a meet_link_update, re-fetch messages to ensure the stored link is updated
+      if (notification.request.content.data?.type === 'meet_link_update' && currentDoctorUserId) {
+        fetchMessagesFromSupabase(currentDoctorUserId, false);
+      }
     });
 
     // Listener for notification clicks
@@ -240,6 +286,11 @@ export default function Message() {
         }
       };
       addNewMessage(notificationContentWithDbId);
+
+      // Re-fetch messages if it's a meet_link_update to get the latest link
+      if (data && data.type === 'meet_link_update' && currentDoctorUserId) {
+        fetchMessagesFromSupabase(currentDoctorUserId, false);
+      }
 
       // Redirect or show Alert depending on the notification type
       if (data && data.type === 'new_booking' && data.booking_id) {
@@ -260,6 +311,12 @@ export default function Message() {
           `${t('payment_status')}: ${data.payment_status || t('not_specified')}\n${t('amount')}: ${data.amount || 'N/A'} ${data.currency || ''}\n${t('patient')}: ${data.patient_name || t('not_specified')}\n${t('date')}: ${data.booking_date || data.date || t('not_specified')}\n${t('time')}: ${data.booking_time_slot || data.time || t('not_specified')}.`,
           [{ text: t('ok') }]
         );
+      } else if (data && data.type === 'meet_link_update' && data.meet_link) { // Handle meet_link_update notifications
+        Alert.alert(
+            t('meet_link_update_notification_title'),
+            `${t('meet_link_updated_body')}\n\n${t('link')}: ${data.meet_link}`,
+            [{ text: t('open_link'), onPress: () => Linking.openURL(data.meet_link) }, { text: t('ok') }]
+        );
       }
       else {
           // General Alert for other notification types
@@ -276,7 +333,7 @@ export default function Message() {
         Notifications.removeNotificationSubscription(notificationResponseListener.current);
       }
     };
-  }, [t, addNewMessage, navigation]);
+  }, [t, addNewMessage, navigation, currentDoctorUserId, fetchMessagesFromSupabase]); // Added currentDoctorUserId and fetchMessagesFromSupabase to dependencies
 
   const markAsReadAndStatus = useCallback(async (messageId, newStatus = null) => {
     // Optimistic UI update
@@ -509,6 +566,117 @@ export default function Message() {
       }
   }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus, navigation]);
 
+  // Функції для керування модальним вікном Meet
+  const handleAddMeetLinkPress = useCallback((message) => {
+    setSelectedBookingForMeet(message);
+    setMeetLinkInput(message.rawData.meet_link || ''); // Заповнюємо, якщо посилання вже є
+    setMeetModalVisible(true);
+  }, []);
+
+  const handleCloseMeetModal = useCallback(() => {
+    setMeetModalVisible(false);
+    setSelectedBookingForMeet(null);
+    setMeetLinkInput('');
+  }, []);
+
+  const handleSaveMeetLink = useCallback(async () => {
+    if (!selectedBookingForMeet || !selectedBookingForMeet.rawData || !selectedBookingForMeet.rawData.booking_id) {
+      Alert.alert(t('error'), t('invalid_booking_data'));
+      return;
+    }
+
+    if (!meetLinkInput.trim()) {
+      Alert.alert(t('error'), t('please_enter_meet_link'));
+      return;
+    }
+
+    setIsMeetLinkSubmitting(true);
+    const bookingId = selectedBookingForMeet.rawData.booking_id;
+    const patientId = selectedBookingForMeet.rawData.patient_id;
+    const doctorName = doctorFullName || t('doctor');
+
+    try {
+      // Оновлення meet_link у patient_bookings
+      const { error: updateBookingError } = await supabase
+        .from('patient_bookings')
+        .update({ meet_link: meetLinkInput.trim() })
+        .eq('id', bookingId);
+
+      if (updateBookingError) {
+        console.error("Error updating meet_link in patient_bookings:", updateBookingError.message);
+        throw updateBookingError;
+      }
+      console.log(`Meet link for booking ${bookingId} updated successfully to: ${meetLinkInput.trim()}`);
+
+      // Виклик Edge Function для надсилання сповіщення пацієнту
+      const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/send-meet-link-notification'; // ПОТРІБНО СТВОРИТИ ЦЮ EDGE FUNCTION!
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        Alert.alert(t('error'), t('user_not_authenticated_please_login_again'));
+        setIsMeetLinkSubmitting(false);
+        return;
+      }
+
+      const payload = {
+        booking_id: bookingId,
+        meet_link: meetLinkInput.trim(),
+        patient_id: patientId,
+        doctor_name: doctorName,
+        booking_date: selectedBookingForMeet.rawData.booking_date || selectedBookingForMeet.rawData.date,
+        booking_time_slot: selectedBookingForMeet.rawData.booking_time_slot || selectedBookingForMeet.rawData.time,
+      };
+
+      console.log("Calling Edge Function send-meet-link-notification with data:", JSON.stringify(payload, null, 2));
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let errorText = `HTTP Error: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.error) {
+            errorText = errorData.error;
+          } else {
+            errorText = JSON.stringify(errorData);
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse error response from Edge Function:", parseError);
+        }
+        console.error('Error calling Edge Function (response not OK):', errorText);
+        Alert.alert(t('error'), `${t('failed_to_send_meet_link_notification')}: ${errorText}`);
+        return;
+      }
+
+      console.log('Edge Function send-meet-link-notification called successfully. Response:', await response.json());
+
+      // Оновити UI повідомлень після успішного збереження посилання
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === selectedBookingForMeet.id ? { ...msg, rawData: { ...msg.rawData, meet_link: meetLinkInput.trim() } } : msg
+        )
+      );
+
+      Alert.alert(t('success'), t('meet_link_sent_successfully'));
+      handleCloseMeetModal();
+
+    } catch (error) {
+      console.error("Error saving meet link or sending notification:", error.message);
+      Alert.alert(t('error'), `${t('failed_to_save_meet_link')}: ${error.message}`);
+    } finally {
+      setIsMeetLinkSubmitting(false);
+    }
+  }, [selectedBookingForMeet, meetLinkInput, t, doctorFullName, handleCloseMeetModal]);
+
 
   const handleConfirmBooking = useCallback(async (message) => {
       Alert.alert(
@@ -580,8 +748,13 @@ export default function Message() {
 
             const isPaymentReceived = message.type === 'payment_received' && message.rawData.is_paid === true;
             const isPaymentUpdate = message.type === 'payment_update_doctor'; // Covers 'failed', 'pending', etc.
-            const isPaymentFailed = isPaymentUpdate && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined');
+            const isPaymentFailed = isPaymentUpdate && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined' || message.rawData.status === 'reversed');
             const isPaymentPending = isPaymentUpdate && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
+
+            // --- НОВИЙ ТИП ПОВІДОМЛЕННЯ ДЛЯ MEET LINK ---
+            const isMeetLinkUpdate = message.type === 'meet_link_update';
+            // --- КІНЕЦЬ НОВОГО ТИПУ ПОВІДОМЛЕННЯ ---
+
 
             // Determine gradient colors and border style based on message type and status
             let cardColors = ['#FFFFFF', '#FDFDFD']; // Default light gradient
@@ -601,141 +774,148 @@ export default function Message() {
                 cardColors = ['#FFEBEE', '#FFCDD2']; // Light red for rejected bookings
                 cardBorderStyle = styles.messageCardRejectedBorder;
                 showStatusText = true;
-            } else if (isPaymentReceived) { // Specific check for successful payment
-                cardColors = ['#E8F5E9', '#C8E6C9']; // Light green for successful payments
-                cardBorderStyle = styles.messageCardConfirmedBorder; // Reusing confirmed border for paid
-            } else if (isPaymentFailed) { // Specific check for failed payment
-                cardColors = ['#FFEBEE', '#FFCDD2']; // Light red for failed payments
-                cardBorderStyle = styles.messageCardRejectedBorder; // Reusing rejected border for failed
-            } else if (isPaymentPending) { // Specific check for pending payment
-                cardColors = ['#FFFDE7', '#FFF9C4']; // Light yellow for pending payments
-                cardBorderStyle = styles.messageCardWarningBorder;
-            } else {
-                // General notifications, distinguish read/unread
-                if (!message.is_read) {
-                    cardColors = ['#FFFFFF', '#F0F8FF']; // Slightly off-white for unread general
-                    cardBorderStyle = styles.messageCardUnreadBorder;
-                } else {
-                    cardColors = ['#F8F8F8', '#ECECEC']; // Greyish for read general
-                }
+            } else if (isPaymentReceived) { // Specific check for payment received (green)
+                cardColors = ['#E8F5E9', '#C8E6C9'];
+                cardBorderStyle = styles.messageCardConfirmedBorder;
+            } else if (isPaymentFailed) { // Specific check for payment failed (red)
+                cardColors = ['#FFEBEE', '#FFCDD2'];
+                cardBorderStyle = styles.messageCardRejectedBorder;
+            } else if (isPaymentPending) { // Specific check for payment pending (orange)
+                cardColors = ['#FFF3E0', '#FFE0B2'];
+                cardBorderStyle = styles.messageCardPendingBorder; // Reusing pending border style for payments
+            } else if (isMeetLinkUpdate) { // Specific styling for meet link updates
+                cardColors = ['#F3E5F5', '#E1BEE7']; // Light purple for Meet link updates
+                cardBorderStyle = styles.messageCardMeetLinkBorder; // You might want to define this style
             }
 
 
             return (
-              <View key={message.id} style={styles.messageGroup}>
-                <View style={styles.dateAndTimestamp}>
-                  <Text style={styles.dateText}>{message.date}</Text>
-                  <Text style={styles.timestampText}>{message.time}</Text>
-                </View>
-                <LinearGradient
-                  colors={cardColors}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[
-                    styles.messageCard,
-                    cardBorderStyle, // Apply the determined border style
-                    !message.is_read && styles.messageCardUnreadLeftBar, // Keep the left bar for unread
-                  ]}
+              <LinearGradient
+                key={message.id}
+                colors={cardColors}
+                style={[styles.messageCard, cardBorderStyle, message.is_read ? styles.readMessage : styles.unreadMessage]}
+              >
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!message.is_read) {
+                      markAsReadAndStatus(message.id, message.rawData.status);
+                    }
+                  }}
                 >
-                  <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
-                  <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
+                  <Text style={styles.messageTitle}>
+                    {message.title}
+                  </Text>
+                  <Text style={styles.messageBody}>{message.body}</Text>
+                  <View style={styles.messageFooter}>
+                    <Text style={styles.messageDate}>{message.date}</Text>
+                    <Text style={styles.messageTime}>{message.time}</Text>
+                  </View>
 
-                  {/* Render content based on type and status */}
-                  {isPendingBooking && showActions && (
-                      <View style={styles.bookingActionButtons}>
-                          <TouchableOpacity
-                              onPress={() => handleConfirmBooking(message)}
-                              style={styles.actionButtonContainer}
-                          >
-                              <LinearGradient
-                                  colors={['#4CAF50', '#2E7D32']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                              >
-                                  <Text style={styles.actionButtonText}>{t('confirm_booking')}</Text>
-                              </LinearGradient>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                              onPress={() => handleRejectBooking(message)}
-                              style={styles.actionButtonContainer}
-                          >
-                              <LinearGradient
-                                  colors={['#D32F2F', '#B71C1C']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                              >
-                                  <Text style={styles.actionButtonText}>{t('reject_booking')}</Text>
-                              </LinearGradient>
-                          </TouchableOpacity>
-                      </View>
-                  )}
-
-                  {(isConfirmedBooking || isRejectedBooking) && showStatusText && (
-                      <Text style={[
-                          styles.statusText,
-                          isConfirmedBooking ? styles.confirmedText : styles.rejectedText
-                      ]}>
-                          {isConfirmedBooking ? t('confirmed_read') : t('rejected_read')}
-                      </Text>
-                  )}
-
-                  {(isPaymentReceived || isPaymentUpdate) && (
-                    <View>
-                      <Text style={styles.paymentDetailsText}>
-                        {t('patient')}: {message.rawData.patient_name || t('not_specified')}
-                      </Text>
-                      <Text style={styles.paymentDetailsText}>
-                        {t('booking_date_time')}: {message.rawData.booking_date || message.rawData.date} {message.rawData.booking_time_slot || message.rawData.time}
-                      </Text>
-                      <Text style={[
-                          styles.paymentStatusText,
-                          isPaymentReceived ? styles.paidStatusText : (isPaymentFailed ? styles.failedStatusText : styles.pendingStatusText)
-                      ]}>
-                          {t('payment_status')}: {isPaymentReceived ? t('paid') : (isPaymentFailed ? t('failed') : t('pending'))}
-                          {message.rawData.amount ? ` (${message.rawData.amount} ${message.rawData.currency || 'UAH'})` : ''}
-                      </Text>
-                       {!message.is_read && ( // Only show mark as read for payment notifications if unread
-                          <TouchableOpacity
-                              onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
-                              style={styles.actionButtonContainer}
-                          >
-                              <LinearGradient
-                                  colors={['#0EB3EB', '#0A8BA6']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                               >
-                                  <Text style={styles.actionButtonText}>{t('mark_as_read')}</Text>
-                              </LinearGradient>
-                          </TouchableOpacity>
-                      )}
+                  {/* Додано відображення Meet Link та кнопку "Відкрити Meet" */}
+                  {(isConfirmedBooking || isMeetLinkUpdate) && message.rawData.meet_link && (
+                    <View style={styles.meetLinkContainer}>
+                      <Text style={styles.meetLinkText}>{t('meet_link')}:</Text>
+                      <TouchableOpacity onPress={() => Linking.openURL(message.rawData.meet_link)}>
+                        <Text style={styles.meetLink}>{message.rawData.meet_link}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.openMeetButton}
+                        onPress={() => Linking.openURL(message.rawData.meet_link)}
+                      >
+                        <Text style={styles.openMeetButtonText}>{t('open_meet')}</Text>
+                        <Ionicons name="link" size={moderateScale(16)} color="#fff" style={{ marginLeft: 5 }} />
+                      </TouchableOpacity>
                     </View>
                   )}
 
-                  {/* For general messages (not booking/payment related) and if it's not handled above */}
-                  {!isPendingBooking && !isConfirmedBooking && !isRejectedBooking && !isPaymentReceived && !isPaymentUpdate && !message.is_read && (
+                  {/* Кнопка "Додати/Редагувати посилання на Meet" */}
+                  {isConfirmedBooking && ( // Показуємо тільки для підтверджених бронювань
                     <TouchableOpacity
-                        onPress={() => message.db_id && markAsReadAndStatus(message.db_id)}
-                        style={styles.actionButtonContainer}
+                      style={styles.addMeetLinkButton}
+                      onPress={() => handleAddMeetLinkPress(message)}
                     >
-                        <LinearGradient
-                            colors={['#0EB3EB', '#0A8BA6']}
-                            style={styles.actionButtonGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                        >
-                            <Text style={styles.actionButtonText}>{t('mark_as_read')}</Text>
-                        </LinearGradient>
+                      <Text style={styles.addMeetLinkButtonText}>
+                        {message.rawData.meet_link ? t('edit_meet_link') : t('add_meet_link')}
+                      </Text>
                     </TouchableOpacity>
                   )}
-                </LinearGradient>
-              </View>
+
+                  {/* Buttons for 'new_booking' type and 'pending' status */}
+                  {showActions && (
+                    <View style={styles.actionButtonsContainer}>
+                      <TouchableOpacity
+                        style={styles.confirmButton}
+                        onPress={() => handleConfirmBooking(message)}
+                      >
+                        <Text style={styles.buttonText}>{t('confirm')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.rejectButton}
+                        onPress={() => handleRejectBooking(message)}
+                      >
+                        <Text style={styles.buttonText}>{t('reject')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Status Text for Confirmed/Rejected bookings */}
+                  {showStatusText && (
+                    <Text style={[
+                      styles.statusText,
+                      isConfirmedBooking ? styles.statusTextConfirmed : styles.statusTextRejected
+                    ]}>
+                      {t('status')}: {t(message.rawData.status)} {/* Use t() for translation */}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </LinearGradient>
             );
           })
         )}
       </ScrollView>
+
+      {/* Meet Link Modal */}
+      <Modal
+        isVisible={isMeetModalVisible}
+        onBackdropPress={handleCloseMeetModal}
+        animationIn="fadeInUp"
+        animationOut="fadeOutDown"
+        backdropTransitionOutTiming={0}
+        style={styles.modal}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>{t('add_meet_link_title')}</Text>
+          <TextInput
+            style={styles.meetLinkTextInput}
+            placeholder={t('enter_meet_link')}
+            value={meetLinkInput}
+            onChangeText={setMeetLinkInput}
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <View style={styles.modalButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton]}
+              onPress={handleCloseMeetModal}
+              disabled={isMeetLinkSubmitting}
+            >
+              <Text style={styles.modalButtonText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalSaveButton]}
+              onPress={handleSaveMeetLink}
+              disabled={isMeetLinkSubmitting}
+            >
+              {isMeetLinkSubmitting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.modalButtonText}>{t('save')}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -743,188 +923,265 @@ export default function Message() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#F5F5F5",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: verticalScale(12),
+    paddingHorizontal: moderateScale(15),
+    paddingVertical: verticalScale(15),
+    backgroundColor: "#FFF",
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    backgroundColor: "#fff",
+    borderBottomColor: "#E0E0E0",
+    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight + 10 : verticalScale(15),
   },
   backButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: moderateScale(25),
-    width: moderateScale(48),
-    height: moderateScale(48),
-    justifyContent: "center",
-    alignItems: "center",
+    padding: moderateScale(5),
+    marginRight: moderateScale(10),
   },
   headerTitle: {
-    fontFamily: "Mont-SemiBold",
-    fontSize: moderateScale(20),
+    fontSize: moderateScale(22),
+    fontWeight: "bold",
     color: "#333",
+    flex: 1, // Allow title to take up available space
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#F5F5F5",
   },
   loadingText: {
-    marginTop: moderateScale(10),
-    fontFamily: "Inter-Regular",
+    marginTop: verticalScale(10),
     fontSize: moderateScale(16),
     color: "#555",
+  },
+  messageList: {
+    paddingHorizontal: moderateScale(15),
+    paddingVertical: verticalScale(20),
   },
   emptyMessagesContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: verticalScale(50),
-    paddingHorizontal: moderateScale(20),
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: verticalScale(50),
   },
   emptyMessagesText: {
-    fontFamily: "Inter-SemiBold",
     fontSize: moderateScale(18),
-    color: "#777",
-    textAlign: "center",
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: verticalScale(5),
   },
   emptyMessagesSubText: {
-    fontFamily: "Inter-Regular",
     fontSize: moderateScale(14),
-    color: "#999",
-    textAlign: "center",
-    marginTop: verticalScale(10),
-  },
-  messageList: {
-    paddingVertical: verticalScale(10),
-    paddingHorizontal: moderateScale(16),
-    flexGrow: 1, // Ensures ScrollView takes full height to enable pull-to-refresh
-  },
-  messageGroup: {
-    marginBottom: verticalScale(15),
-  },
-  dateAndTimestamp: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: verticalScale(5),
-    paddingHorizontal: moderateScale(5),
-  },
-  dateText: {
-    fontFamily: "Inter-SemiBold",
-    fontSize: moderateScale(12),
-    color: "#555",
-  },
-  timestampText: {
-    fontFamily: "Inter-Regular",
-    fontSize: moderateScale(11),
-    color: "#777",
+    color: '#999',
+    textAlign: 'center',
   },
   messageCard: {
-    borderRadius: moderateScale(12),
+    backgroundColor: "#FFF",
+    borderRadius: moderateScale(10),
     padding: moderateScale(15),
+    marginBottom: verticalScale(15),
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    position: 'relative',
-    overflow: 'hidden', // Ensures the gradient and border are within bounds
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  messageCardUnreadLeftBar: {
-    borderLeftWidth: moderateScale(6),
-    borderLeftColor: '#0EB3EB', // A distinct color for unread messages
+  readMessage: {
+    backgroundColor: "#F8F8F8", // Slightly grey for read messages
+    opacity: 0.8,
   },
-  // Border styles for different statuses
+  unreadMessage: {
+    // No specific style, inherits from messageCard
+  },
   messageCardPendingBorder: {
-    borderWidth: moderateScale(1),
-    borderColor: '#0EB3EB',
+    borderColor: '#0EB3EB', // Light blue
+    borderWidth: 1.5,
   },
   messageCardConfirmedBorder: {
-    borderWidth: moderateScale(1),
-    borderColor: '#4CAF50',
+    borderColor: '#4CAF50', // Green
+    borderWidth: 1.5,
   },
   messageCardRejectedBorder: {
-    borderWidth: moderateScale(1),
-    borderColor: '#D32F2F',
+    borderColor: '#F44336', // Red
+    borderWidth: 1.5,
   },
-  messageCardWarningBorder: {
-    borderWidth: moderateScale(1),
-    borderColor: '#FFA000',
+  messageCardMeetLinkBorder: { // New style for Meet Link messages
+    borderColor: '#9C27B0', // Purple
+    borderWidth: 1.5,
   },
-  messageCardUnreadBorder: {
-    borderWidth: moderateScale(1),
-    borderColor: '#A7D9F5', // Lighter blue for general unread
-  },
-  cardTitle: {
-    fontFamily: "Inter-SemiBold",
-    fontSize: moderateScale(16),
+  messageTitle: {
+    fontSize: moderateScale(18),
+    fontWeight: "bold",
     marginBottom: verticalScale(5),
     color: "#333",
   },
-  cardText: {
-    fontFamily: "Inter-Regular",
-    fontSize: moderateScale(14),
+  messageBody: {
+    fontSize: moderateScale(15),
     color: "#555",
-    lineHeight: verticalScale(20),
+    marginBottom: verticalScale(10),
   },
-  bookingActionButtons: {
+  messageFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: verticalScale(10),
+    borderTopWidth: 1,
+    borderTopColor: '#EEE',
+    paddingTop: verticalScale(8),
+  },
+  messageDate: {
+    fontSize: moderateScale(12),
+    color: "#777",
+  },
+  messageTime: {
+    fontSize: moderateScale(12),
+    color: "#777",
+  },
+  actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: verticalScale(15),
-    width: '100%',
   },
-  actionButtonContainer: {
-    borderRadius: moderateScale(8),
-    overflow: 'hidden',
-    flex: 1, // Take equal space
-    marginHorizontal: moderateScale(5),
-  },
-  actionButtonGradient: {
+  confirmButton: {
+    backgroundColor: '#4CAF50',
     paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: moderateScale(8),
+    flex: 1,
+    marginRight: scale(5),
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  actionButtonText: {
-    fontFamily: "Inter-SemiBold",
-    fontSize: moderateScale(14),
-    color: "#fff",
+  rejectButton: {
+    backgroundColor: '#F44336',
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: moderateScale(8),
+    flex: 1,
+    marginLeft: scale(5),
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
   },
   statusText: {
-    fontFamily: "Inter-Bold",
-    fontSize: moderateScale(14),
     marginTop: verticalScale(10),
+    fontSize: moderateScale(15),
+    fontWeight: 'bold',
     textAlign: 'right',
   },
-  confirmedText: {
-    color: '#4CAF50', // Green for confirmed
-  },
-  rejectedText: {
-    color: '#D32F2F', // Red for rejected
-  },
-  paymentDetailsText: {
-    fontFamily: "Inter-Regular",
-    fontSize: moderateScale(13),
-    color: "#666",
-    marginTop: verticalScale(5),
-  },
-  paymentStatusText: {
-    fontFamily: "Inter-SemiBold",
-    fontSize: moderateScale(14),
-    marginTop: verticalScale(5),
-  },
-  paidStatusText: {
+  statusTextConfirmed: {
     color: '#4CAF50',
   },
-  failedStatusText: {
-    color: '#D32F2F',
+  statusTextRejected: {
+    color: '#F44336',
   },
-  pendingStatusText: {
-    color: '#FFA000',
+  // Meet Link Styles
+  meetLinkContainer: {
+    marginTop: verticalScale(10),
+    paddingTop: verticalScale(8),
+    borderTopWidth: 1,
+    borderTopColor: '#EEE',
+  },
+  meetLinkText: {
+    fontSize: moderateScale(14),
+    fontWeight: 'bold',
+    color: '#555',
+    marginBottom: verticalScale(5),
+  },
+  meetLink: {
+    fontSize: moderateScale(14),
+    color: '#007BFF', // Blue link color
+    textDecorationLine: 'underline',
+    marginBottom: verticalScale(10),
+  },
+  openMeetButton: {
+    backgroundColor: '#007BFF',
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: scale(15),
+    borderRadius: moderateScale(8),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: verticalScale(5),
+  },
+  openMeetButtonText: {
+    color: '#fff',
+    fontSize: moderateScale(15),
+    fontWeight: 'bold',
+  },
+  addMeetLinkButton: {
+    backgroundColor: '#9C27B0', // Purple color
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(15),
+    borderRadius: moderateScale(8),
+    alignItems: 'center',
+    marginTop: verticalScale(15),
+  },
+  addMeetLinkButtonText: {
+    color: '#fff',
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
+  },
+  // Modal Styles
+  modal: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(20),
+    width: '90%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: 'bold',
+    marginBottom: verticalScale(15),
+    color: '#333',
+  },
+  meetLinkTextInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(10),
+    width: '100%',
+    marginBottom: verticalScale(20),
+    fontSize: moderateScale(16),
+  },
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: moderateScale(8),
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: scale(5),
+  },
+  modalSaveButton: {
+    backgroundColor: '#9C27B0',
+  },
+  modalCancelButton: {
+    backgroundColor: '#999',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
   },
 });
