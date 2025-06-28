@@ -899,7 +899,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   backButton: {
-    padding: moderateScale(8),
+      backgroundColor: "rgba(14, 179, 235, 0.2)",
+    borderRadius: 25,
+    width: 48,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontFamily: "Mont-SemiBold", // Змінено шрифт

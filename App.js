@@ -11,7 +11,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
-import * as Linking from "expo-linking";
+import * as Linking from "expo-linking"; // Це імпортовано, але не використовується у цьому фрагменті коду
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import "./i18n";
 
@@ -39,16 +39,12 @@ import ConsultationTime from "./app/doctor/ConsultationTime";
 import ConsultationTimePatient from "./app/ConsultationTimePatient";
 import PatientMessages from "./app/PatientMessages";
 import ResetPasswordScreen from "./app/doctor/ResetPasswordScreen";
-import TabBar_doctor from "./components/TopBar_doctor";
+import TabBar_doctor from "./components/TopBar_doctor"; // Це імпортовано, але не використовується у Stack Navigator напряму
 
 SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 
-/**
- * RootNavigator: Єдиний навігатор, який керує всіма екранами
- * та імперативно переключає між автентифікованими та неавтентифікованими потоками.
- */
 function RootNavigator() {
   const { session, loading, userRole } = useAuth();
   const navigationRef = useRef();
@@ -63,6 +59,8 @@ function RootNavigator() {
       return;
     }
 
+    // Цей useEffect буде викликаний лише тоді, коли `loading` стане `false`
+    // і `session` та `userRole` будуть визначені `AuthProvider`
     if (session && session.user) {
       if (userRole === "doctor") {
         console.log("RootNavigator Effect: Сесія активна, роль - лікар. Перехід до Profile_doctor.");
@@ -78,6 +76,8 @@ function RootNavigator() {
         });
       } else {
         // Якщо сесія є, але роль ще не визначена (може бути тимчасово null після входу)
+        // Це має бути рідкісним випадком, якщо userRole завжди визначена після завантаження.
+        // Можливо, тут потрібен окремий екран "визначення ролі" або дефолтний, поки роль не провантажиться.
         console.log("RootNavigator Effect: Сесія активна, але роль не визначена. Перехід до HomeScreen.");
         navigationRef.current.reset({
           index: 0,
@@ -94,20 +94,20 @@ function RootNavigator() {
     }
   }, [session, userRole, isNavigationReady]); // Залежності: сесія, роль, готовність навігатора
 
-  // ЗВЕРНІТЬ УВАГУ: Глобальний індикатор завантаження для AuthProvider БІЛЬШЕ НЕ РЕНДЕРИТЬСЯ ТУТ
-  // if (loading) {
-  //   console.log("RootNavigator: AuthProvider завантажується (первинна ініціалізація)...");
-  //   return (
-  //     <View style={styles.centeredContainer}>
-  //       <ActivityIndicator size="large" color="#0EB3EB" />
-  //       <Text style={{ marginTop: 10, fontFamily: "Mont-Regular" }}>Завантаження даних користувача...</Text>
-  //     </View>
-  //   );
-  // }
+  // Глобальний індикатор завантаження для AuthProvider
+  // Цей блок ПОВИНЕН БУТИ розкоментований
+  if (loading) {
+    console.log("RootNavigator: AuthProvider завантажується (первинна ініціалізація)...");
+    return (
+      <View style={styles.centeredContainer}>
+        <ActivityIndicator size="large" color="#0EB3EB" />
+        <Text style={{ marginTop: 10, fontFamily: "Mont-Regular" }}>Завантаження даних користувача...</Text>
+      </View>
+    );
+  }
 
   // Лог для налагодження: показує поточний стан сесії та ролі
   console.log(`RootNavigator (RENDER): Сесія: ${session ? 'Присутня' : 'Відсутня'}, Роль: ${userRole}, Навігатор готовий: ${isNavigationReady}, AuthProvider Loading: ${loading}`);
-
 
   return (
     <NavigationContainer
@@ -116,7 +116,7 @@ function RootNavigator() {
         setNavigationReady(true);
         console.log("RootNavigator: NavigationContainer готовий!");
       }}
-      // linking={{ ... }}
+      // linking={{ ... }} // Якщо ви використовуєте deep linking, додайте його сюди
     >
       <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade", animationDuration: 0 }}>
         {/*
@@ -125,40 +125,34 @@ function RootNavigator() {
           Порядок тут не так важливий, як був раніше з initialRouteName.
         */}
         {/* Неавтентифіковані екрани */}
-        <React.Fragment>
-          <Stack.Screen name="Login" component={Login} />
-          <Stack.Screen name="HomeScreen" component={HomeScreen} />
-          <Stack.Screen name="LoginScreen" component={LoginScreen} />
-          <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
-          <Stack.Screen name="Register" component={Register} />
-          <Stack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
-        </React.Fragment>
+        <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="HomeScreen" component={HomeScreen} />
+        <Stack.Screen name="LoginScreen" component={LoginScreen} />
+        <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
+        <Stack.Screen name="Register" component={Register} />
+        <Stack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
 
         {/* Автентифіковані екрани (пацієнти) */}
-        <React.Fragment>
-          <Stack.Screen name="Patsient_Home" component={Patsient_Home} />
-          <Stack.Screen name="Search" component={Search} />
-          <Stack.Screen name="Faq" component={Faq} />
-          <Stack.Screen name="Support" component={Support} />
-          <Stack.Screen name="Review" component={Review} />
-          <Stack.Screen name="ChooseSpecial" component={ChooseSpecial} />
-          <Stack.Screen name="WriteReview" component={WriteReview} />
-          <Stack.Screen name="Profile" component={Profile} />
-          <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
-          <Stack.Screen name="PatientMessages" component={PatientMessages} />
-        </React.Fragment>
+        <Stack.Screen name="Patsient_Home" component={Patsient_Home} />
+        <Stack.Screen name="Search" component={Search} />
+        <Stack.Screen name="Faq" component={Faq} />
+        <Stack.Screen name="Support" component={Support} />
+        <Stack.Screen name="Review" component={Review} />
+        <Stack.Screen name="ChooseSpecial" component={ChooseSpecial} />
+        <Stack.Screen name="WriteReview" component={WriteReview} />
+        <Stack.Screen name="Profile" component={Profile} />
+        <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
+        <Stack.Screen name="PatientMessages" component={PatientMessages} />
 
         {/* Автентифіковані екрани (лікарі) */}
-        <React.Fragment>
-          <Stack.Screen name="Anketa_Settings" component={Anketa_Settings} />
-          <Stack.Screen name="Profile_doctor" component={Profile_doctor} />
-          <Stack.Screen name="Messege" component={Messege} />
-          <Stack.Screen name="Faq_doctor" component={Faq_doctor} />
-          <Stack.Screen name="Support_doctor" component={Support_doctor} />
-          <Stack.Screen name="Rewiew_app" component={Rewiew_app} />
-          <Stack.Screen name="ConsultationTime" component={ConsultationTime} />
-          <Stack.Screen name="TabBar_doctor" component={TabBar_doctor} />
-        </React.Fragment>
+        <Stack.Screen name="Anketa_Settings" component={Anketa_Settings} />
+        <Stack.Screen name="Profile_doctor" component={Profile_doctor} />
+        <Stack.Screen name="Messege" component={Messege} />
+        <Stack.Screen name="Faq_doctor" component={Faq_doctor} />
+        <Stack.Screen name="Support_doctor" component={Support_doctor} />
+        <Stack.Screen name="Rewiew_app" component={Rewiew_app} />
+        <Stack.Screen name="ConsultationTime" component={ConsultationTime} />
+        <Stack.Screen name="TabBar_doctor" component={TabBar_doctor} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -738,6 +738,22 @@
   "meet_link_empty_error": "Будь ласка, введіть посилання на зустріч.",
   "invalid_meet_link_format": "Некоректний формат посилання. Посилання має починатися з http:// або https://",
   "invalid_booking_data_for_meet_link": "Недостатньо даних для надсилання посилання на зустріч.",
-  "failed_to_fetch_booking_details": "Не вдалося отримати деталі бронювання."
+  "failed_to_fetch_booking_details": "Не вдалося отримати деталі бронювання.",
+  "fill_profile": "Заповніть профіль",
+  "fill_profile_description": "Будь ласка, заповніть ваш профіль",
+  "profile_not_filled_message": "Будь ласка, заповніть ваш профіль преходячи до анкети лікаря.",
+  "writeReview.fullNameLabel": "Ваше ім'я",
+  "writeReview.fullNamePlaceholder": "Введіть ваше ім'я",
+  "writeReview.ratingLabel": "Ваша оцінка",
+    "title": "Відгуки про додаток",
+    "writeReviewButton": "Написати відгук",
+    "fetchError": "Помилка завантаження відгуків: ",
+    "loadingReviews": "Завантаження відгуків...",
+    "noReviews": "Наразі відгуків немає. Будьте першими, хто залишить відгук!",
+    "anonymousUser": "Анонімний користувач",
+     "complete_profile_title": "Завершіть профіль",
+  "complete_profile_message": "Будь ласка, заповніть усі обов'язкові поля вашого профілю, щоб пацієнти могли вас знайти та записатися на консультацію.",
+  "go_to_profile_settings": "Перейти до налаштувань профілю",
+  "maybe_later": "Можливо, пізніше"
 
 }
