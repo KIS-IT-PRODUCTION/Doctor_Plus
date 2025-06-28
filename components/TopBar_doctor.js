@@ -8,80 +8,72 @@ import {
   Text,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native"; // useNavigation для доступу до навігації
+// Додаємо useRoute для отримання інформації про поточний маршрут
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
-const TabBar_doctor = ({ activeTab, onTabPress }) => {
-  const navigation = useNavigation();
+// Зміни тут: прибираємо state та navigation з пропсів, використовуємо хуки
+const TabBar_doctor = () => {
+  const navigation = useNavigation(); // Отримуємо об'єкт навігації
+  const route = useRoute();           // Отримуємо об'єкт поточного маршруту
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
-  const handlePress = (tabName, screenName) => {
-    // Оновлюємо активну вкладку в батьківському компоненті,
-    // щоб він знав, яка вкладка зараз активна і міг її підсвітити.
-    onTabPress(tabName);
+  // Використовуємо route.name для визначення активної вкладки
+  const currentRouteName = route.name;
 
-    // Отримуємо поточний стан навігації
-    const state = navigation.getState();
-    // Отримуємо назву поточного активного маршруту
-    const currentRouteName = state.routes[state.index].name;
-
-    // Перевіряємо, чи поточний маршрут відрізняється від того,
-    // на який ми хочемо перейти, щоб уникнути зайвої навігації.
+  const handlePress = (screenName) => {
     if (currentRouteName !== screenName) {
-      // Використовуємо replace, щоб замінити поточний екран новим.
-      // Це запобігає накопиченню дублікатів екранів у стеку навігації.
+      // Використовуємо replace для навігації
       navigation.replace(screenName);
     }
   };
 
   return (
     <View style={[styles.tabBar_doctorContainer, { bottom: 10 + insets.bottom }]}>
-      {/* Кнопка "Домашня" */}
-       
+      {/* Кнопка "Профіль" */}
       <TouchableOpacity
         style={[
           styles.tabButton,
-          activeTab === "Profile_doctor" && styles.activeTabButton,
+          currentRouteName === "Profile_doctor" && styles.activeTabButton,
         ]}
-        onPress={() => handlePress("Profile_doctor", "Profile_doctor")}
+        onPress={() => handlePress("Profile_doctor")}
       >
         <Ionicons
           name="person-outline"
           size={28}
-          color={activeTab === "Profile_doctor" ? "#0EB3EB" : "white"}
+          color={currentRouteName === "Profile_doctor" ? "#0EB3EB" : "white"}
         />
         <Text
           style={[
             styles.tabText,
-            { color: activeTab === "Profile_doctor" ? "#0EB3EB" : "white" },
+            { color: currentRouteName === "Profile_doctor" ? "#0EB3EB" : "white" },
           ]}
         >
           {t("profile")}
         </Text>
       </TouchableOpacity>
-     
 
       {/* Кнопка "Питання" (FAQ) */}
       <TouchableOpacity
         style={[
           styles.tabButton,
-          activeTab === "Questions_doctor" && styles.activeTabButton,
+          currentRouteName === "Faq_doctor" && styles.activeTabButton,
         ]}
-        onPress={() => handlePress("Questions_doctor", "Faq_doctor")} // Переконайтеся, що "Faq_doctor" - це назва вашого екрану
+        onPress={() => handlePress("Faq_doctor")}
       >
         <Ionicons
           name="chatbubble-ellipses-outline"
           size={28}
-          color={activeTab === "Questions_doctor" ? "#0EB3EB" : "white"}
+          color={currentRouteName === "Faq_doctor" ? "#0EB3EB" : "white"}
         />
         <Text
           style={[
             styles.tabText,
-            { color: activeTab === "Questions_doctor" ? "#0EB3EB" : "white" },
+            { color: currentRouteName === "Faq_doctor" ? "#0EB3EB" : "white" },
           ]}
         >
           {t("questions")}
@@ -92,19 +84,19 @@ const TabBar_doctor = ({ activeTab, onTabPress }) => {
       <TouchableOpacity
         style={[
           styles.tabButton,
-          activeTab === "Headphones_doctor" && styles.activeTabButton,
+          currentRouteName === "Support_doctor" && styles.activeTabButton,
         ]}
-        onPress={() => handlePress("Headphones_doctor", "Support_doctor")} // Переконайтеся, що "Support_doctor" - це назва вашого екрану
+        onPress={() => handlePress("Support_doctor")}
       >
         <Ionicons
           name="headset-outline"
           size={28}
-          color={activeTab === "Headphones_doctor" ? "#0EB3EB" : "white"}
+          color={currentRouteName === "Support_doctor" ? "#0EB3EB" : "white"}
         />
         <Text
           style={[
             styles.tabText,
-            { color: activeTab === "Headphones_doctor" ? "#0EB3EB" : "white" },
+            { color: currentRouteName === "Support_doctor" ? "#0EB3EB" : "white" },
           ]}
         >
           {t("support")}
@@ -115,70 +107,66 @@ const TabBar_doctor = ({ activeTab, onTabPress }) => {
       <TouchableOpacity
         style={[
           styles.tabButton,
-          activeTab === "Stars_doctor" && styles.activeTabButton,
+          currentRouteName === "Rewiew_app" && styles.activeTabButton,
         ]}
-        onPress={() => handlePress("Stars_doctor", "Rewiew_app")} // Переконайтеся, що "Rewiew_app" - це назва вашого екрану
+        onPress={() => handlePress("Rewiew_app")}
       >
         <Ionicons
           name="star-outline"
           size={28}
-          color={activeTab === "Stars_doctor" ? "#0EB3EB" : "white"}
+          color={currentRouteName === "Rewiew_app" ? "#0EB3EB" : "white"}
         />
         <Text
           style={[
             styles.tabText,
-            { color: activeTab === "Stars_doctor" ? "#0EB3EB" : "white" },
+            { color: currentRouteName === "Rewiew_app" ? "#0EB3EB" : "white" },
           ]}
         >
           {t("Review")}
         </Text>
       </TouchableOpacity>
-
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   tabBar_doctorContainer: {
-    position: "fixed",
+    position: "fixed", // Або "absolute"
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
     backgroundColor: "rgb(14, 180, 235)",
     height: 70,
     width: Dimensions.get("window").width * 0.9,
-    borderRadius: 555, // Створює "круглястий" вигляд
-    position: "absolute",
-    alignSelf: "center", // Вирівнює контейнер по центру горизонтально
+    borderRadius: 555,
+    position: "absolute", // Змінив на "absolute" для надійності
+    alignSelf: "center",
     paddingHorizontal: 10,
-    zIndex: 10, // Гарантує, що таббар буде поверх іншого контенту
-    overflow: "hidden", // Обрізає вміст, якщо він виходить за межі borderRadius
-    // Додаємо тіні для кращого візуального ефекту
+    zIndex: 10,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 5, // Збільшуємо тінь, щоб таббар "плавав"
+      height: 5,
     },
     shadowOpacity: 0.34,
     shadowRadius: 6.27,
-    elevation: 10, // Для Android тіні
+    elevation: 10,
   },
   tabButton: {
-    flex: 1, // Розподіляє простір між кнопками рівномірно
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 2, // Невеликий відступ між кнопками
+    marginHorizontal: 2,
     paddingVertical: 5,
-    // transition: 'all 0.3s ease-in-out', // CSS transition не працює в React Native Styles
   },
   activeTabButton: {
-    borderRadius: 555, // Також "круглястий" вигляд для активної кнопки
+    borderRadius: 555,
     backgroundColor: "white",
-    width: 60, // Фіксована ширина
-    height: 55, // Фіксована висота
+    width: 60,
+    height: 55,
     justifyContent: "center",
     alignItems: "center",
-    // Додаємо тінь для активної кнопки, щоб вона виділялась
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -191,8 +179,8 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 10,
     marginTop: 2,
-    fontFamily: "Mont-Regular", // Переконайтеся, що шрифт завантажено
-    textAlign: "center", // Вирівнювання тексту по центру
+    fontFamily: "Mont-Regular",
+    textAlign: "center",
   },
 });
 

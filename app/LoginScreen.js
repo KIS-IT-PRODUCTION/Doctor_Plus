@@ -7,20 +7,23 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  Alert,
-  ActivityIndicator, // Додано для індикатора завантаження
+  // Alert, // Можна використовувати для налагодження, але для продакшену краще кастомні UI
+  ActivityIndicator,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../providers/supabaseClient";
-import { useAuth } from "../providers/AuthProvider";
-import { useTranslation } from "react-i18next"; // Імпортуємо useTranslation
+import { supabase } from "../providers/supabaseClient"; // Все ще використовується для прямого signInWithPassword
+import { useAuth } from "../providers/AuthProvider"; // Для доступу до сесії та, можливо, інших функцій у майбутньому
+import { useTranslation } from "react-i18next";
 
 const LoginScreen = () => {
   const navigation = useNavigation();
+  // Використовуємо session з useAuth для загальної логіки сесії.
+  // Хоча signInWithPassword викликається напряму через supabase.auth,
+  // AuthProvider все одно відстежує стан сесії та оновлює її.
   const { session } = useAuth();
-  const { t } = useTranslation(); // Ініціалізуємо хук useTranslation
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,25 +32,29 @@ const LoginScreen = () => {
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
+  // Цей useEffect буде автоматично перенаправляти на Patsient_Home
+  // якщо сесія активна після завантаження або успішного входу.
   useEffect(() => {
     if (session && session.user) {
+      console.log("LoginScreen.js: Сесія активна, перенаправлення на Patsient_Home.");
       navigation.replace("Patsient_Home");
     }
   }, [session, navigation]);
 
   const handleLogin = async () => {
-    setLoginError("");
+    setLoginError(""); // Очищаємо попередні помилки
 
     if (!email.trim()) {
-      setLoginError(t("error_empty_email")); // Переклад помилки
+      setLoginError(t("error_empty_email"));
       return;
     }
     if (!password.trim()) {
-      setLoginError(t("error_empty_password")); // Переклад помилки
+      setLoginError(t("error_empty_password"));
       return;
     }
 
-    setIsLoggingIn(true);
+    setIsLoggingIn(true); // Включаємо індикатор завантаження
+    console.log("LoginScreen.js: Спроба входу для пацієнта з email:", email);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -56,21 +63,30 @@ const LoginScreen = () => {
       });
 
       if (error) {
-        console.error("Помилка входу Supabase:", error.message);
-        // Використовуємо інтерполяцію для передачі оригінального повідомлення помилки
+        console.error("LoginScreen.js: Помилка входу Supabase:", error.message);
+        // Відображаємо помилку локально на екрані входу
         setLoginError(t("error_login_failed", { error: error.message }));
       } else {
-        console.log("Вхід Supabase успішний. Дані користувача:", data.user?.id);
+        console.log("LoginScreen.js: Вхід Supabase успішний. Користувач:", data.user?.id);
+        // Поля введення можна очистити тут або залишити, оскільки успішна навігація
+        // призведе до розмонтування компонента і скидання стану.
         setEmail("");
         setPassword("");
         // Навігація відбудеться через useEffect завдяки оновленню сесії в AuthProvider
       }
     } catch (err) {
-      console.error("Загальна помилка входу:", err);
-      setLoginError(t("error_general_login_failed")); // Переклад загальної помилки
+      console.error("LoginScreen.js: Загальна помилка входу (try/catch):", err);
+      setLoginError(t("error_general_login_failed"));
     } finally {
-      setIsLoggingIn(false);
+      setIsLoggingIn(false); // Вимикаємо індикатор завантаження
     }
+  };
+
+  const handleForgotPasswordPress = () => {
+    setLoginError(""); // Очищаємо будь-яку поточну помилку перед переходом
+    // Перенаправляємо на екран скидання пароля, передаючи email
+    console.log("LoginScreen.js: Перехід на екран ResetPasswordScreen.");
+    navigation.navigate("ResetPasswordScreen", { email: email });
   };
 
   return (
@@ -92,11 +108,12 @@ const LoginScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder={t("placeholder_email")} // Переклад плейсхолдера
+            placeholder={t("placeholder_email")}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!isLoggingIn} // Деактивуємо поле під час входу
           />
         </View>
 
@@ -110,10 +127,11 @@ const LoginScreen = () => {
           />
           <TextInput
             style={styles.input}
-            placeholder={t("placeholder_password")} // Переклад плейсхолдера
+            placeholder={t("placeholder_password")}
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
+            editable={!isLoggingIn} // Деактивуємо поле під час входу
           />
         </View>
 
@@ -122,25 +140,36 @@ const LoginScreen = () => {
         <TouchableOpacity
           style={styles.loginButton(width)}
           onPress={handleLogin}
-          disabled={isLoggingIn}
+          disabled={isLoggingIn} // Кнопка вимкнена під час завантаження
         >
           {isLoggingIn ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.loginButtonText}>
-              {t("login_button")} {/* Переклад тексту кнопки */}
+              {t("login_button")}
             </Text>
           )}
+        </TouchableOpacity>
+
+        {/* НОВЕ: Кнопка "Забули пароль?" */}
+        <TouchableOpacity
+          style={styles.forgotPasswordLink}
+          onPress={handleForgotPasswordPress}
+          disabled={isLoggingIn} // Деактивуємо під час входу
+        >
+          <Text style={styles.forgotPasswordText}>
+            {t("forgot_password_link")}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.registerLink}
           onPress={() => navigation.navigate("RegisterScreen")}
+          disabled={isLoggingIn} // Деактивуємо під час входу
         >
           <Text style={styles.registerLinkText}>
-            {t("not_registered")} {/* Переклад тексту посилання */}
-            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>{" "}
-            {/* Переклад частини посилання */}
+            {t("not_registered")}
+            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
           </Text>
         </TouchableOpacity>
       </View>
@@ -220,6 +249,15 @@ const styles = StyleSheet.create({
     color: "red",
     marginBottom: 16,
     textAlign: "center",
+  },
+  forgotPasswordLink: { // Додано стиль для нового посилання
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  forgotPasswordText: { // Додано стиль для нового посилання
+    fontSize: 14,
+    color: "#757575",
+    textDecorationLine: "underline",
   },
   registerLink: {
     marginTop: 24,

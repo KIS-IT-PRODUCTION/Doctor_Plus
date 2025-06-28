@@ -803,7 +803,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Стилі для модального вікна вибору мови (залишаються без змін)
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -814,8 +813,8 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
-    borderColor: "#0EB3EB",
-    borderWidth: 1,
+    borderColor: "#0EB3EB", // Колір рамки
+    borderWidth: 1, // Товщина рамки
     alignItems: "center",
     width: Dimensions.get("window").width * 0.8,
     shadowColor: "#000",
@@ -828,13 +827,21 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   languageOption: {
-    paddingVertical: 10,
+    paddingVertical: 15,
     width: "100%",
     alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#rgba(14, 179, 235, 0.1)",
   },
   languageOptionText: {
     fontSize: 18,
-    color: "#333",
+    fontFamily: "Mont-Regular",
+    color: "#333333",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Mont-SemiBold",
+    marginBottom: 15,
   },
 });
 export default Register;

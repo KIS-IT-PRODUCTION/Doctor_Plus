@@ -750,11 +750,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Товщина рамки
   },
   // modalTitle (залишається як було, але його немає в модальному вікні вибору країни в прикладі)
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 15,
-  },
+  
   modalScrollView: {
     width: "100%", // ScrollView займає всю доступну ширину
   },
@@ -797,9 +793,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-
-  // Стилі для модального вікна вибору мови (залишаються без змін)
-  modalOverlay: {
+modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
@@ -833,6 +827,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "Mont-Regular",
     color: "#333333",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Mont-SemiBold",
+    marginBottom: 15,
   },
 });
 
