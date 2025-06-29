@@ -13,7 +13,9 @@ import {
   Modal,
   TouchableWithoutFeedback,
   ActivityIndicator,
-  RefreshControl, // Імпортуємо RefreshControl
+  RefreshControl, 
+  KeyboardAvoidingView,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -697,6 +699,8 @@ const styles = StyleSheet.create({
   safeAreaContent: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+    paddingTop: Platform.OS === "ios" ? (StatusBar.currentHeight ? 5 : 10) : 0,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
   },
   scrollContentContainer: {
     flexGrow: 1,
@@ -714,9 +718,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: containerWidth,
-    paddingTop: Platform.OS === 'android' ? 10 : 0,
     height: 60,
-    marginTop: 10,
     zIndex: 10,
   },
   logoContainer: {
@@ -835,7 +837,6 @@ const styles = StyleSheet.create({
 
   signOutButtonAboveSearch: {
     position: "absolute",
-    bottom: 75,
     right: 0,
     backgroundColor: "rgba(255, 0, 0, 0.7)",
     borderRadius: 30,

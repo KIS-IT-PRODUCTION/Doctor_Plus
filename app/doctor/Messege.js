@@ -1,3 +1,4 @@
+import "react-native-url-polyfill/auto";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
@@ -13,6 +14,7 @@ import {
   RefreshControl,
   TextInput,
   Linking,
+  StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../../assets/icon.svg";
@@ -20,7 +22,6 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../../providers/supabaseClient';
-import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get("window");
@@ -40,6 +41,7 @@ export default function Message() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
+  const [hiddenMessageIds, setHiddenMessageIds] = useState(new Set());
 
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
@@ -80,7 +82,7 @@ export default function Message() {
           is_read: (data && data.is_read) || false,
           type: messageType,
           rawData: { ...data, status: messageStatus } || {},
-          meetLinkInput: data && data.meet_link ? data.meet_link : '', // Ініціалізація поля введення посилання
+          meetLinkInput: data && data.meet_link ? data.meet_link : '',
         },
         ...prevMessages,
       ];
@@ -129,7 +131,7 @@ export default function Message() {
           is_read: notif.is_read,
           type: messageType,
           rawData: { ...rawData, status: messageStatus },
-          meetLinkInput: rawData.meet_link ? rawData.meet_link : '', // Ініціалізація поля введення посилання при завантаженні
+          meetLinkInput: rawData.meet_link ? rawData.meet_link : '',
         };
       });
 
@@ -284,7 +286,6 @@ export default function Message() {
                 updatedRawData.status = newStatus;
             }
           }
-          // Do NOT mark as read if it's a payment notification and no meet_link is present yet
           const shouldMarkAsRead = !(isPaymentNotification && !updatedRawData.meet_link);
 
           return { ...msg, is_read: shouldMarkAsRead, rawData: updatedRawData };
@@ -319,7 +320,6 @@ export default function Message() {
         updateObject.data = updatedDataForDB;
       }
 
-      // Логіка is_read для бази даних
       if (isPaymentNotification && !existingRawData.meet_link) {
           updateObject.is_read = false;
       } else {
@@ -343,6 +343,44 @@ export default function Message() {
     }
   }, [t]);
 
+  const handleMarkAsRead = useCallback(async (messageId) => {
+    setMessages(prevMessages =>
+      prevMessages.map(msg =>
+        msg.id === messageId ? { ...msg, is_read: true } : msg
+      )
+    );
+    setHiddenMessageIds(prev => new Set(prev).add(messageId));
+
+    try {
+      const { error } = await supabase
+        .from('doctor_notifications')
+        .update({ is_read: true })
+        .eq('id', messageId);
+
+      if (error) {
+        console.error("Error marking general notification as read in DB:", error.message);
+        Alert.alert(t('error'), t('failed_to_update_notification_status'));
+      } else {
+        console.log(`General notification ${messageId} marked as read in DB.`);
+      }
+    } catch (error) {
+      console.error("Network error marking general notification as read:", error.message);
+      Alert.alert(t('error'), t('failed_to_update_notification_status'));
+    }
+  }, [t]);
+
+  const handleHideMessage = useCallback((messageId) => {
+    setHiddenMessageIds(prev => new Set(prev).add(messageId));
+  }, []);
+
+  const handleOpenMessage = useCallback((messageId) => {
+    setHiddenMessageIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(messageId);
+      return newSet;
+    });
+  }, []);
+
   const updateBookingStatusAndNotify = useCallback(async (message, newStatus) => {
       if (!message || !message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId) {
           console.error("Missing essential data for updateBookingStatusAndNotify (initial check):", {
@@ -361,7 +399,7 @@ export default function Message() {
       const bookingDate = message.rawData.booking_date || message.rawData.date;
       const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
       const doctorFinalName = doctorFullName || t('doctor');
-      const bookingAmount = message.rawData.amount;
+      // const bookingAmount = message.rawData.amount; // Це значення може бути неактуальним для всіх статусів
 
       if (typeof bookingDate !== 'string' || bookingDate.trim() === '' || typeof bookingTimeSlot !== 'string' || bookingTimeSlot.trim() === '') {
           console.error("Missing or invalid booking date or time slot in rawData.");
@@ -409,8 +447,6 @@ export default function Message() {
           }
 
           const edgeFunctionUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/handle-booking-status-update';
-          const sendMeetLinkUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/send-meet-link-notification';
-
 
           const { data: { session } } = await supabase.auth.getSession();
           const accessToken = session?.access_token;
@@ -447,10 +483,10 @@ export default function Message() {
                   Alert.alert(t('error'), t('failed_to_fetch_booking_details'));
                   return;
               }
-              if (bookingDetails && bookingDetails.amount !== undefined) {
-                  payload.booking.amount = bookingDetails.amount;
-                  payload.booking.is_paid = bookingDetails.is_paid;
-                  payload.booking.meet_link = bookingDetails.meet_link;
+              if (bookingDetails) {
+                  payload.booking.amount = bookingDetails.amount || 0;
+                  payload.booking.is_paid = bookingDetails.is_paid || false;
+                  payload.booking.meet_link = bookingDetails.meet_link || null;
               } else {
                   console.warn("Booking amount/is_paid/meet_link not found, setting amount to 0 and is_paid to false for Edge Function.");
                   payload.booking.amount = 0;
@@ -491,12 +527,11 @@ export default function Message() {
           Alert.alert(t('success'), newStatus === 'confirmed' ? t('booking_confirmed_successfully_message') : t('booking_rejected_successfully_message'));
 
           if (message.db_id) {
-            const isPaymentNotif = message.type === 'payment_received' || message.type === 'payment_update_doctor';
-            await markAsReadAndStatus(message.db_id, newStatus, isPaymentNotif);
+            await markAsReadAndStatus(message.db_id, newStatus, false);
           } else {
             setMessages(prevMessages =>
               prevMessages.map(msg =>
-                msg.id === message.id ? { ...msg, is_read: (msg.type !== 'payment_received' && msg.type !== 'payment_update_doctor'), rawData: { ...msg.rawData, status: newStatus } } : msg
+                msg.id === message.id ? { ...msg, is_read: true, rawData: { ...msg.rawData, status: newStatus } } : msg
               )
             );
           }
@@ -504,7 +539,7 @@ export default function Message() {
           console.error("Error processing booking (general fetch or DB update error):", error.message);
           Alert.alert(t('error'), `${t('failed_to_process_booking')}: ${error.message}`);
       }
-  }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus, navigation]);
+  }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus]);
 
 
   const handleConfirmBooking = useCallback(async (message) => {
@@ -528,6 +563,14 @@ export default function Message() {
           ]
       );
   }, [t, updateBookingStatusAndNotify]);
+
+  const handleMeetLinkInputChange = useCallback((messageId, text) => {
+    setMessages(prevMessages =>
+      prevMessages.map(msg =>
+        msg.id === messageId ? { ...msg, meetLinkInput: text } : msg
+      )
+    );
+  }, []);
 
   const handleSendMeetLink = useCallback(async (message) => {
     const meetLink = message.meetLinkInput;
@@ -585,7 +628,7 @@ export default function Message() {
             meet_link: meetLink,
             doctor_name: doctorFinalName,
             booking_date: bookingDate,
-            booking_time_slot: bookingTimeSlot, // Виправлено
+            booking_time_slot: bookingTimeSlot,
         };
 
         console.log("Calling send-meet-link-notification with data:", JSON.stringify(meetLinkPayload, null, 2));
@@ -619,32 +662,13 @@ export default function Message() {
         console.log('Meet link notification sent successfully. Response:', await response.json());
         Alert.alert(t('success'), t('meet_link_sent_successfully'));
 
-        // Оновлюємо стан повідомлень, щоб відобразити нове посилання та позначити як прочитане
-        setMessages(prevMessages =>
-            prevMessages.map(msg =>
-                msg.id === message.id ? {
-                    ...msg,
-                    rawData: { ...msg.rawData, meet_link: meetLink },
-                    meetLinkInput: meetLink, // Зберігаємо нове посилання в meetLinkInput
-                    is_read: true,
-                } : msg
-            )
-        );
-
-        // Оновлюємо базу даних
-        await supabase
-            .from('doctor_notifications')
-            .update({
-                is_read: true,
-                data: { ...message.rawData, meet_link: meetLink }
-            })
-            .eq('id', message.db_id);
+        await markAsReadAndStatus(message.db_id, message.rawData.status, true);
 
     } catch (error) {
         console.error("Error sending meet link:", error.message);
         Alert.alert(t('error'), `${t('failed_to_send_meet_link')}: ${error.message}`);
     }
-  }, [t, currentDoctorUserId, doctorFullName]);
+  }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus]);
 
   if (loading && !refreshing) {
     return (
@@ -687,51 +711,67 @@ export default function Message() {
           </View>
         ) : (
           messages.map((message) => {
+            if (hiddenMessageIds.has(message.id)) {
+              return (
+                <View key={message.id} style={styles.hiddenMessageContainer}>
+                  <Text style={styles.hiddenMessageText}>
+                    {message.title} ({t('messages_screen.hidden_message')})
+                  </Text>
+                  <TouchableOpacity onPress={() => handleOpenMessage(message.id)} style={styles.openMessageButton}>
+                    <Ionicons name="eye-outline" size={moderateScale(20)} color="#0EB3EB" />
+                    <Text style={styles.openMessageButtonText}>{t('messages_screen.open')}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
             const isConfirmedBooking = message.type === 'new_booking' && message.rawData.status === 'confirmed';
             const isRejectedBooking = message.type === 'new_booking' && message.rawData.status === 'rejected';
             const isPendingBooking = message.type === 'new_booking' && message.rawData.status === 'pending';
 
-            const isPaymentReceived = message.type === 'payment_received' && message.rawData.is_paid === true;
+            const isPaymentReceived = message.type === 'payment_received';
             const isPaymentUpdate = message.type === 'payment_update_doctor';
-            const isPaymentFailed = isPaymentUpdate && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined');
-            const isPaymentPending = isPaymentUpdate && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
+            const isPaymentSuccessful = (isPaymentReceived || isPaymentUpdate) && message.rawData.status === 'success' && message.rawData.is_paid === true;
+            const isPaymentFailed = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined');
+            const isPaymentPending = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
 
-            let cardColors = ['#FFFFFF', '#FDFDFD']; // Default
+            let cardColors = ['#FFFFFF', '#FDFDFD'];
             let cardBorderStyle = {};
             let showActions = false;
             let showStatusText = false;
+            let isGeneralMessage = false;
 
             if (isPendingBooking) {
-                cardColors = ['#E0F7FA', '#B2EBF2']; // Light Blue for pending
+                cardColors = ['#E0F7FA', '#B2EBF2'];
                 cardBorderStyle = styles.messageCardPendingBorder;
                 showActions = true;
             } else if (isConfirmedBooking) {
-                cardColors = ['#E8F5E9', '#C8E6C9']; // Light Green for confirmed
+                cardColors = ['#E8F5E9', '#C8E6C9'];
                 cardBorderStyle = styles.messageCardConfirmedBorder;
                 showStatusText = true;
             } else if (isRejectedBooking) {
-                cardColors = ['#FFEBEE', '#FFCDD2']; // Light Red for rejected
+                cardColors = ['#FFEBEE', '#FFCDD2'];
                 cardBorderStyle = styles.messageCardRejectedBorder;
                 showStatusText = true;
-            } else if (isPaymentReceived) {
-                cardColors = ['#E8F5E9', '#C8E6C9']; // Light Green for paid
+            } else if (isPaymentSuccessful) {
+                cardColors = ['#E8F5E9', '#C8E6C9'];
                 cardBorderStyle = styles.messageCardConfirmedBorder;
             } else if (isPaymentFailed) {
-                cardColors = ['#FFEBEE', '#FFCDD2']; // Light Red for payment failed
+                cardColors = ['#FFEBEE', '#FFCDD2'];
                 cardBorderStyle = styles.messageCardRejectedBorder;
             } else if (isPaymentPending) {
-                cardColors = ['#FFFDE7', '#FFF9C4']; // Light Yellow for payment pending
+                cardColors = ['#FFFDE7', '#FFF9C4'];
                 cardBorderStyle = styles.messageCardWarningBorder;
-            } else { // General messages
+            } else {
+                isGeneralMessage = true;
                 if (!message.is_read) {
-                    cardColors = ['#FFFFFF', '#F0F8FF']; // Slightly bluish for unread
+                    cardColors = ['#FFFFFF', '#F0F8FF'];
                     cardBorderStyle = styles.messageCardUnreadBorder;
                 } else {
-                    cardColors = ['#F8F8F8', '#ECECEC']; // Greyish for read
+                    cardColors = ['#F8F8F8', '#ECECEC'];
                     cardBorderStyle = styles.messageCardDefaultBorder;
                 }
             }
-
 
             return (
               <View key={message.id} style={styles.messageGroup}>
@@ -752,46 +792,58 @@ export default function Message() {
                   <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                   <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
 
-                  {isPendingBooking && showActions && (
-                      <View style={styles.bookingActionButtons}>
-                          <TouchableOpacity
-                              onPress={() => handleConfirmBooking(message)}
-                              style={styles.actionButtonContainer}
-                          >
-                              <LinearGradient
-                                  colors={['#4CAF50', '#2E7D32']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                              >
-                                  <Text style={styles.actionButtonText}>{t('confirm_booking')}</Text>
-                              </LinearGradient>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                              onPress={() => handleRejectBooking(message)}
-                              style={styles.actionButtonContainer}
-                          >
-                              <LinearGradient
-                                  colors={['#D32F2F', '#B71C1C']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                              >
-                                  <Text style={styles.actionButtonText}>{t('reject_booking')}</Text>
-                              </LinearGradient>
-                          </TouchableOpacity>
+                  {/* Секція для повідомлень про бронювання */}
+                  {message.type === 'new_booking' && (
+                      <View>
+                          {message.rawData.patient_name && <Text style={styles.paymentDetailsText}>{t('patient')}: {message.rawData.patient_name}</Text>}
+                          {message.rawData.booking_date && <Text style={styles.paymentDetailsText}>{t('date')}: {message.rawData.booking_date}</Text>}
+                          {message.rawData.booking_time_slot && <Text style={styles.paymentDetailsText}>{t('time')}: {message.rawData.booking_time_slot}</Text>}
+                          {message.rawData.reason && <Text style={styles.paymentDetailsText}>{t('reason')}: {message.rawData.reason}</Text>}
+
+                          {isPendingBooking && showActions && (
+                              <View style={styles.bookingActionButtons}>
+                                  <TouchableOpacity
+                                      onPress={() => handleConfirmBooking(message)}
+                                      style={styles.actionButtonContainer}
+                                  >
+                                      <LinearGradient
+                                          colors={['#4CAF50', '#2E7D32']}
+                                          style={styles.actionButtonGradient}
+                                          start={{ x: 0, y: 0 }}
+                                          end={{ x: 1, y: 0 }}
+                                      >
+                                          <Text style={styles.actionButtonText}>{t('confirm_booking')}</Text>
+                                      </LinearGradient>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                      onPress={() => handleRejectBooking(message)}
+                                      style={styles.actionButtonContainer}
+                                  >
+                                      <LinearGradient
+                                          colors={['#D32F2F', '#B71C1C']}
+                                          style={styles.actionButtonGradient}
+                                          start={{ x: 0, y: 0 }}
+                                          end={{ x: 1, y: 0 }}
+                                      >
+                                          <Text style={styles.actionButtonText}>{t('reject_booking')}</Text>
+                                      </LinearGradient>
+                                  </TouchableOpacity>
+                              </View>
+                          )}
+
+                          {(isConfirmedBooking || isRejectedBooking) && showStatusText && (
+                              <Text style={[
+                                  styles.statusText,
+                                  isConfirmedBooking ? styles.confirmedText : styles.rejectedText
+                              ]}>
+                                  {isConfirmedBooking ? t('confirmed_read') : t('rejected_read')}
+                              </Text>
+                          )}
                       </View>
                   )}
 
-                  {(isConfirmedBooking || isRejectedBooking) && showStatusText && (
-                      <Text style={[
-                          styles.statusText,
-                          isConfirmedBooking ? styles.confirmedText : styles.rejectedText
-                      ]}>
-                          {isConfirmedBooking ? t('confirmed_read') : t('rejected_read')}
-                      </Text>
-                  )}
 
+                  {/* Секція для платіжних повідомлень */}
                   {(isPaymentReceived || isPaymentUpdate) && (
                     <View>
                       <Text style={styles.paymentDetailsText}>
@@ -824,13 +876,7 @@ export default function Message() {
                             placeholder={t('enter_meet_link_placeholder')}
                             placeholderTextColor="#888"
                             value={message.meetLinkInput}
-                            onChangeText={(text) => {
-                                setMessages(prevMessages =>
-                                    prevMessages.map(msg =>
-                                        msg.id === message.id ? { ...msg, meetLinkInput: text } : msg
-                                    )
-                                );
-                            }}
+                            onChangeText={(text) => handleMeetLinkInputChange(message.id, text)}
                           />
                           <TouchableOpacity
                             onPress={() => handleSendMeetLink(message)}
@@ -857,7 +903,7 @@ export default function Message() {
                               style={styles.meetLinkButton}
                           >
                               <LinearGradient
-                                  colors={['#4CAF50', '#2E7D32']} // Використовуємо зелений для приєднання
+                                  colors={['#4CAF50', '#2E7D32']}
                                   style={styles.meetLinkButtonGradient}
                                   start={{ x: 0, y: 0 }}
                                   end={{ x: 1, y: 0 }}
@@ -868,6 +914,42 @@ export default function Message() {
                       )}
 
                     </View>
+                  )}
+                  {/* Кнопки дій для загальних повідомлень */}
+                  {isGeneralMessage && (
+                      <View style={styles.generalMessageActions}>
+                          {!message.is_read ? (
+                            <TouchableOpacity
+                                onPress={() => handleMarkAsRead(message.id)}
+                                style={styles.actionButtonContainer} // Використовуємо той самий контейнер для градієнта
+                            >
+                                <LinearGradient
+                                  colors={['#0EB3EB', '#0A8BC2']}
+                                  style={styles.actionButtonGradient}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                                >
+                                  <Ionicons name="checkmark-done-circle-outline" size={moderateScale(20)} color="#FFFFFF" />
+                                  <Text style={styles.actionButtonText}>{t('messages_screen.mark_as_read')}</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                                onPress={() => handleHideMessage(message.id)}
+                                style={styles.actionButtonContainer} // Використовуємо той самий контейнер для градієнта
+                            >
+                                <LinearGradient
+                                  colors={['#6c757d', '#5a6268']}
+                                  style={styles.actionButtonGradient}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                                >
+                                  <Ionicons name="eye-off-outline" size={moderateScale(20)} color="#FFFFFF" />
+                                  <Text style={styles.actionButtonText}>{t('messages_screen.hide')}</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                          )}
+                      </View>
                   )}
                 </LinearGradient>
               </View>
@@ -882,7 +964,9 @@ export default function Message() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f0f2f5", // Light background for the whole screen
+    backgroundColor: "#f0f2f5",
+    // Об'єднано два padding на Platform.OS
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
   },
   header: {
     flexDirection: "row",
@@ -890,16 +974,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: moderateScale(16),
     paddingVertical: verticalScale(12),
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-    shadowColor: "#000", // Soft shadow for header
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
   },
   backButton: {
-      backgroundColor: "rgba(14, 179, 235, 0.2)",
+    backgroundColor: "rgba(14, 179, 235, 0.2)",
     borderRadius: 25,
     width: 48,
     height: 48,
@@ -907,8 +984,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontFamily: "Mont-SemiBold", // Змінено шрифт
-    fontSize: moderateScale(22),
+    fontFamily: "Mont-SemiBold",
+    fontSize: moderateScale(20),
     color: "#333",
   },
   messageList: {
@@ -926,12 +1003,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(10),
   },
   dateText: {
-    fontFamily: "Mont-Medium", // Змінено шрифт
+    fontFamily: "Mont-Medium",
     fontSize: moderateScale(13),
     color: "#777",
   },
   timestampText: {
-    fontFamily: "Mont-Regular", // Змінено шрифт
+    fontFamily: "Mont-Regular",
     fontSize: moderateScale(11),
     color: "#999",
   },
@@ -976,13 +1053,13 @@ const styles = StyleSheet.create({
     borderColor: '#0EB3EB',
   },
   cardTitle: {
-    fontFamily: "Mont-SemiBold", // Змінено шрифт
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(16),
     marginBottom: verticalScale(8),
     color: "#222",
   },
   cardText: {
-    fontFamily: "Mont-Regular", // Змінено шрифт
+    fontFamily: "Mont-Regular",
     fontSize: moderateScale(14),
     color: "#555",
     marginBottom: verticalScale(12),
@@ -991,28 +1068,31 @@ const styles = StyleSheet.create({
   bookingActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-        borderRadius: 30,
-    
+    borderRadius: 30, // Цей стиль на View не має ефекту на градієнтні кнопки всередині
+    marginTop: verticalScale(15), // Додано для відступу від попереднього контенту
   },
   actionButtonContainer: {
     flex: 1,
     marginHorizontal: moderateScale(7),
+    borderRadius: 30, // Додано сюди для округлення градієнта
+    overflow: 'hidden', // Обрізає градієнт за межами borderRadius
   },
   actionButtonGradient: {
     paddingVertical: verticalScale(12),
     paddingHorizontal: moderateScale(18),
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 30,
-
+    borderRadius: 30, // Забезпечує округлення всередині
+    flexDirection: 'row', // Щоб іконка була поруч з текстом
   },
   actionButtonText: {
     color: '#fff',
-    fontFamily: "Mont-SemiBold", // Змінено шрифт
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(15),
+    marginLeft: moderateScale(5), // Відступ від іконки
   },
   statusText: {
-      fontFamily: "Mont-SemiBold", // Змінено шрифт
+      fontFamily: "Mont-SemiBold",
       fontSize: moderateScale(15),
       marginTop: verticalScale(15),
       textAlign: 'center',
@@ -1024,13 +1104,13 @@ const styles = StyleSheet.create({
       color: '#B71C1C',
   },
   paymentDetailsText: {
-    fontFamily: "Mont-Regular", // Змінено шрифт
+    fontFamily: "Mont-Regular",
     fontSize: moderateScale(14),
     color: "#555",
     marginTop: verticalScale(4),
   },
   paymentStatusValue: {
-    fontFamily: "Mont-SemiBold", // Змінено шрифт
+    fontFamily: "Mont-SemiBold",
   },
   paymentStatusSuccess: {
     color: '#2E7D32',
@@ -1056,22 +1136,23 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: verticalScale(10),
     paddingHorizontal: moderateScale(12),
-    fontFamily: "Mont-Regular", // Змінено шрифт
+    fontFamily: "Mont-Regular",
     fontSize: moderateScale(15),
     color: '#333',
   },
   sendMeetLinkButton: {
-    padding: moderateScale(0),
+    padding: moderateScale(0), // Залишаємо 0, оскільки градієнт обробляє padding
   },
   sendMeetLinkButtonGradient: {
     paddingVertical: verticalScale(12),
     paddingHorizontal: moderateScale(15),
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row', // Щоб текст був по центру, якщо буде іконка
   },
   sendMeetLinkButtonText: {
     color: '#fff',
-    fontFamily: "Mont-SemiBold", // Змінено шрифт
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(14),
   },
   meetLinkButton: {
@@ -1089,7 +1170,7 @@ const styles = StyleSheet.create({
   },
   meetLinkButtonText: {
     color: '#fff',
-    fontFamily: "Mont-SemiBold", // Змінено шрифт
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(15),
   },
   loadingContainer: {
@@ -1100,7 +1181,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: verticalScale(10),
-    fontFamily: 'Mont-Medium', // Змінено шрифт
+    fontFamily: 'Mont-Medium',
     fontSize: moderateScale(17),
     color: '#555',
   },
@@ -1111,18 +1192,64 @@ const styles = StyleSheet.create({
     marginTop: height * 0.2,
   },
   emptyMessagesText: {
-    fontFamily: 'Mont-Bold', // Змінено шрифт
+    fontFamily: 'Mont-Bold',
     fontSize: moderateScale(20),
     color: '#777',
     marginBottom: verticalScale(12),
     textAlign: 'center',
   },
   emptyMessagesSubText: {
-    fontFamily: 'Mont-Regular', // Змінено шрифт
+    fontFamily: 'Mont-Regular',
     fontSize: moderateScale(16),
     color: '#999',
     textAlign: 'center',
     paddingHorizontal: moderateScale(30),
     lineHeight: moderateScale(24),
+  },
+  // Стилі для загальних повідомлень
+  generalMessageActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end', // Вирівнювання праворуч для кнопок "Прочитати"/"Приховати"
+    marginTop: verticalScale(15),
+    paddingTop: verticalScale(10),
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+  },
+  hiddenMessageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#E0E0E0',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(15),
+    marginBottom: moderateScale(10),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  hiddenMessageText: {
+    fontSize: moderateScale(15),
+    fontStyle: 'italic',
+    color: '#666666',
+    flexShrink: 1,
+    marginRight: moderateScale(10),
+  },
+  openMessageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(8),
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#0EB3EB',
+  },
+  openMessageButtonText: {
+    color: '#0EB3EB',
+    fontSize: moderateScale(14),
+    fontWeight: 'bold',
+    marginLeft: moderateScale(5),
   },
 });

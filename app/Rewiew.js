@@ -8,6 +8,10 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
+  SafeAreaView,
+  StatusBar, // Додаємо StatusBar для умовних стилів
+  KeyboardAvoidingView, // Додаємо KeyboardAvoidingView для кращого UX
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -109,7 +113,10 @@ const ReviewsScreen = () => {
   };
 
   return (
+    
     <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("reviews.title")}</Text>
         <Icon width={50} height={50} />
@@ -149,7 +156,7 @@ const ReviewsScreen = () => {
                 <Text style={styles.authorName}>{review.user_name || t("reviews.anonymousUser")}</Text>
               </View>
               <View style={styles.authorDateContainer}>
-                {/* Тут user_name вже відображається */}
+                
               
                 <Text style={styles.reviewDate}> ({formatDate(review.created_at)}) </Text>
               </View>
@@ -161,16 +168,21 @@ const ReviewsScreen = () => {
       )}
 
       <TabBar activeTab={activeTab} onTabPress={handleTabPress} />
+      </SafeAreaView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+   safeArea: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingTop: 50,
-  },
+    },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

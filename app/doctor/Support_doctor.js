@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native"; // Переконайтеся, що useNavigation імпортовано
@@ -247,7 +248,14 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop: 50,
+   paddingTop: Platform.OS === "android"
+      ? StatusBar.currentHeight
+        ? StatusBar.currentHeight + 5
+        : 10
+      : Platform.OS === "ios"
+      ? (StatusBar.currentHeight || 0) + 5
+      : 10,
+
   },
   scrollContent: {
     flexGrow: 1,

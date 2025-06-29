@@ -11,13 +11,14 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useNavigation } from "@react-navigation/native";
 import { useTranslation }  from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
-import Icon from "../assets/icon.svg";
+// import Icon from "../assets/icon.svg"; // Залишаємо закоментованим, якщо не використовується напряму тут
 
 // Отримання розмірів екрану
 const { width, height } = Dimensions.get("window");
@@ -79,27 +80,217 @@ const specializationsList = [
 ];
 
 
-const consultationLanguagesList = [
-  { code: "UK", nameKey: "ukrainian", emoji: "🇺🇦" },
-  { code: "DE", nameKey: "german", emoji: "🇩🇪" },
-  { code: "PL", nameKey: "polish", emoji: "🇵🇱" },
-  { code: "EN", nameKey: "english", emoji: "🇬🇧" },
-  { code: "FR", nameKey: "french", emoji: "🇫🇷" },
-  { code: "ES", nameKey: "spanish", emoji: "🇪🇸" },
-];
+// --- Додаємо мапу прапорів (таку ж, як у Profile_doctor.js) ---
+const COUNTRY_FLAGS_MAP = {
+  "EN": "🇬🇧", // Використовуємо для 'english'
+  "UK": "🇺🇦", // Використовуємо для 'ukrainian'
+  "DE": "🇩🇪", // Germany/German
+  "PH": "🇵🇭", // Philippines
+  "HR": "🇭🇷", // Croatia
+  "CF": "🇨🇫", // Central African Republic
+  "TD": "🇹🇩", // Chad
+  "CZ": "🇨🇿", // Czechia
+  "CL": "🇨🇱", // Chile
+  "ME": "🇲🇪", // Montenegro
+  "LK": "🇱🇰", // Sri Lanka
+  "JM": "🇯🇲", // Jamaica
+  "UA": "🇺🇦", // Ukraine
+  "GB": "🇬🇧", // United Kingdom
+  "US": "🇺🇸", // United States
+  "CA": "🇨🇦", // Canada
+  "FR": "🇫🇷", // France
+  "PL": "🇵🇱", // Poland
+  "IT": "🇮🇹", // Italy
+  "ES": "🇪🇸", // Spain
+  "JP": "🇯🇵", // Japan
+  "CN": "🇨🇳", // China
+  "IN": "🇮🇳", // India
+  "AU": "🇦🇺", // Australia
+  "BR": "🇧🇷", // Brazil
+  "TR": "🇹🇷", // Turkey
+  "SE": "🇸🇪", // Sweden
+  "CH": "🇨🇭", // Switzerland
+  "NL": "🇳🇱", // Netherlands
+  "NO": "🇳🇴", // Norway
+  "DK": "🇩🇰", // Denmark
+  "FI": "🇫🇮", // Finland
+  "ZA": "🇿🇦", // South Africa
+  "MX": "🇲🇽", // Mexico
+  "KR": "🇰🇷", // South Korea
+  "AR": "🇦🇷", // Argentina
+  "IE": "🇮🇪", // Ireland
+  "NZ": "🇳🇿", // New Zealand
+  "SG": "🇸🇬", // Singapore
+  "IL": "🇮🇱", // Israel
+  "MY": "🇲🇾", // Malaysia
+  "TH": "🇹🇭", // Thailand
+  "VN": "🇻🇳", // Vietnam
+  "ID": "🇮🇩", // Indonesia
+  "EG": "🇪🇬", // Egypt
+  "NG": "🇳🇬", // Nigeria
+  "SA": "🇸🇦", // Saudi Arabia
+  "AE": "🇦🇪", // United Arab Emirates
+  "KW": "🇰🇼", // Kuwait
+  "QA": "🇶🇦", // Qatar
+  "AT": "🇦🇹", // Austria
+  "AZ": "🇦🇿", // Azerbaijan
+  "AL": "🇦🇱", // Albania
+  "DZ": "🇩🇿", // Algeria
+  "AO": "🇦🇴", // Angola
+  "AD": "🇦🇩", // Andorra
+  "AG": "🇦🇬", // Antigua and Barbuda
+  "AF": "🇦🇫", // Afghanistan
+  "BS": "🇧🇸", // Bahamas
+  "BD": "🇧🇩", // Bangladesh
+  "BB": "🇧🇧", // Barbados
+  "BH": "🇧🇭", // Bahrain
+  "BZ": "🇧🇿", // Belize
+  "BE": "🇧🇪", // Belgium
+  "BJ": "🇧🇯", // Benin
+  "BY": "🇧🇾", // Belarus
+  "BG": "🇧🇬", // Bulgaria
+  "BO": "🇧🇴", // Bolivia
+  "BA": "🇧🇦", // Bosnia and Herzegovina
+  "BW": "🇧🇼", // Botswana
+  "BN": "🇧🇳", // Brunei
+  "BF": "🇧🇫", // Burkina Faso
+  "BI": "🇧🇮", // Burundi
+  "BT": "🇧🇹", // Bhutan
+  "VU": "🇻🇺", // Vanuatu
+  "VE": "🇻🇪", // Venezuela
+  "AM": "🇦🇲", // Armenia
+  "GA": "🇬🇦", // Gabon
+  "HT": "🇭🇹", // Haiti
+  "GM": "🇬🇲", // Gambia
+  "GH": "🇬🇭", // Ghana
+  "GY": "🇬🇾", // Guyana
+  "GT": "🇬🇹", // Guatemala
+  "GN": "🇬🇳", // Guinea
+  "GW": "🇬🇼", // Guinea-Bissau
+  "HN": "🇭🇳", // Honduras
+  "GD": "🇬🇩", // Grenada
+  "GR": "🇬🇷", // Greece
+  "GE": "🇬🇪", // Georgia
+  "DJ": "🇩🇯", // Djibouti
+  "DM": "🇩🇲", // Dominica
+  "DO": "🇩🇴", // Dominican Republic
+  "CD": "🇨🇩", // DR Congo
+  "EC": "🇪🇨", // Ecuador
+  "GQ": "🇬🇶", // Equatorial Guinea
+  "ER": "🇪🇷", // Eritrea
+  "SZ": "🇸🇿", // Eswatini
+  "EE": "🇪🇪", // Estonia
+  "ET": "🇪🇹", // Ethiopia
+  "YE": "🇾🇪", // Yemen
+  "ZM": "🇿🇲", // Zambia
+  "ZW": "🇿🇼", // Zimbabwe
+  "IR": "🇮🇷", // Iran
+  "IS": "🇮🇸", // Iceland
+  "IQ": "🇮🇶", // Iraq
+  "JO": "🇯🇴", // Jordan
+  "CV": "🇨🇻", // Cape Verde
+  "KZ": "🇰🇿", // Kazakhstan
+  "KH": "🇰🇭", // Cambodia
+  "CM": "🇨🇲", // Cameroon
+  "KE": "🇰🇪", // Kenya
+  "KG": "🇰🇬", // Kyrgyzstan
+  "CY": "🇨🇾", // Cyprus
+  "KI": "🇰🇮", // Kiribati
+  "CO": "🇨🇴", // Colombia
+  "KM": "🇰🇲", // Comoros
+  "CR": "🇨🇷", // Costa Rica
+  "CI": "🇨🇮", // Ivory Coast
+  "CU": "🇨🇺", // Cuba
+  "LA": "🇱🇦", // Laos
+  "LV": "🇱🇻", // Latvia
+  "LS": "🇱🇸", // Lesotho
+  "LT": "🇱🇹", // Lithuania
+  "LR": "🇱🇷", // Liberia
+  "LB": "🇱🇧", // Lebanon
+  "LY": "🇱🇾", // Libya
+  "LI": "🇱🇮", // Liechtenstein
+  "LU": "🇱🇺", // Luxembourg
+  "MM": "🇲🇲", // Myanmar
+  "MU": "🇲🇺", // Mauritius
+  "MR": "🇲🇷", // Mauritania
+  "MG": "🇲🇬", // Madagascar
+  "MW": "🇲🇼", // Malawi
+  "ML": "🇲🇱", // Mali
+  "MV": "🇲🇻", // Maldives
+  "MT": "🇲🇹", // Malta
+  "MA": "🇲🇦", // Morocco
+  "MH": "🇲🇭", // Marshall Islands
+  "MZ": "🇲🇿", // Mozambique
+  "MD": "🇲🇩", // Moldova
+  "MC": "🇲🇨", // Monaco
+  "MN": "🇲🇳", // Mongolia
+  "NA": "🇳🇦", // Namibia
+  "NR": "🇳🇷", // Nauru
+  "NP": "🇳🇵", // Nepal
+  "NE": "🇳🇪", // Niger
+  "NI": "🇳🇮", // Nicaragua
+  "OM": "🇴🇲", // Oman
+  "PK": "🇵🇰", // Pakistan
+  "PW": "🇵🇼", // Palau
+  "PA": "🇵🇦", // Panama
+  "PG": "🇵🇬", // Papua New Guinea
+  "PY": "🇵🇾", // Paraguay
+  "PE": "🇵🇪", // Peru
+  "SS": "🇸🇸", // South Sudan
+  "KP": "🇰🇵", // North Korea
+  "MK": "🇲🇰", // North Macedonia
+  "PT": "🇵🇹", // Portugal
+  "CG": "🇨🇬", // Republic of the Congo
+  "RU": "🇷🇺", // Russia
+  "RW": "🇷🇼", // Rwanda
+  "RO": "🇷🇴", // Romania
+  "SV": "🇸🇻", // El Salvador
+  "WS": "🇼🇸", // Samoa
+  "SM": "🇸🇲", // San Marino
+  "ST": "🇸🇹", // Sao Tome and Principe
+  "SC": "🇸🇨", // Seychelles
+  "SN": "🇸🇳", // Senegal
+  "VC": "🇻🇨", // Saint Vincent and the Grenadines
+  "KN": "🇰🇳", // Saint Kitts and Nevis
+  "LC": "🇱🇨", // Saint Lucia
+  "RS": "🇷🇸", // Serbia
+  "SY": "🇸🇾", // Syria
+  "SK": "🇸🇰", // Slovakia
+  "SI": "🇸🇮", // Slovenia
+  "SB": "🇸🇧", // Solomon Islands
+  "SO": "🇸🇴", // Somalia
+  "SD": "🇸🇩", // Sudan
+  "SR": "🇸🇷", // Suriname
+  "TL": "🇹🇱", // East Timor
+  "SL": "🇸🇱", // Sierra Leone
+  "TJ": "🇹🇯", // Tajikistan
+  "TZ": "🇹🇿", // Tanzania
+  "TG": "🇹🇬", // Togo
+  "TO": "🇹🇴", // Tonga
+  "TT": "🇹🇹", // Trinidad and Tobago
+  "TV": "🇹🇻", // Tuvalu
+  "TN": "🇹🇳", // Tunisia
+  "TM": "🇹🇲", // Turkmenistan
+  "UG": "🇺🇬", // Uganda
+  "HU": "🇭🇺", // Hungary
+  "UZ": "🇺🇿", // Uzbekistan
+  "UY": "🇺🇾", // Uruguay
+  "FM": "🇫🇲", // Federated States of Micronesia
+  "FJ": "🇫🇯", // Fiji
+};
+
 
 const LanguageFlags = ({ languages }) => {
+  const { t } = useTranslation(); // Отримуємо t для перекладу "not_specified"
   const getFlag = (code) => {
-    const lang = consultationLanguagesList.find(
-      (item) => item.code === code.toUpperCase()
-    );
-    return lang ? lang.emoji : "❓";
+    // Звертаємося до глобальної мапи прапорів
+    return COUNTRY_FLAGS_MAP[String(code).toUpperCase()] || "❓";
   };
 
   if (!languages || languages.length === 0) {
     return (
       <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-        Not specified
+        {t("not_specified")}
       </Text>
     );
   }
@@ -119,6 +310,7 @@ const LanguageFlags = ({ languages }) => {
 };
 
 const InfoBox = ({ label, value, children }) => {
+  const { t } = useTranslation();
   const isEmpty =
     !value && (!children || (Array.isArray(children) && children.length === 0));
   return (
@@ -127,7 +319,7 @@ const InfoBox = ({ label, value, children }) => {
       <View style={styles.infoBoxValueContainer}>
         {isEmpty ? (
           <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-            Not specified
+            {t("not_specified")}
           </Text>
         ) : children ? (
           children
@@ -138,6 +330,17 @@ const InfoBox = ({ label, value, children }) => {
     </View>
   );
 };
+
+// Функція для розрахунку кількості зірочок від 0 до 5
+// де 1000 points = 5 зірочок
+const calculateStarsFromPoints = (points) => {
+  if (points === null || points === undefined || isNaN(points) || points < 0) {
+    return 0; // Якщо балів немає або вони некоректні, повертаємо 0 зірок
+  }
+  // Максимально 1000 балів = 5 зірок. Кожна зірка = 200 балів.
+  return Math.min(5, Math.floor(points / 200));
+};
+
 
 const DoctorCard = ({ doctor }) => {
   const navigation = useNavigation();
@@ -179,6 +382,10 @@ const DoctorCard = ({ doctor }) => {
       .join(", ");
   };
 
+  // Отримуємо doctor_points з об'єкта doctor, який має вкладений profile_doctor
+  const doctorPoints = doctor.profile_doctor?.doctor_points;
+  const starRating = calculateStarsFromPoints(doctorPoints);
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -186,14 +393,27 @@ const DoctorCard = ({ doctor }) => {
           <Image source={{ uri: doctor.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={40} color="#666" />
+            <Ionicons name="person-circle-outline" size={moderateScale(60)} color="#0EB3EB" />
           </View>
         )}
         <View style={styles.doctorSummary}>
           <Text style={styles.doctorName}>{doctor.full_name || t("not_specified")}</Text>
-          <InfoBox label={t("rating")} value="N/A" />
+          <InfoBox label={t("rating")}>
+            {/* Відображаємо повні зірочки */}
+            {Array.from({ length: starRating }).map((_, i) => (
+              <Ionicons key={`star-full-${i}`} name="star" size={moderateScale(18)} color="#FFD700" />
+            ))}
+            {/* Відображаємо пусті зірочки */}
+            {Array.from({ length: 5 - starRating }).map((_, i) => (
+              <Ionicons key={`star-outline-${i}`} name="star-outline" size={moderateScale(18)} color="#ccc" />
+            ))}
+             {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
+              <Text style={styles.ratingPointsText}> ({doctorPoints} {t('points_short')})</Text>
+            )}
+          </InfoBox>
           <InfoBox label={t("communication_language")}>
-            <LanguageFlags languages={doctor.communication_languages || []} />
+            {/* Передаємо languages, як у Profile_doctor */}
+            <LanguageFlags languages={getParsedArray(doctor.communication_languages)} />
           </InfoBox>
         </View>
       </View>
@@ -264,17 +484,47 @@ const Search = () => {
       if (category) {
         const { data: categoryData, error: categoryError } = await supabase
           .from("anketa_doctor")
-          .select("*, consultation_cost, experience_years, created_at, avatar_url, search_tags") // Додаємо search_tags до SELECT
+          .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, search_tags") // IMPORTANT: Select profile_doctor(doctor_points)
           .filter("specialization", "cs", `["${category}"]`);
         data = categoryData;
         error = categoryError;
       } else if (query) {
         // Викликаємо RPC функцію, яка тепер включатиме search_tags
+        // Якщо RPC функція не повертає profile_doctor, вам потрібно буде модифікувати її
+        // або зробити додатковий запит. Припускаємо, що вона або повертає, або ви будете використовувати основний запит.
+        // Наразі RPC функція `search_doctors_by_name_or_specialization` не повертає `profile_doctor`
+        // напряму, тому для запиту за пошуковим текстом рейтинг не буде відображатися,
+        // якщо ви не модифікуєте RPC функцію.
         const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
             p_search_query: query,
         });
-        data = rpcData;
-        error = rpcError;
+
+        // Якщо RPC не повертає profile_doctor, його потрібно додати вручну або оновити RPC.
+        // Тимчасове рішення для перевірки, якщо RPC повертає лише основні дані:
+        if (rpcData && !rpcError) {
+          const doctorIds = rpcData.map(d => d.user_id);
+          const { data: profileData, error: profileError } = await supabase
+            .from('profile_doctor')
+            .select('user_id, doctor_points')
+            .in('user_id', doctorIds);
+
+          if (!profileError) {
+            const profileMap = new Map(profileData.map(p => [p.user_id, p.doctor_points]));
+            data = rpcData.map(d => ({
+              ...d,
+              profile_doctor: { doctor_points: profileMap.get(d.user_id) }
+            }));
+            error = rpcError; // Зберігаємо оригінальну помилку RPC, якщо є
+          } else {
+            console.warn("Could not fetch doctor_points for RPC results:", profileError.message);
+            data = rpcData; // Використовуємо дані без рейтингу, якщо не вдалося завантажити
+            error = rpcError || profileError;
+          }
+        } else {
+          data = rpcData;
+          error = rpcError;
+        }
+
       } else {
           setDoctors([]);
           setLoading(false);
@@ -287,9 +537,14 @@ const Search = () => {
         setDoctors([]);
       } else {
         const processedDoctors = data.map((doctor) => {
-          const parsedCommunicationLanguages = getParsedArray(
-            doctor.communication_languages
-          );
+          // Отримуємо мови, перетворюючи їх на верхній регістр та фільтруючи за COUNTRY_FLAGS_MAP
+          const parsedCommunicationLanguages = getParsedArray(doctor.communication_languages).map(lang => {
+            if (typeof lang === 'object' && lang !== null && lang.code) {
+              return String(lang.code).toUpperCase();
+            }
+            return String(lang).toUpperCase();
+          }).filter(code => COUNTRY_FLAGS_MAP[code]); // Фільтруємо, щоб були лише ті, для яких є прапори
+
 
           let timeInAppDisplay = t("not_specified");
           if (doctor.created_at) {
@@ -420,7 +675,10 @@ const Search = () => {
 
         <ScrollView contentContainerStyle={styles.doctorsListContainer}>
           {!hasUserInitiatedSearch && !loading && (
-              <Text style={styles.initialSearchPrompt}>{t("initial_search_prompt")}</Text>
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="search" size={moderateScale(150)} color="#888" />
+                <Text style={styles.initialSearchPrompt}>{t("initial_search_prompt")}</Text>
+              </View>
           )}
 
           {loading && (
@@ -435,7 +693,10 @@ const Search = () => {
               <DoctorCard key={doctor.user_id} doctor={doctor} />
             ))
           ) : !loading && hasUserInitiatedSearch && !searchError && doctors.length === 0 && (
+             <View style={{ alignItems: "center",  justifyContent: "start" }}>
+                <Ionicons name="no-search" size={moderateScale(150)} color="#888" />
             <Text style={styles.noDoctorsFound}>{t("no_doctors_found")}</Text>
+            </View>
           )}
         </ScrollView>
       </View>
@@ -447,7 +708,8 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : 0,
+    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
   },
   container: {
     flex: 1,
@@ -527,7 +789,7 @@ const styles = StyleSheet.create({
   },
   doctorsListContainer: {
     paddingHorizontal: scale(15),
-    paddingBottom: verticalScale(20),
+    paddingBottom: verticalScale(300),
   },
   loadingContainer: {
     flex: 1,
@@ -544,14 +806,12 @@ const styles = StyleSheet.create({
   noDoctorsFound: {
     fontSize: moderateScale(18),
     textAlign: "center",
-    marginTop: verticalScale(50),
     color: "#777",
     fontFamily: "Mont-Regular",
   },
   initialSearchPrompt: {
     fontSize: moderateScale(18),
     textAlign: "center",
-    marginTop: verticalScale(50),
     color: "#555",
     fontFamily: "Mont-Regular",
     paddingHorizontal: scale(20),
@@ -587,6 +847,9 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: '#E3F2FD',
+    borderWidth: 1,
+    borderColor: '#B3E0F2',
   },
   doctorSummary: {
     flex: 1,
@@ -634,6 +897,12 @@ const styles = StyleSheet.create({
   flagText: {
     fontSize: moderateScale(18),
     marginRight: scale(5),
+  },
+  ratingPointsText: {
+    fontSize: moderateScale(14),
+    color: '#666',
+    marginLeft: scale(5),
+    fontFamily: 'Mont-Regular',
   },
   cardDetails: {
     paddingTop: verticalScale(10),

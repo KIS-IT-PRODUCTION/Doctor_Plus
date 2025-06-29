@@ -186,9 +186,9 @@
     "anesthesiologist": "Anesthesiologist",
     "general_practitioner": "General Practitioner"
   },
+    "header_title": "Messages",
 
   "messages_screen": {
-    "header_title": "Messages",
     "today": "Today",
     "yesterday": "Yesterday",
     "consultation_confirmation_title": "Consultation Confirmation",
@@ -753,5 +753,7 @@
   "writeReview.ratingLabel": "Your Rating",
   "complete_profile_title": "Complete Your Profile",
   "go_to_profile_settings": "Go to Profile Settings",
-  "maybe_later": "Maybe Later"
+  "maybe_later": "Maybe Later",
+  "points_short": "points",
+  "messages_screen.header_title":"Messages"
 }

@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  StatusBar,
+  Platform,
+  SafeAreaView
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -110,6 +113,8 @@ const Rewiew_app = () => {
 
   return (
     <View style={styles.container}>
+            <SafeAreaView style={styles.safeArea}>
+      
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("reviews.title")}</Text>
         <Icon width={50} height={50} />
@@ -161,16 +166,21 @@ const Rewiew_app = () => {
       )}
 
       <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
+      </SafeAreaView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingTop: 50,
-  },
+    },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

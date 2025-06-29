@@ -10,6 +10,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../../assets/icon.svg";
@@ -141,13 +142,11 @@ export default function Faq_doctor() {
             isExpanded={expandedItemId === item.id}
             onToggleExpand={() => handleToggleExpand(item.id)}
           />
-        ))}
-      </ScrollView>
+        ))}    
 
-      {/* TabBar_doctor внизу екрана Faq */}
-      {/* Передаємо handleTabPress як onTabPress */}
-      <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
-    </SafeAreaView>
+      </ScrollView>
+      <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} /></SafeAreaView>
+
   );
 }
 
@@ -155,7 +154,13 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
-    paddingTop: 50, // Відступ зверху для вмісту
+    paddingTop: Platform.OS === "android"
+      ? StatusBar.currentHeight
+        ? StatusBar.currentHeight + 5
+        : 10
+      : Platform.OS === "ios"
+      ? (StatusBar.currentHeight || 0) + 5
+      : 10,
   },
   header: {
     flexDirection: "row",

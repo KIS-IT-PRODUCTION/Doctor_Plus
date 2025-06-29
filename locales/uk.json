@@ -186,9 +186,8 @@
     "anesthesiologist": "Анестезіолог",
     "general_practitioner": "Терапевт"
   },
-
+"header_title": "Повідомлення",
   "messages_screen": {
-    "header_title": "Повідомлення",
     "today": "Сьогодні",
     "yesterday": "Вчора",
     "consultation_confirmation_title": "Підтвердження консультації",
@@ -754,6 +753,9 @@
      "complete_profile_title": "Завершіть профіль",
   "complete_profile_message": "Будь ласка, заповніть усі обов'язкові поля вашого профілю, щоб пацієнти могли вас знайти та записатися на консультацію.",
   "go_to_profile_settings": "Перейти до налаштувань профілю",
-  "maybe_later": "Можливо, пізніше"
-
+  "maybe_later": "Можливо, пізніше",
+  "points_short": "балів",
+  "initial_search_prompt": "Введіть у полі пошуку",
+  "no_doctors_found":"На жаль за вашим запитом нікого не знайдено",
+  "messages_screen.header_title":"Повідомлення"
 }

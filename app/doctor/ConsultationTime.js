@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,10 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
-  Platform, // <-- Додаємо Platform для умовних стилів
+  Platform,
+  StatusBar,
+  Animated, // <--- Імпортуємо Animated
+  Easing,   // <--- Імпортуємо Easing для ефектів анімації
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +32,25 @@ const ConsultationTime = ({ route }) => {
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Створюємо анімовану змінну для іконки
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  // Ефект для запуску анімації обертання іконки
+  useEffect(() => {
+    // Функція, що запускає анімацію безкінечно
+    const startRotation = () => {
+      rotateAnim.setValue(0); // Скидаємо значення анімації до початкового
+      Animated.timing(rotateAnim, {
+        toValue: 1, // Кінцеве значення (один повний оберт)
+        duration: 2000, // Зменшено тривалість до 2 секунд для більш помітної постійної анімації
+        easing: Easing.linear, // Лінійна швидкість
+        useNativeDriver: true, // Використовувати нативний драйвер для плавності
+      }).start(() => startRotation()); // Запускаємо анімацію знову після завершення (це робить її постійною)
+    };
+
+    startRotation(); // Запускаємо анімацію при монтуванні компонента
+  }, []); // Пустий масив залежностей означає, що ефект запуститься один раз при монтуванні
 
   const generateSchedule = useCallback(() => {
     const today = new Date();
@@ -80,7 +102,7 @@ const ConsultationTime = ({ route }) => {
 
       if (error) {
         console.error("Error fetching doctor schedule:", error.message);
-        Alert.alert(t('error'), t('failed_to_load_schedule'));
+        Alert.alert(t('error_title'), t('failed_to_load_schedule'));
         setScheduleData(generateSchedule());
         return;
       }
@@ -102,7 +124,7 @@ const ConsultationTime = ({ route }) => {
       console.log("Doctor schedule fetched and states updated.");
     } catch (err) {
       console.error("Catch error fetching doctor schedule:", err.message);
-      Alert.alert(t('error'), t('failed_to_load_schedule'));
+      Alert.alert(t('error_title'), t('failed_to_load_schedule'));
       setScheduleData(generateSchedule());
     } finally {
       setLoading(false);
@@ -130,7 +152,7 @@ const ConsultationTime = ({ route }) => {
 
   const saveDoctorAvailability = async () => {
     if (!doctorId) {
-      Alert.alert(t('error'), t('doctor_id_missing'));
+      Alert.alert(t('error_title'), t('doctor_id_missing'));
       return;
     }
     setSaving(true);
@@ -181,10 +203,10 @@ const ConsultationTime = ({ route }) => {
         console.log("No slots to insert (all were de-selected or none selected).");
       }
 
-      Alert.alert(t('success'), t('schedule_saved_successfully'));
+      Alert.alert(t('success_title'), t('schedule_saved_successfully'));
     } catch (err) {
       console.error("Error saving doctor availability:", err.message);
-      Alert.alert(t('error'), `${t('failed_to_save_schedule')}: ${err.message}`);
+      Alert.alert(t('error_title'), `${t('failed_to_save_schedule')}: ${err.message}`);
     } finally {
       setSaving(false);
       console.log("Saving process finished. Re-fetching schedule...");
@@ -195,6 +217,12 @@ const ConsultationTime = ({ route }) => {
   const handleBackPress = () => {
     navigation.goBack();
   };
+
+  // Інтерполяція для обертання
+  const rotate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   if (loading) {
     return (
@@ -211,12 +239,12 @@ const ConsultationTime = ({ route }) => {
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('set_my_availability')}</Text>
         <TouchableOpacity
           style={styles.saveButton}
           onPress={saveDoctorAvailability}
           disabled={saving}
         >
+
           <LinearGradient
             colors={['#0EB3EB', '#0A8BA6']} // Gradient colors for save button
             style={styles.saveButtonGradient}
@@ -226,6 +254,7 @@ const ConsultationTime = ({ route }) => {
             {saving ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
+
               <Text style={styles.saveButtonText}>{t('save_schedule')}</Text>
             )}
           </LinearGradient>
@@ -234,15 +263,17 @@ const ConsultationTime = ({ route }) => {
 
       <ScrollView style={styles.scrollViewContent}>
         {Array.isArray(scheduleData) && scheduleData.map((dayData, dayIndex) => (
-          // Змінюємо dayContainer на View та додаємо LinearGradient всередині для "скляного" ефекту
           <View key={dayIndex} style={styles.dayCardOuter}>
             <LinearGradient
-              // Ці кольори створюють ефект напівпрозорого скла
               colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)']}
               style={styles.dayContainerInner}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
+              {/* Анімована іконка розкладу (зараз time-outline, постійно анімується) */}
+              <Animated.View style={[styles.iconContainer, { transform: [{ rotate }] }]}>
+                <Ionicons name="time-outline" size={32} color="#0EB3EB" />
+              </Animated.View>
               <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
               <View style={styles.slotsContainer}>
                 {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
@@ -252,11 +283,11 @@ const ConsultationTime = ({ route }) => {
                     <TouchableOpacity
                       key={slot.id}
                       onPress={() => handleSlotPress(slot)}
-                      style={styles.timeSlotWrapper} // Wrapper for gradient
+                      style={styles.timeSlotWrapper}
                     >
                       {isSlotSelected ? (
                         <LinearGradient
-                          colors={['#0EB3EB', '#0A8BA6']} // Gradient for selected slot
+                          colors={['#0EB3EB', '#0A8BA6']}
                           style={styles.timeSlotButtonSelected}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 0 }}
@@ -287,7 +318,9 @@ const ConsultationTime = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA', // Lighter background for overall screen
+    backgroundColor: '#F5F7FA',
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 15 : 10) : 0,
+    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 15 : 10,
   },
   loadingContainer: {
     flex: 1,
@@ -308,25 +341,29 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingVertical: 15,
     paddingHorizontal: 20,
-    borderBottomWidth: 0, // Remove border for cleaner look
-    shadowColor: '#000', // Add shadow to header
+    borderBottomWidth: 0,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.1, // iOS shadow
+    shadowRadius: 4, // iOS shadow
+    ...Platform.select({
+      android: {
+        elevation: 0.8, // Almost invisible shadow for Android
+      },
+    }),
   },
   backButton: {
-    backgroundColor: 'rgba(14, 179, 235, 0.1)', // Lighter, more subtle background
+    backgroundColor: "rgba(14, 179, 235, 0.2)",
     borderRadius: 25,
     width: 48,
     height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    justifyContent: "center",
+    alignItems: "center",},
+  languageDisplayContainer: {
+    backgroundColor: "#0EB3EB",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   headerTitle: {
     fontSize: 18,
@@ -337,13 +374,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   saveButton: {
-    borderRadius: 12, // More rounded corners
-    overflow: 'hidden', // Crucial for gradient to respect border-radius
-    shadowColor: '#0EB3EB', // Shadow matching gradient color
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOpacity: 0.3, // iOS shadow
+    shadowRadius: 6, // iOS shadow
+    ...Platform.select({
+      android: {
+        elevation: 1, // Subtle shadow for Android save button
+      },
+    }),
   },
   saveButtonGradient: {
     paddingVertical: 12,
@@ -360,65 +401,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingBottom: 30,
   },
-  // Новий зовнішній контейнер для тіні та ефекту скла
   dayCardOuter: {
     marginTop: 20,
     borderRadius: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    overflow: 'hidden', // Важливо для обрізки вмісту по borderRadius
-    // backdropFilter та border (для ефекту скла) переміщуємо на inner
+    shadowOpacity: 0.15, // iOS shadow
+    shadowRadius: 8, // iOS shadow
+    ...Platform.select({
+      android: {
+        elevation: 1, // Subtle shadow for Android cards
+      },
+    }),
+    overflow: 'hidden',
   },
-  // Внутрішній LinearGradient для "скляного" ефекту
   dayContainerInner: {
     borderRadius: 18,
     padding: 20,
-    // Додаємо тонку прозору рамку для візуального відділення "скла"
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    // backdropFilter: 'blur(10px)', // Це тільки для Web. Для нативних:
-    ...Platform.select({
-      ios: {
-        // На iOS backdropFilter працює
-        // Requires importing 'react-native-blur' or 'expo-blur' for a true blur effect
-        // For simplicity, we're just using translucent background here
-        // If you want a real blur, you'd integrate `BlurView` from `expo-blur`
-        // and wrap the content of dayContainerInner with it.
-      },
-      android: {
-        // Android не підтримує backdropFilter нативно.
-        // Ефект імітується напівпрозорим градієнтом та тінями.
-      },
-    }),
+    alignItems: 'center', // Центруємо вміст, щоб іконка була по центру зверху
+    // backdropFilter is web-specific, native platforms rely on transparent backgrounds and shadows
+  },
+  // Стиль для обгортки анімованої іконки
+  iconContainer: {
+    marginBottom: 10, // Відступ від тексту заголовка дня
   },
   dayHeader: {
     fontSize: 19,
     fontWeight: 'bold',
     color: '#222',
     marginBottom: 15,
-    textAlign: 'center', // Center the day header
+    textAlign: 'center',
   },
   slotsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-around', // Use space-around for better distribution
+    justifyContent: 'space-around',
   },
   timeSlotWrapper: {
     width: ITEM_WIDTH,
     marginBottom: 12,
     borderRadius: 10,
-    overflow: 'hidden', // Crucial for gradient on selected slots
-    shadowColor: '#000', // General shadow for all slots
+    overflow: 'hidden',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.1, // iOS shadow
+    shadowRadius: 3, // iOS shadow
+    ...Platform.select({
+      android: {
+        elevation: 0.8, // Subtle shadow for Android time slots
+      },
+    }),
   },
   timeSlotButtonUnavailable: {
-    backgroundColor: 'rgba(240, 240, 240, 0.7)', // Lighter, slightly transparent background for unavailable slots
+    backgroundColor: 'rgba(240, 240, 240, 0.7)',
     borderColor: 'rgba(224, 224, 224, 0.7)',
     borderWidth: 1,
     borderRadius: 10,
@@ -429,18 +466,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
-    // Shadow is applied to the wrapper to make it consistent
   },
   timeSlotText: {
     fontSize: 14,
     fontWeight: '600',
   },
   timeSlotTextUnavailable: {
-    color: '#888888', // Softer color for unavailable text
+    color: '#888888',
   },
   timeSlotTextSelected: {
     color: '#FFFFFF',
-    fontWeight: 'bold', // Make selected text bolder
+    fontWeight: 'bold',
   },
 });
 

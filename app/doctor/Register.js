@@ -609,6 +609,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#fff",
   },
   container: (width, height) => ({
     flex: 1,
@@ -617,6 +618,7 @@ const styles = StyleSheet.create({
     paddingTop: height * 0.15,
     paddingHorizontal: width * 0.05,
     width: "100%",
+    marginBottom: 50,
   }),
   languageContainerRegister: {
     flexDirection: "row",

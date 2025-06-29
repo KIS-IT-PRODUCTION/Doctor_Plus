@@ -12,6 +12,7 @@ import {
   Platform,
   Linking,
   Dimensions,
+  StatusBar, // Додаємо StatusBar для умовних стилів
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -390,7 +391,7 @@ export default function PatientMessages() {
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={moderateScale(24)} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('patient_messages_screen.header_title')}</Text>
+        <Text style={styles.headerTitle}>{t('header_title')}</Text>
         <View style={styles.headerIconContainer}>
           <Icon width={moderateScale(50)} height={moderateScale(50)} />
         </View>
@@ -526,7 +527,8 @@ export default function PatientMessages() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : 0,
+    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
     backgroundColor: '#F5F7FA',
   },
   header: {
@@ -535,13 +537,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: moderateScale(15),
     paddingVertical: verticalScale(10),
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.2)",
@@ -552,7 +547,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    // fontFamily: "Mont-SemiBold", // Якщо шрифт Mont-SemiBold доступний
+    fontFamily: "Mont-SemiBold", // Якщо шрифт Mont-SemiBold доступний
     fontSize: moderateScale(20),
     color: "#333",
   },

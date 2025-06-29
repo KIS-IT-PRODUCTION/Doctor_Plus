@@ -11,6 +11,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  StatusBar,
+  SafeAreaView,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useNavigation } from "@react-navigation/native";
@@ -115,6 +117,7 @@ const WriteReview = () => {
   };
 
   return (
+    <SafeAreaView style={styles.safeArea}>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -167,24 +170,28 @@ const WriteReview = () => {
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "white",
+    paddingTop: Platform.OS === "android"
+      ? StatusBar.currentHeight
+        ? StatusBar.currentHeight + 5
+        : 10
+      : Platform.OS === "ios"
+      ? (StatusBar.currentHeight || 0) + 5
+      : 10,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    justifyContent: "space-between",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
   },
   backButton: {
     marginRight: 15,

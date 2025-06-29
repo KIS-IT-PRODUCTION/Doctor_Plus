@@ -12,13 +12,24 @@ import {
   ActivityIndicator,
   Platform,
   SafeAreaView,
+  StatusBar,
+  Dimensions
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../assets/icon.svg";
-
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
+import Icon from "../assets/icon.svg"; // Залишаємо закоментованим, якщо не використовується напряму тут
+
+// Отримання розмірів екрану
+const { width, height } = Dimensions.get("window");
+
+// Функції для масштабування розмірів
+const scale = (size) => (width / 375) * size;
+const verticalScale = (size) => (height / 812) * size;
+const moderateScale = (size, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
+
 
 // Helper for safe JSON parsing
 const getParsedArray = (value) => {
@@ -39,29 +50,7 @@ const getParsedArray = (value) => {
   }
 };
 
-// Reusable component for displaying values in a styled box
-const InfoBox = ({ label, value, children }) => {
-  const isEmpty =
-    !value && (!children || (Array.isArray(children) && children.length === 0));
-  return (
-    <View style={styles.infoBoxRow}>
-      <Text style={styles.infoBoxLabel}>{label}:</Text>
-      <View style={styles.infoBoxValueContainer}>
-        {isEmpty ? (
-          <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-            Not specified
-          </Text>
-        ) : children ? (
-          children
-        ) : (
-          <Text style={styles.infoBoxValueText}>{value}</Text>
-        )}
-      </View>
-    </View>
-  );
-};
-
-// Data for specializations and languages (should ideally come from a central config/API)
+// Data for specializations
 const specializationsList = [
   { value: "general_practitioner", nameKey: "categories.general_practitioner" },
   { value: "pediatrician", nameKey: "categories.pediatrician" },
@@ -92,28 +81,240 @@ const specializationsList = [
 ];
 
 
-const consultationLanguagesList = [
-  { code: "UK", nameKey: "ukrainian", emoji: "🇺🇦" },
-  { code: "DE", nameKey: "german", emoji: "🇩🇪" },
-  { code: "PL", nameKey: "polish", emoji: "🇵🇱" },
-  { code: "EN", nameKey: "english", emoji: "🇬🇧" },
-  { code: "FR", nameKey: "french", emoji: "🇫🇷" },
-  { code: "ES", nameKey: "spanish", emoji: "🇪🇸" },
-];
+// --- Додаємо мапу прапорів (таку ж, як у Profile_doctor.js та Search.js) ---
+const COUNTRY_FLAGS_MAP = {
+  "EN": "🇬🇧", // Використовуємо для 'english'
+  "UK": "🇺🇦", // Використовуємо для 'ukrainian'
+  "DE": "🇩🇪", // Germany/German
+  "PL": "🇵🇱", // Poland
+  "FR": "🇫🇷", // France
+  "ES": "🇪🇸", // Spanish
+  "PH": "🇵🇭", // Philippines
+  "HR": "🇭🇷", // Croatia
+  "CF": "🇨🇫", // Central African Republic
+  "TD": "🇹🇩", // Chad
+  "CZ": "🇨🇿", // Czechia
+  "CL": "🇨🇱", // Chile
+  "ME": "🇲🇪", // Montenegro
+  "LK": "🇱🇰", // Sri Lanka
+  "JM": "🇯🇲", // Jamaica
+  "UA": "🇺🇦", // Ukraine
+  "GB": "🇬🇧", // United Kingdom
+  "US": "🇺🇸", // United States
+  "CA": "🇨🇦", // Canada
+  "IT": "🇮🇹", // Italy
+  "JP": "🇯🇵", // Japan
+  "CN": "🇨🇳", // China
+  "IN": "🇮🇳", // India
+  "AU": "🇦🇺", // Australia
+  "BR": "🇧🇷", // Brazil
+  "TR": "🇹🇷", // Turkey
+  "SE": "🇸🇪", // Sweden
+  "CH": "🇨🇭", // Switzerland
+  "NL": "🇳🇱", // Netherlands
+  "NO": "🇳🇴", // Norway
+  "DK": "🇩🇰", // Denmark
+  "FI": "🇫🇮", // Finland
+  "ZA": "🇿🇦", // South Africa
+  "MX": "🇲🇽", // Mexico
+  "KR": "🇰🇷", // South Korea
+  "AR": "🇦🇷", // Argentina
+  "IE": "🇮🇪", // Ireland
+  "NZ": "🇳🇿", // New Zealand
+  "SG": "🇸🇬", // Singapore
+  "IL": "🇮🇱", // Israel
+  "MY": "🇲🇾", // Malaysia
+  "TH": "🇹🇭", // Thailand
+  "VN": "🇻🇳", // Vietnam
+  "ID": "🇮🇩", // Indonesia
+  "EG": "🇪🇬", // Egypt
+  "NG": "🇳🇬", // Nigeria
+  "SA": "🇸🇦", // Saudi Arabia
+  "AE": "🇦🇪", // United Arab Emirates
+  "KW": "🇰🇼", // Kuwait
+  "QA": "🇶🇦", // Qatar
+  "AT": "🇦🇹", // Austria
+  "AZ": "🇦🇿", // Azerbaijan
+  "AL": "🇦🇱", // Albania
+  "DZ": "🇩🇿", // Algeria
+  "AO": "🇦🇴", // Angola
+  "AD": "🇦🇩", // Andorra
+  "AG": "🇦🇬", // Antigua and Barbuda
+  "AF": "🇦🇫", // Afghanistan
+  "BS": "🇧🇸", // Bahamas
+  "BD": "🇧🇩", // Bangladesh
+  "BB": "🇧🇧", // Barbados
+  "BH": "🇧🇭", // Bahrain
+  "BZ": "🇧🇿", // Belize
+  "BE": "🇧🇪", // Belgium
+  "BJ": "🇧🇯", // Benin
+  "BY": "🇧🇾", // Belarus
+  "BG": "🇧🇬", // Bulgaria
+  "BO": "🇧🇴", // Bolivia
+  "BA": "🇧🇦", // Bosnia and Herzegovina
+  "BW": "🇧🇼", // Botswana
+  "BN": "🇧🇳", // Brunei
+  "BF": "🇧🇫", // Burkina Faso
+  "BI": "🇧🇮", // Burundi
+  "BT": "🇧🇹", // Bhutan
+  "VU": "🇻🇺", // Vanuatu
+  "VE": "🇻🇪", // Venezuela
+  "AM": "🇦🇲", // Armenia
+  "GA": "🇬🇦", // Gabon
+  "HT": "🇭🇹", // Haiti
+  "GM": "🇬🇲", // Gambia
+  "GH": "🇬🇭", // Ghana
+  "GY": "🇬🇾", // Guyana
+  "GT": "🇬🇹", // Guatemala
+  "GN": "🇬🇳", // Guinea
+  "GW": "🇬🇼", // Guinea-Bissau
+  "HN": "🇭🇳", // Honduras
+  "GD": "🇬🇩", // Grenada
+  "GR": "🇬🇷", // Greece
+  "GE": "🇬🇪", // Georgia
+  "DJ": "🇩🇯", // Djibouti
+  "DM": "🇩🇲", // Dominica
+  "DO": "🇩🇴", // Dominican Republic
+  "CD": "🇨🇩", // DR Congo
+  "EC": "🇪🇨", // Ecuador
+  "GQ": "🇬🇶", // Equatorial Guinea
+  "ER": "🇪🇷", // Eritrea
+  "SZ": "🇸🇿", // Eswatini
+  "EE": "🇪🇪", // Estonia
+  "ET": "🇪🇹", // Ethiopia
+  "YE": "🇾🇪", // Yemen
+  "ZM": "🇿🇲", // Zambia
+  "ZW": "🇿🇼", // Zimbabwe
+  "IR": "🇮🇷", // Iran
+  "IS": "🇮🇸", // Iceland
+  "IQ": "🇮🇶", // Iraq
+  "JO": "🇯🇴", // Jordan
+  "CV": "🇨🇻", // Cape Verde
+  "KZ": "🇰🇿", // Kazakhstan
+  "KH": "🇰🇭", // Cambodia
+  "CM": "🇨🇲", // Cameroon
+  "KE": "🇰🇪", // Kenya
+  "KG": "🇰🇬", // Kyrgyzstan
+  "CY": "🇨🇾", // Cyprus
+  "KI": "🇰🇮", // Kiribati
+  "CO": "🇨🇴", // Colombia
+  "KM": "🇰🇲", // Comoros
+  "CR": "🇨🇷", // Costa Rica
+  "CI": "🇨🇮", // Ivory Coast
+  "CU": "🇨🇺", // Cuba
+  "LA": "🇱🇦", // Laos
+  "LV": "🇱🇻", // Latvia
+  "LS": "🇱🇸", // Lesotho
+  "LT": "🇱🇹", // Lithuania
+  "LR": "🇱🇷", // Liberia
+  "LB": "🇱🇧", // Lebanon
+  "LY": "🇱🇾", // Libya
+  "LI": "🇱🇮", // Liechtenstein
+  "LU": "🇱🇺", // Luxembourg
+  "MM": "🇲🇲", // Myanmar
+  "MU": "🇲🇺", // Mauritius
+  "MR": "🇲🇷", // Mauritania
+  "MG": "🇲🇬", // Madagascar
+  "MW": "🇲🇼", // Malawi
+  "ML": "🇲🇱", // Mali
+  "MV": "🇲🇻", // Maldives
+  "MT": "🇲🇹", // Malta
+  "MA": "🇲🇦", // Morocco
+  "MH": "🇲🇭", // Marshall Islands
+  "MZ": "🇲🇿", // Mozambique
+  "MD": "🇲🇩", // Moldova
+  "MC": "🇲🇨", // Monaco
+  "MN": "🇲🇳", // Mongolia
+  "NA": "🇳🇦", // Namibia
+  "NR": "🇳🇷", // Nauru
+  "NP": "🇳🇵", // Nepal
+  "NE": "🇳🇪", // Niger
+  "NI": "🇳🇮", // Nicaragua
+  "OM": "🇴🇲", // Oman
+  "PK": "🇵🇰", // Pakistan
+  "PW": "🇵🇼", // Palau
+  "PA": "🇵🇦", // Panama
+  "PG": "🇵🇬", // Papua New Guinea
+  "PY": "🇵🇾", // Paraguay
+  "PE": "🇵🇪", // Peru
+  "SS": "🇸🇸", // South Sudan
+  "KP": "🇰🇵", // North Korea
+  "MK": "🇲🇰", // North Macedonia
+  "PT": "🇵🇹", // Portugal
+  "CG": "🇨🇬", // Republic of the Congo
+  "RU": "🇷🇺", // Russia
+  "RW": "🇷🇼", // Rwanda
+  "RO": "🇷🇴", // Romania
+  "SV": "🇸🇻", // El Salvador
+  "WS": "🇼🇸", // Samoa
+  "SM": "🇸🇲", // San Marino
+  "ST": "🇸🇹", // Sao Tome and Principe
+  "SC": "🇸🇨", // Seychelles
+  "SN": "🇸🇳", // Senegal
+  "VC": "🇻🇨", // Saint Vincent and the Grenadines
+  "KN": "🇰🇳", // Saint Kitts and Nevis
+  "LC": "🇱🇨", // Saint Lucia
+  "RS": "🇷🇸", // Serbia
+  "SY": "🇸🇾", // Syria
+  "SK": "🇸🇰", // Slovakia
+  "SI": "🇸🇮", // Slovenia
+  "SB": "🇸🇧", // Solomon Islands
+  "SO": "🇸🇴", // Somalia
+  "SD": "🇸🇩", // Sudan
+  "SR": "🇸🇷", // Suriname
+  "TL": "🇹🇱", // East Timor
+  "SL": "🇸🇱", // Sierra Leone
+  "TJ": "🇹🇯", // Tajikistan
+  "TZ": "🇹🇿", // Tanzania
+  "TG": "🇹🇬", // Togo
+  "TO": "🇹🇴", // Tonga
+  "TT": "🇹🇹", // Trinidad and Tobago
+  "TV": "🇹🇻", // Tuvalu
+  "TN": "🇹🇳", // Tunisia
+  "TM": "🇹🇲", // Turkmenistan
+  "UG": "🇺🇬", // Uganda
+  "HU": "🇭🇺", // Hungary
+  "UZ": "🇺🇿", // Uzbekistan
+  "UY": "🇺🇾", // Uruguay
+  "FM": "🇫🇲", // Federated States of Micronesia
+  "FJ": "🇫🇯", // Fiji
+};
+
+
+// Reusable component for displaying values in a styled box
+const InfoBox = ({ label, value, children }) => {
+  const { t } = useTranslation();
+  const isEmpty =
+    !value && (!children || (Array.isArray(children) && children.length === 0));
+  return (
+    <View style={styles.infoBoxRow}>
+      <Text style={styles.infoBoxLabel}>{label}:</Text>
+      <View style={styles.infoBoxValueContainer}>
+        {isEmpty ? (
+          <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
+            {t("not_specified")}
+          </Text>
+        ) : children ? (
+          children
+        ) : (
+          <Text style={styles.infoBoxValueText}>{value}</Text>
+        )}
+      </View>
+    </View>
+  );
+};
 
 // Функція для відображення прапорів мов
 const LanguageFlags = ({ languages }) => {
+  const { t } = useTranslation();
   const getFlag = (code) => {
-    const lang = consultationLanguagesList.find(
-      (item) => item.code === code.toUpperCase()
-    );
-    return lang ? lang.emoji : "❓"; // Default to a question mark if not recognized
+    return COUNTRY_FLAGS_MAP[String(code).toUpperCase()] || "❓";
   };
 
   if (!languages || languages.length === 0) {
     return (
       <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-        Not specified
+        {t("not_specified")}
       </Text>
     );
   }
@@ -131,6 +332,17 @@ const LanguageFlags = ({ languages }) => {
     </View>
   );
 };
+
+// Функція для розрахунку кількості зірочок від 0 до 5
+// де 1000 points = 5 зірочок
+const calculateStarsFromPoints = (points) => {
+  if (points === null || points === undefined || isNaN(points) || points < 0) {
+    return 0; // Якщо балів немає або вони некоректні, повертаємо 0 зірок
+  }
+  // Максимально 1000 балів = 5 зірок. Кожна зірка = 200 балів.
+  return Math.min(5, Math.floor(points / 200));
+};
+
 
 const DoctorCard = ({ doctor }) => {
   const navigation = useNavigation();
@@ -172,6 +384,11 @@ const DoctorCard = ({ doctor }) => {
       .join(", ");
   };
 
+  // Отримуємо doctor_points з об'єкта doctor, який має вкладений profile_doctor
+  // Завдяки нормалізації в fetchDoctors, profile_doctor завжди є масивом
+  const doctorPoints = doctor.profile_doctor?.[0]?.doctor_points;
+  const starRating = calculateStarsFromPoints(doctorPoints);
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -179,14 +396,27 @@ const DoctorCard = ({ doctor }) => {
           <Image source={{ uri: doctor.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person" size={40} color="#666" />
+            <Ionicons name="person-circle-outline" size={moderateScale(60)} color="#0EB3EB" />
           </View>
         )}
         <View style={styles.doctorSummary}>
           <Text style={styles.doctorName}>{doctor.full_name || t("not_specified")}</Text>
-          <InfoBox label={t("rating")} value="N/A" />
+          <InfoBox label={t("rating")}>
+            {/* Відображаємо повні зірочки */}
+            {Array.from({ length: starRating }).map((_, i) => (
+              <Ionicons key={`star-full-${i}`} name="star" size={moderateScale(18)} color="#FFD700" />
+            ))}
+            {/* Відображаємо пусті зірочки */}
+            {Array.from({ length: 5 - starRating }).map((_, i) => (
+              <Ionicons key={`star-outline-${i}`} name="star-outline" size={moderateScale(18)} color="#ccc" />
+            ))}
+             {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
+              <Text style={styles.ratingPointsText}> ({doctorPoints} {t('points_short')})</Text>
+            )}
+          </InfoBox>
           <InfoBox label={t("communication_language")}>
-            <LanguageFlags languages={doctor.communication_languages || []} />
+            {/* Передаємо languages, як у Profile_doctor */}
+            <LanguageFlags languages={getParsedArray(doctor.communication_languages)} />
           </InfoBox>
         </View>
       </View>
@@ -222,6 +452,7 @@ const DoctorCard = ({ doctor }) => {
   );
 };
 
+
 const ChooseSpecial = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -235,33 +466,36 @@ const ChooseSpecial = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentSortOption, setCurrentSortOption] = useState("experience_desc");
+  const [currentSortOption, setCurrentSortOption] = useState("rating_desc"); // Default sort by rating desc
+
+  // --- Додано: Ефект для скидання сортування при зміні спеціалізації ---
+  useEffect(() => {
+    if (initialSpecialization) {
+      setCurrentSortOption("rating_desc"); // Скидаємо до сортування за рейтингом (спадання)
+    }
+  }, [initialSpecialization]); // Запускається при зміні initialSpecialization
+
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let queryBuilder = supabase
-        .from("anketa_doctor")
-        .select("*, consultation_cost, experience_years, created_at, avatar_url");
+      let data = [];
+      let fetchError = null;
 
       if (initialSpecialization) {
-        // Якщо передана спеціалізація (наприклад, з кнопок категорій)
-        // Шукаємо точний збіг спеціалізації
-        queryBuilder = queryBuilder.filter(
-          "specialization",
-          "cs", // 'cs' - contains string, шукає точний елемент у масиві JSONB
-          `["${initialSpecialization}"]`
-        );
+        // Вибірка за спеціалізацією
+        const { data: categoryData, error: categoryError } = await supabase
+          .from("anketa_doctor")
+          .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url")
+          .filter("specialization", "cs", `["${initialSpecialization}"]`);
+        
+        data = categoryData;
+        fetchError = categoryError;
       } else if (searchQuery) {
-        // Якщо передано загальний пошуковий запит (з поля пошуку)
-        const searchPattern = `%${searchQuery}%`; // Pattern для ilike
-
-        // Використовуємо rpc (Remote Procedure Call) для виклику кастомної функції Supabase
-        // Ця функція шукатиме як по full_name, так і по спеціалізаціях у JSONB масиві.
-        // Це вимагає створення функції в Supabase.
-        const { data, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
-            p_search_query: searchQuery, // Передаємо пошуковий запит
+        // Пошук за запитом
+        const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
+            p_search_query: searchQuery,
         });
 
         if (rpcError) {
@@ -269,91 +503,45 @@ const ChooseSpecial = () => {
             setError(`${t("error_fetching_doctors")}: ${rpcError.message}`);
             setDoctors([]);
             setLoading(false);
-            return; // Виходимо з функції
+            return;
         }
-
-        // Встановлюємо отримані через RPC дані
-        setDoctors(data.map(doctor => {
-            // Оскільки RPC повертає повні дані, ми можемо їх обробити тут.
-            // Переконайтеся, що RPC повертає всі необхідні поля.
-            const parsedCommunicationLanguages = getParsedArray(
-              doctor.communication_languages
-            );
-
-            let timeInAppDisplay = t("not_specified");
-            if (doctor.created_at) {
-              const joinedDate = new Date(doctor.created_at);
-              const now = new Date();
-              const diffTime = Math.abs(now.getTime() - joinedDate.getTime());
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-              if (diffDays < 30) {
-                timeInAppDisplay = t("days_in_app", { count: diffDays });
-              } else if (diffDays < 365) {
-                const diffMonths = Math.floor(diffDays / 30);
-                timeInAppDisplay = t("months_in_app", { count: diffMonths });
-              } else {
-                const diffYears = Math.floor(diffDays / 365);
-                timeInAppDisplay = t("years_in_app", { count: diffYears });
-              }
-            }
-
-            return {
-              ...doctor,
-              communication_languages: parsedCommunicationLanguages,
-              time_in_app: timeInAppDisplay,
-            };
-        }));
-        setLoading(false);
-        return; // Виходимо, оскільки RPC вже повернув відфільтровані дані
+        data = rpcData;
+        fetchError = rpcError;
+      } else {
+          // Завантаження всіх лікарів, якщо немає ні спеціалізації, ні пошукового запиту
+          const { data: allDoctorsData, error: allDoctorsError } = await supabase
+            .from("anketa_doctor")
+            .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url");
+          data = allDoctorsData;
+          fetchError = allDoctorsError;
       }
-
-      // Якщо немає ні specialization, ні searchQuery, або після фільтрації по specialization
-      // застосовуємо сортування до queryBuilder
-      switch (currentSortOption) {
-        case "experience_desc":
-          queryBuilder = queryBuilder.order("experience_years", {
-            ascending: false,
-            nullsFirst: false,
-          });
-          break;
-        case "experience_asc":
-          queryBuilder = queryBuilder.order("experience_years", {
-            ascending: true,
-            nullsFirst: true,
-          });
-          break;
-        case "price_asc":
-          queryBuilder = queryBuilder.order("consultation_cost", {
-            ascending: true,
-            nullsFirst: true,
-          });
-          break;
-        case "price_desc":
-          queryBuilder = queryBuilder.order("consultation_cost", {
-            ascending: false,
-            nullsFirst: false,
-          });
-          break;
-        default:
-          queryBuilder = queryBuilder.order("experience_years", {
-            ascending: false,
-            nullsFirst: false,
-          });
-      }
-
-      // Виконуємо запит, якщо не було RPC
-      const { data, error: fetchError } = await queryBuilder;
 
       if (fetchError) {
         console.error("Error fetching doctors:", fetchError);
         setError(`${t("error_fetching_doctors")}: ${fetchError.message}`);
         setDoctors([]);
       } else {
+        // Обробка отриманих даних для всіх лікарів
         const processedDoctors = data.map((doctor) => {
-          const parsedCommunicationLanguages = getParsedArray(
-            doctor.communication_languages
-          );
+          // Нормалізуємо profile_doctor до масиву для консистентного доступу до doctor_points
+          let normalizedProfileDoctor = null;
+          if (doctor.profile_doctor) {
+            if (Array.isArray(doctor.profile_doctor)) {
+              normalizedProfileDoctor = doctor.profile_doctor;
+            } else {
+              // Якщо profile_doctor є об'єктом, обгортаємо його в масив
+              normalizedProfileDoctor = [doctor.profile_doctor];
+            }
+          }
+
+          // Отримуємо мови, перетворюючи їх на верхній регістр та фільтруючи за COUNTRY_FLAGS_MAP
+          const parsedCommunicationLanguages = getParsedArray(doctor.communication_languages).map(lang => {
+            if (typeof lang === 'object' && lang !== null && lang.code) {
+              return String(lang.code).toUpperCase();
+            }
+            return String(lang).toUpperCase();
+          }).filter(code => COUNTRY_FLAGS_MAP[code]); // Фільтруємо, щоб були лише ті, для яких є прапори
+
 
           let timeInAppDisplay = t("not_specified");
           if (doctor.created_at) {
@@ -375,11 +563,37 @@ const ChooseSpecial = () => {
 
           return {
             ...doctor,
+            profile_doctor: normalizedProfileDoctor, // Використовуємо нормалізовану версію
             communication_languages: parsedCommunicationLanguages,
             time_in_app: timeInAppDisplay,
           };
         });
-        setDoctors(processedDoctors);
+
+        // Застосовуємо сортування на стороні клієнта відповідно до вибраної опції
+        const sortedDoctors = [...processedDoctors].sort((a, b) => {
+          // Доступ до doctor_points як елемента масиву, враховуючи нормалізацію
+          const pointsA = a.profile_doctor?.[0]?.doctor_points || 0;
+          const pointsB = b.profile_doctor?.[0]?.doctor_points || 0;
+
+          switch (currentSortOption) {
+            case "experience_desc":
+              return (b.experience_years || 0) - (a.experience_years || 0);
+            case "experience_asc":
+              return (a.experience_years || 0) - (b.experience_years || 0);
+            case "price_asc":
+              return (a.consultation_cost || 0) - (b.consultation_cost || 0);
+            case "price_desc":
+              return (b.consultation_cost || 0) - (a.consultation_cost || 0);
+            case "rating_desc": // Сортування за рейтингом (спадання)
+              return pointsB - pointsA;
+            case "rating_asc": // Сортування за рейтингом (зростання)
+              return pointsA - pointsB;
+            default:
+              return 0;
+          }
+        });
+
+        setDoctors(sortedDoctors);
       }
     } catch (e) {
       console.error("Unexpected error during doctor fetch:", e);
@@ -388,17 +602,19 @@ const ChooseSpecial = () => {
     } finally {
       setLoading(false);
     }
-  }, [t, initialSpecialization, searchQuery, currentSortOption]);
+  }, [t, initialSpecialization, searchQuery, currentSortOption]); // currentSortOption додано до залежностей
 
   useEffect(() => {
     fetchDoctors();
   }, [fetchDoctors]);
 
   const sortOptions = [
-    { label: t("sort_by_experience_desc"), value: "experience_desc" },
-    { label: t("sort_by_experience_asc"), value: "experience_asc" },
-    { label: t("sort_by_price_asc"), value: "price_asc" },
-    { label: t("sort_by_price_desc"), value: "price_desc" },
+    { label: t("sort_by_rating_desc"), value: "rating_desc" }, // Нова опція сортування
+    { label: t("sort_by_rating_asc"), value: "rating_asc" },   // Нова опція сортування
+    { label: t("sort_by_experience_desc"), value: "experience_desc" }, // Переклад
+    { label: t("sort_by_experience_asc"), value: "experience_asc" },   // Переклад
+    { label: t("sort_by_price_asc"), value: "price_asc" },             // Переклад
+    { label: t("sort_by_price_desc"), value: "price_desc" },           // Переклад
   ];
 
   const handleBackPress = () => {
@@ -454,7 +670,7 @@ const ChooseSpecial = () => {
       return spec ? t(spec.nameKey) : t("doctors");
     }
     if (searchQuery) {
-        return `${t("search_results_for")} "${searchQuery}"`; // Новий ключ для перекладу
+        return `${t("search_results_for")} "${searchQuery}"`;
     }
     return t("doctors");
   };
@@ -487,7 +703,8 @@ const ChooseSpecial = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.rightIcon}>
-          <Icon width={50} height={50} />
+          {/* <Icon width={50} height={50} /> */}
+          {/* Якщо Icon з assets/icon.svg не використовується, можна видалити */}
         </View>
       </View>
 
@@ -558,6 +775,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0, // Adjusted for Android StatusBar
   },
   container: {
     flex: 1,
@@ -572,7 +790,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: "#000000",
-    fontFamily: "Mont-Regular",
+    // fontFamily: "Mont-Regular",
   },
   errorContainer: {
     flex: 1,
@@ -586,7 +804,7 @@ const styles = StyleSheet.create({
     color: "#000000",
     textAlign: "center",
     marginBottom: 15,
-    fontFamily: "Mont-Regular",
+    // fontFamily: "Mont-Regular",
   },
   retryButton: {
     backgroundColor: "#0EB3EB",
@@ -598,14 +816,14 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
   noDoctorsFound: {
     fontSize: 18,
     textAlign: "center",
     marginTop: 50,
     color: "#777",
-    fontFamily: "Mont-Regular",
+    // fontFamily: "Mont-Regular",
   },
   header: {
     flexDirection: "row",
@@ -633,7 +851,7 @@ const styles = StyleSheet.create({
     color: "#333",
     flex: 1,
     textAlign: "center",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
   rightIcon: {
     width: 50,
@@ -660,7 +878,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
   scrollViewContent: {
     paddingHorizontal: 15,
@@ -697,6 +915,9 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: '#E3F2FD',
+    borderWidth: 1,
+    borderColor: '#B3E0F2',
   },
   doctorSummary: {
     flex: 1,
@@ -706,7 +927,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     marginBottom: 8,
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
   infoBoxRow: {
     flexDirection: "row",
@@ -717,7 +938,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#555",
     marginRight: 5,
-    fontFamily: "Mont-Medium",
+    // fontFamily: "Mont-Medium",
   },
   infoBoxValueContainer: {
     flex: 1,
@@ -729,7 +950,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     fontWeight: "500",
-    fontFamily: "Mont-Regular",
+    // fontFamily: "Mont-Regular",
     flexShrink: 1,
   },
   notSpecifiedText: {
@@ -744,6 +965,12 @@ const styles = StyleSheet.create({
   flagText: {
     fontSize: 18,
     marginRight: 5,
+  },
+  ratingPointsText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 5,
+    // fontFamily: 'Mont-Regular',
   },
   cardDetails: {
     paddingTop: 10,
@@ -773,13 +1000,13 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 15,
     fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
   priceText: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#3498DB",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
   modalOverlay: {
     flex: 1,
@@ -813,7 +1040,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     fontWeight: "500",
-    fontFamily: "Mont-Regular",
+    // fontFamily: "Mont-Regular",
   },
   sortOptionSelected: {
     backgroundColor: "rgba(14, 179, 235, 0.1)",
@@ -822,7 +1049,7 @@ const styles = StyleSheet.create({
   sortOptionTextSelected: {
     fontWeight: "bold",
     color: "#0EB3EB",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
   closeSortButton: {
     backgroundColor: "#0EB3EB",
@@ -836,7 +1063,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    // fontFamily: "Mont-Bold",
   },
 });
 

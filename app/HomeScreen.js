@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Platform,
+  StatusBar, // <-- Додаємо StatusBar для умовних стилів
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import Icon from "../assets/icon.svg";
@@ -76,9 +78,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     backgroundColor: "white",
-    paddingTop: 120,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 10 : 10,
   },
-
   title: {
     fontSize: 24,
     color: "#333",

@@ -10,6 +10,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../assets/icon.svg";
@@ -124,7 +125,8 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
-    paddingTop: 50, // Відступ зверху для вмісту
+    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
   },
   header: {
     flexDirection: "row",

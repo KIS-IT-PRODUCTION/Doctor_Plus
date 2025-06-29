@@ -7,42 +7,43 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  // Alert, // Можна використовувати для налагодження, але для продакшену краще кастомні UI
   ActivityIndicator,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../providers/supabaseClient"; // Все ще використовується для прямого signInWithPassword
-import { useAuth } from "../providers/AuthProvider"; // Для доступу до сесії та, можливо, інших функцій у майбутньому
+import { supabase } from "../providers/supabaseClient";
+import { useAuth } from "../providers/AuthProvider"; // Це все ще потрібно для доступу до signIn функції, якщо ми її використовуємо
 import { useTranslation } from "react-i18next";
 
 const LoginScreen = () => {
   const navigation = useNavigation();
-  // Використовуємо session з useAuth для загальної логіки сесії.
-  // Хоча signInWithPassword викликається напряму через supabase.auth,
-  // AuthProvider все одно відстежує стан сесії та оновлює її.
-  const { session } = useAuth();
+  // Використовуємо функції signIn з useAuth. Це дозволяє AuthProvider контролювати setLoading та isRoleDetermined
+  const { signIn, loading: authLoading, session, userRole } = useAuth(); // Отримуємо signIn функцію та authLoading
   const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  // isLoggingIn тепер буде синхронізуватися з authLoading з AuthProvider,
+  // або можна залишити окремо для локальних станів UI.
+  // Для простоти та консистентності, давайте покладатися на authLoading.
+  // const [isLoggingIn, setIsLoggingIn] = useState(false);
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
-  // Цей useEffect буде автоматично перенаправляти на Patsient_Home
-  // якщо сесія активна після завантаження або успішного входу.
-  useEffect(() => {
-    if (session && session.user) {
-      console.log("LoginScreen.js: Сесія активна, перенаправлення на Patsient_Home.");
-      navigation.replace("Patsient_Home");
-    }
-  }, [session, navigation]);
+  // *** ВАЖЛИВА ЗМІНА: ВИДАЛЯЄМО ЦЕЙ useEffect ***
+  // Логіка перенаправлення після успішного входу тепер повністю
+  // контролюється RootNavigator на основі `session`, `userRole` та `isRoleDetermined`.
+  // useEffect(() => {
+  //   if (session && session.user) {
+  //     console.log("LoginScreen.js: Сесія активна, перенаправлення на Patsient_Home.");
+  //     navigation.replace("Patsient_Home");
+  //   }
+  // }, [session, navigation]);
 
   const handleLogin = async () => {
-    setLoginError(""); // Очищаємо попередні помилки
+    setLoginError("");
 
     if (!email.trim()) {
       setLoginError(t("error_empty_email"));
@@ -53,41 +54,34 @@ const LoginScreen = () => {
       return;
     }
 
-    setIsLoggingIn(true); // Включаємо індикатор завантаження
+    // setIsLoggingIn(true); // Більше не потрібен, якщо використовуємо authLoading
     console.log("LoginScreen.js: Спроба входу для пацієнта з email:", email);
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
+    // *** ЗМІНА: Використовуємо signIn з AuthProvider ***
+    const { success, error } = await signIn(email, password);
 
-      if (error) {
-        console.error("LoginScreen.js: Помилка входу Supabase:", error.message);
-        // Відображаємо помилку локально на екрані входу
-        setLoginError(t("error_login_failed", { error: error.message }));
-      } else {
-        console.log("LoginScreen.js: Вхід Supabase успішний. Користувач:", data.user?.id);
-        // Поля введення можна очистити тут або залишити, оскільки успішна навігація
-        // призведе до розмонтування компонента і скидання стану.
-        setEmail("");
-        setPassword("");
-        // Навігація відбудеться через useEffect завдяки оновленню сесії в AuthProvider
-      }
-    } catch (err) {
-      console.error("LoginScreen.js: Загальна помилка входу (try/catch):", err);
-      setLoginError(t("error_general_login_failed"));
-    } finally {
-      setIsLoggingIn(false); // Вимикаємо індикатор завантаження
+    if (!success) {
+      console.error("LoginScreen.js: Помилка входу через AuthProvider:", error?.message || "Невідома помилка.");
+      setLoginError(t("error_login_failed", { error: error?.message || "Невідома помилка." }));
+    } else {
+      console.log("LoginScreen.js: Вхід успішний. AuthProvider керує перенаправленням.");
+      setEmail("");
+      setPassword("");
+      // Після успішного входу AuthProvider оновить `session`, `loading` та `userRole`.
+      // `RootNavigator` потім перенаправить куди потрібно.
+      // Не викликаємо navigation.replace тут!
     }
+    // setIsLoggingIn(false); // Більше не потрібен
   };
 
   const handleForgotPasswordPress = () => {
-    setLoginError(""); // Очищаємо будь-яку поточну помилку перед переходом
-    // Перенаправляємо на екран скидання пароля, передаючи email
+    setLoginError("");
     console.log("LoginScreen.js: Перехід на екран ResetPasswordScreen.");
     navigation.navigate("ResetPasswordScreen", { email: email });
   };
+
+  // Використовуємо authLoading для керування станом кнопки та полів
+  const isDisabled = authLoading;
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -113,7 +107,7 @@ const LoginScreen = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            editable={!isLoggingIn} // Деактивуємо поле під час входу
+            editable={!isDisabled} // Деактивуємо поле під час входу
           />
         </View>
 
@@ -131,7 +125,7 @@ const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
-            editable={!isLoggingIn} // Деактивуємо поле під час входу
+            editable={!isDisabled} // Деактивуємо поле під час входу
           />
         </View>
 
@@ -140,9 +134,9 @@ const LoginScreen = () => {
         <TouchableOpacity
           style={styles.loginButton(width)}
           onPress={handleLogin}
-          disabled={isLoggingIn} // Кнопка вимкнена під час завантаження
+          disabled={isDisabled} // Кнопка вимкнена під час завантаження
         >
-          {isLoggingIn ? (
+          {isDisabled ? ( // Використовуємо isDisabled (тобто authLoading)
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.loginButtonText}>
@@ -151,11 +145,11 @@ const LoginScreen = () => {
           )}
         </TouchableOpacity>
 
-        {/* НОВЕ: Кнопка "Забули пароль?" */}
+        {/* Кнопка "Забули пароль?" */}
         <TouchableOpacity
           style={styles.forgotPasswordLink}
           onPress={handleForgotPasswordPress}
-          disabled={isLoggingIn} // Деактивуємо під час входу
+          disabled={isDisabled} // Деактивуємо під час входу
         >
           <Text style={styles.forgotPasswordText}>
             {t("forgot_password_link")}
@@ -165,7 +159,7 @@ const LoginScreen = () => {
         <TouchableOpacity
           style={styles.registerLink}
           onPress={() => navigation.navigate("RegisterScreen")}
-          disabled={isLoggingIn} // Деактивуємо під час входу
+          disabled={isDisabled} // Деактивуємо під час входу
         >
           <Text style={styles.registerLinkText}>
             {t("not_registered")}
@@ -179,7 +173,7 @@ const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   scrollContainer: {
-    flexGrow: 1,
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -250,17 +244,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
-  forgotPasswordLink: { // Додано стиль для нового посилання
+  forgotPasswordLink: {
     marginTop: 10,
     marginBottom: 10,
   },
-  forgotPasswordText: { // Додано стиль для нового посилання
+  forgotPasswordText: {
     fontSize: 14,
     color: "#757575",
     textDecorationLine: "underline",
   },
   registerLink: {
-    marginTop: 24,
   },
   registerLinkText: {
     fontSize: 16,

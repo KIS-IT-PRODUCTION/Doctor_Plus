@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserRole = useCallback(async (userSession) => {
     console.log("AuthProvider: fetchUserRole called. Session present:", !!userSession);
-
+userRole
     if (!userSession || !userSession.user) {
       console.log("AuthProvider: fetchUserRole - No user session. Setting role to null.");
       setUserRole(null);

@@ -11,35 +11,37 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
-import * as Linking from "expo-linking"; // Це імпортовано, але не використовується у цьому фрагменті коду
+import * as Linking from "expo-linking";
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import "./i18n";
 
 // Імпорти екранів
 import ChooseSpecial from "./app/ChooseSpecial";
-import LoginScreen from "./app/LoginScreen"; // Ймовірно, для пацієнтів
+import LoginScreen from "./app/LoginScreen";
 import Patsient_Home from "./app/Patsient_Home";
-import RegisterScreen from "./app/RegisterScreen"; // Ймовірно, для пацієнтів
+import RegisterScreen from "./app/RegisterScreen";
 import HomeScreen from "./app/HomeScreen";
 import Search from "./app/Search";
 import Messege from "./app/doctor/Messege";
 import Faq from "./app/Faq";
-import Faq_doctor from "./app/doctor/Faq_doctor"; // Ймовірно, для лікарів
+import Faq_doctor from "./app/doctor/Faq_doctor";
 import Support from "./app/Support";
-import Support_doctor from "./app/doctor/Support_doctor"; // Ймовірно, для лікарів
+import Support_doctor from "./app/doctor/Support_doctor";
 import Review from "./app/Rewiew";
-import Rewiew_app from "./app/doctor/Rewiew_app"; // Ймовірно, для лікарів
+import Rewiew_app from "./app/doctor/Rewiew_app";
 import WriteReview from "./app/WriteRewiew";
 import Profile from "./app/Profile";
-import Register from "./app/doctor/Register"; // Ймовірно, для лікарів
-import Login from "./app/doctor/Login"; // Ймовірно, для лікарів
+import Register from "./app/doctor/Register";
+import Login from "./app/doctor/Login";
 import Anketa_Settings from "./app/doctor/Anketa_Settings";
 import Profile_doctor from "./app/doctor/Profile_doctor";
 import ConsultationTime from "./app/doctor/ConsultationTime";
 import ConsultationTimePatient from "./app/ConsultationTimePatient";
 import PatientMessages from "./app/PatientMessages";
 import ResetPasswordScreen from "./app/doctor/ResetPasswordScreen";
-import TabBar_doctor from "./components/TopBar_doctor"; // Це імпортовано, але не використовується у Stack Navigator напряму
+import TabBar_doctor from "./components/TopBar_doctor";
+
+import { DoctorProfileProvider } from "./components/DoctorProfileContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -50,17 +52,12 @@ function RootNavigator() {
   const navigationRef = useRef();
   const [isNavigationReady, setNavigationReady] = useState(false);
 
-  // useEffect для імперативної навігації після зміни стану сесії/ролі
   useEffect(() => {
-    // console.log("RootNavigator Effect: Виконання логіки навігації...");
     if (!isNavigationReady || !navigationRef.current) {
-      // Чекаємо, поки навігатор буде повністю готовий
       console.log("RootNavigator Effect: Навігатор не готовий або посилання недоступне, пропускаємо навігацію.");
       return;
     }
 
-    // Цей useEffect буде викликаний лише тоді, коли `loading` стане `false`
-    // і `session` та `userRole` будуть визначені `AuthProvider`
     if (session && session.user) {
       if (userRole === "doctor") {
         console.log("RootNavigator Effect: Сесія активна, роль - лікар. Перехід до Profile_doctor.");
@@ -75,27 +72,21 @@ function RootNavigator() {
           routes: [{ name: "Patsient_Home" }],
         });
       } else {
-        // Якщо сесія є, але роль ще не визначена (може бути тимчасово null після входу)
-        // Це має бути рідкісним випадком, якщо userRole завжди визначена після завантаження.
-        // Можливо, тут потрібен окремий екран "визначення ролі" або дефолтний, поки роль не провантажиться.
         console.log("RootNavigator Effect: Сесія активна, але роль не визначена. Перехід до HomeScreen.");
         navigationRef.current.reset({
           index: 0,
-          routes: [{ name: "HomeScreen" }], // Або інший екран для очікування ролі
+          routes: [{ name: "HomeScreen" }],
         });
       }
     } else {
-      // Якщо сесії немає, переходимо на HomeScreen (початковий екран)
       console.log("RootNavigator Effect: Сесії немає. Перехід до HomeScreen.");
       navigationRef.current.reset({
         index: 0,
         routes: [{ name: "HomeScreen" }],
       });
     }
-  }, [session, userRole, isNavigationReady]); // Залежності: сесія, роль, готовність навігатора
+  }, [session, userRole, isNavigationReady]);
 
-  // Глобальний індикатор завантаження для AuthProvider
-  // Цей блок ПОВИНЕН БУТИ розкоментований
   if (loading) {
     console.log("RootNavigator: AuthProvider завантажується (первинна ініціалізація)...");
     return (
@@ -106,7 +97,6 @@ function RootNavigator() {
     );
   }
 
-  // Лог для налагодження: показує поточний стан сесії та ролі
   console.log(`RootNavigator (RENDER): Сесія: ${session ? 'Присутня' : 'Відсутня'}, Роль: ${userRole}, Навігатор готовий: ${isNavigationReady}, AuthProvider Loading: ${loading}`);
 
   return (
@@ -116,14 +106,8 @@ function RootNavigator() {
         setNavigationReady(true);
         console.log("RootNavigator: NavigationContainer готовий!");
       }}
-      // linking={{ ... }} // Якщо ви використовуєте deep linking, додайте його сюди
     >
       <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade", animationDuration: 0 }}>
-        {/*
-          Усі екрани вашої програми.
-          Початковий маршрут встановлюватиметься імперативно через useEffect.
-          Порядок тут не так важливий, як був раніше з initialRouteName.
-        */}
         {/* Неавтентифіковані екрани */}
         <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="HomeScreen" component={HomeScreen} />
@@ -152,7 +136,6 @@ function RootNavigator() {
         <Stack.Screen name="Support_doctor" component={Support_doctor} />
         <Stack.Screen name="Rewiew_app" component={Rewiew_app} />
         <Stack.Screen name="ConsultationTime" component={ConsultationTime} />
-        <Stack.Screen name="TabBar_doctor" component={TabBar_doctor} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -197,11 +180,40 @@ export default function App() {
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <AuthProvider>
-        <RootNavigator />
+        {/*
+          Умовне рендеринг DoctorProfileProvider
+          Він буде працювати тільки тоді, коли userRole визначено як 'doctor'
+        */}
+        <ConditionalDoctorProfileProvider>
+          <RootNavigator />
+        </ConditionalDoctorProfileProvider>
       </AuthProvider>
     </View>
   );
 }
+
+// Новий компонент для умовного рендерингу DoctorProfileProvider
+function ConditionalDoctorProfileProvider({ children }) {
+  const { userRole, loading } = useAuth();
+
+  // Показуємо дітей без провайдера, якщо роль пацієнт або ще завантажується
+  if (loading || userRole === 'patient' || userRole === null) {
+    return <>{children}</>;
+  }
+
+  // Якщо роль - лікар, тоді обгортаємо дітей у DoctorProfileProvider
+  if (userRole === 'doctor') {
+    return (
+      <DoctorProfileProvider>
+        {children}
+      </DoctorProfileProvider>
+    );
+  }
+
+  // Дефолтний випадок, якщо роль невідома або інша, також показуємо дітей без провайдера
+  return <>{children}</>;
+}
+
 
 const styles = StyleSheet.create({
   centeredContainer: {

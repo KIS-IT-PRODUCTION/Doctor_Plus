@@ -1700,6 +1700,8 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Regular",
   },
   container: (width, height) => ({
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
+    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
     backgroundColor: "#fff",
     alignItems: "center",
     paddingTop: 0,
@@ -1711,7 +1713,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 20,
     marginBottom: 10,
   },
   backButton: {
@@ -1719,6 +1720,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     width: 48,
     height: 48,
+    zIndex: 1,
     justifyContent: "center",
     alignItems: "center",},
   languageDisplayContainer: {
@@ -1734,11 +1736,15 @@ const styles = StyleSheet.create({
   },
   title: (isLargeScreen) => ({
     fontSize: 22,
-    fontWeight: "bold",
-    color: "#000000",
     flex: 1,
     textAlign: "center",
     marginHorizontal: 10,
+    justifyContent: "center",
+    position: "absolute",
+    left: 0,
+    // top: 0,
+    paddingVertical: 10,
+    right: 0,
     fontFamily: "Mont-SemiBold",
   }),
   inputLabel: {

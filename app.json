@@ -33,19 +33,13 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "splash": {
-        "image": "./assets/icon.png",
+        "image": "./assets/icon2.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
         "tabletImage": "./assets/icon.png",
         "tabletBackgroundColor": "#ffffff",
         "darkModeImage": "./assets/icon.png",
         "darkModeBackgroundColor": "#ffffff"
-      },
-      "notification": {  
-        "icon": "./assets/icon.png", 
-        "sounds": [
-          "./assets/sms_meow.mp3" 
-        ]
       }
     },
     "android": {
@@ -55,6 +49,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.kis_production.DOCTOR",
+      "googleServicesFile": "./google-services.json", 
       "intentFilters": [
         {
           "action": "VIEW",
@@ -73,13 +68,7 @@
             "DEFAULT"
           ]
         }
-      ],
-      "notification": { 
-        "icon": "./assets/icon.png", 
-        "sounds": [
-          "./assets/sms_meow.mp3" 
-        ]
-      }
+      ]
     },
     "web": {
       "favicon": "./assets/icon.png"
@@ -87,7 +76,16 @@
     "plugins": [
       "expo-localization",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "sounds": [
+            "./assets/sms_meow.mp3"
+          ]
+        }
+      ]
     ]
   }
 }

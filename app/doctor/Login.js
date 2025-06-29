@@ -8,64 +8,58 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  // Alert, // Можна використовувати для налагодження
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useAuth } from "../../providers/AuthProvider"; // Використовуємо AuthProvider
+// Хоча ми використовуємо signIn з AuthProvider, supabase також потрібен для resetPasswordForEmail
+import { supabase } from "../../providers/supabaseClient";
+import { useAuth } from "../../providers/AuthProvider"; // Для доступу до сесії, ролі та signIn/signOut
 import { useTranslation } from "react-i18next";
-
-const Login = () => {
+const Login = () => { // Цей компонент - для входу лікарів
   const navigation = useNavigation();
-  // Отримуємо необхідні стани та функції з useAuth
-  const { session, loading: authLoading, userRole, signIn, signOut, authError } = useAuth();
+  const { session, userRole, loading: authLoading, isRoleDetermined, signIn } = useAuth();
   const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState(""); // Локальна помилка для відображення в UI
-  const [isLoggingIn, setIsLoggingIn] = useState(false); // Стан для індикатора завантаження кнопки
+  const [loginError, setLoginError] = useState("");
+  // isLoggingIn тепер буде відображати стан завантаження AuthProvider
+  const isDisabled = authLoading;
 
   const { width } = Dimensions.get("window");
   const isLargeScreen = width > 768;
 
-  // Цей useEffect буде реагувати на зміни сесії або ролі після спроби входу.
-  // Він відповідає за логіку "якщо пацієнт увійшов через лікарський вхід".
-  // Перехід до профілю лікаря або пацієнта тепер керується RootNavigator в App.js.
+  // Логіка перенаправлення на основі сесії та ролі
   useEffect(() => {
-    // console.log("Login.js useEffect (Session/Role): Спрацював");
-    // console.log(`  - session: ${session ? "Присутня" : "Відсутня"}`);
-    // console.log(`  - authLoading: ${authLoading}`);
-    // console.log(`  - userRole: ${userRole}`);
-    // console.log(`  - authError: ${authError ? authError.message : "Немає"}`);
-
-    if (!authLoading && session && session.user) {
-      // Якщо сесія активна і AuthProvider закінчив завантаження
-      if (userRole === "patient") {
-        // Якщо це пацієнт, виходимо його і показуємо повідомлення про помилку
-        console.log("Login.js: Пацієнт увійшов через лікарський вхід. Вихід...");
-        signOut(); // Викликаємо signOut з AuthProvider
-        setLoginError(t("error_doctors_only_login")); // Встановлюємо локальну помилку
-        setEmail(""); // Очищаємо поля
-        setPassword("");
-      } else if (userRole === "doctor") {
-        // Якщо це лікар, RootNavigator в App.js повинен перенаправити на Profile_doctor.
-        // Цей екран сам не викликає navigation.replace, оскільки RootNavigator вже це зробить.
-        console.log("Login.js: Лікар успішно увійшов. RootNavigator перенаправить.");
-      }
-      // Якщо userRole === null, це означає, що роль ще визначається.
-      // Не робимо нічого, чекаємо, поки AuthProvider завершить визначення ролі.
-    } else if (authError) {
-      // Якщо AuthProvider повернув помилку (наприклад, "Invalid login credentials")
-      console.error("Login.js useEffect (AuthError): Отримано помилку від AuthProvider:", authError.message);
-      setLoginError(t("error_login_failed", { error: authError.message }));
-      setIsLoggingIn(false); // Зупиняємо індикатор
+    // Чекаємо, поки AuthProvider завершить завантаження та визначення ролі
+    if (authLoading || !isRoleDetermined) {
+      console.log("Login.js: AuthProvider завантажується або роль не визначена. Чекаємо...");
+      return;
     }
-  }, [session, authLoading, userRole, authError, signOut, t]);
 
+    if (session && session.user) {
+      // Користувач вже увійшов, перенаправляємо його відповідно до ролі
+      if (userRole === "doctor") {
+        console.log("Login.js: Лікар вже увійшов. Перенаправлення на Profile_doctor.");
+        navigation.replace("Profile_doctor", { doctorId: session.user.id });
+      } else if (userRole === "patient") {
+        console.log("Login.js: Пацієнт вже увійшов. Перенаправлення на Patsient_Home.");
+        navigation.replace("Patsient_Home", { patientId: session.user.id });
+      } else {
+        // Якщо роль невідома, але сесія є, перенаправляємо на загальний HomeScreen
+        console.warn("Login.js: Користувач увійшов з невідомою роллю. Перенаправлення на HomeScreen.");
+        navigation.replace("HomeScreen");
+      }
+    } else {
+      // Якщо сесії немає, залишаємо на екрані входу (це нормальна поведінка)
+      console.log("Login.js: Сесії немає, залишаємо на екрані входу лікаря.");
+    }
+  }, [session, userRole, authLoading, isRoleDetermined, navigation]);
 
   const handleLogin = async () => {
-    setLoginError(""); // Очищаємо попередні помилки
+    setLoginError("");
 
     if (!email.trim()) {
       setLoginError(t("error_empty_email"));
@@ -76,29 +70,25 @@ const Login = () => {
       return;
     }
 
-    setIsLoggingIn(true); // Включаємо індикатор завантаження
-    console.log("Login.js: handleLogin - Виклик signIn з AuthProvider для email:", email);
+    console.log("Login.js: Спроба входу для лікаря з email:", email);
 
-    // Викликаємо функцію signIn з AuthProvider
+    // Використовуємо функцію signIn з AuthProvider, яка вже має логіку setLoading та визначення ролі
     const { success, error } = await signIn(email, password);
 
-    if (error) {
-      console.error("Login.js: handleLogin - Помилка signIn:", error.message);
-      // Якщо signIn повертає помилку, відображаємо її локально.
-      // Користувач залишається на поточному екрані.
-      setLoginError(t("error_login_failed", { error: error.message }));
+    if (!success) {
+      console.error("Login.js: Помилка входу Supabase:", error?.message || "Невідома помилка.");
+      setLoginError(t("error_login_failed", { error: error?.message || "Невідома помилка." }));
     } else {
-      console.log("Login.js: handleLogin - signIn успішний. AuthProvider оновлює сесію.");
-      // Якщо успішно, AuthProvider оновить сесію, і useEffect вище або RootNavigator
-      // візьмуть на себе подальшу логіку (навігацію або обробку ролі пацієнта).
-      // Поля введення не очищаємо тут, щоб користувач міг бачити свої дані при помилці.
-      // Якщо вхід успішний, вони все одно будуть скинуті при переході на інший екран.
+      console.log("Login.js: Вхід Supabase успішний. AuthProvider керує перенаправленням.");
+      setEmail("");
+      setPassword("");
+      // Навігація відбудеться через useEffect цього ж компонента, як тільки userRole буде визначено.
     }
-    setIsLoggingIn(false); // Вимикаємо індикатор завантаження
   };
 
   const handleForgotPasswordPress = () => {
-    setLoginError(""); // Очищаємо помилку перед переходом
+    setLoginError("");
+    console.log("Login.js: Перехід на екран ResetPasswordScreen.");
     navigation.navigate("ResetPasswordScreen", { email: email });
   };
 
@@ -106,9 +96,9 @@ const Login = () => {
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container(width)}>
         <StatusBar style="auto" />
-        <Text style={styles.title(isLargeScreen)}>{t("login_greeting")}</Text>
+        <Text style={styles.title(isLargeScreen)}>{t("login_greeting")}</Text> 
         <Text style={styles.subtitle(isLargeScreen)}>
-          {t("login_subtitle")}
+          {t("login_subtitle")} 
         </Text>
 
         <Text style={styles.subtitle2}>{t("email")}</Text>
@@ -126,7 +116,7 @@ const Login = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            editable={!isLoggingIn}
+            editable={!isDisabled}
           />
         </View>
 
@@ -144,7 +134,7 @@ const Login = () => {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
-            editable={!isLoggingIn}
+            editable={!isDisabled}
           />
         </View>
 
@@ -153,19 +143,21 @@ const Login = () => {
         <TouchableOpacity
           style={styles.loginButton(width)}
           onPress={handleLogin}
-          disabled={isLoggingIn}
+          disabled={isDisabled}
         >
-          {isLoggingIn ? (
+          {isDisabled ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.loginButtonText}>{t("login_button")}</Text>
+            <Text style={styles.loginButtonText}>
+              {t("login_button")}
+            </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.forgotPasswordLink}
           onPress={handleForgotPasswordPress}
-          disabled={isLoggingIn}
+          disabled={isDisabled}
         >
           <Text style={styles.forgotPasswordText}>
             {t("forgot_password_link")}
@@ -174,12 +166,12 @@ const Login = () => {
 
         <TouchableOpacity
           style={styles.registerLink}
-          onPress={() => navigation.navigate("RegisterScreen")} // Можливо, тут має бути Register для лікарів, а не RegisterScreen?
-          disabled={isLoggingIn}
+          onPress={() => navigation.navigate("Register")} // Перенаправляємо на Register для лікарів
+          disabled={isDisabled}
         >
           <Text style={styles.registerLinkText}>
-            {t("not_registered")}
-            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
+            {t("not_registered")} 
+            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text> 
           </Text>
         </TouchableOpacity>
       </View>
@@ -204,14 +196,14 @@ const styles = StyleSheet.create({
   title: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 36 : 32,
     marginBottom: 9,
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold", // Залишаємо, якщо шрифт завантажено
     color: "#212121",
     textAlign: "center",
   }),
   subtitle: (isLargeScreen) => ({
     fontSize: isLargeScreen ? 18 : 16,
     color: "#757575",
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Залишаємо, якщо шрифт завантажено
     marginBottom: 24,
     textAlign: "center",
   }),
@@ -219,7 +211,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     alignSelf: "flex-start",
     color: "#2A2A2A",
-    fontFamily: "Mont-Medium",
+    fontFamily: "Mont-Medium", // Залишаємо, якщо шрифт завантажено
     paddingHorizontal: 35,
     marginBottom: 8,
   },
@@ -237,7 +229,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Залишаємо, якщо шрифт завантажено
   },
   loginButton: (width) => ({
     backgroundColor: "#0EB3EB",
@@ -270,12 +262,11 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   registerLink: {
-    marginTop: 24,
   },
   registerLinkText: {
     fontSize: 16,
     color: "#757575",
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular", // Залишаємо, якщо шрифт завантажено
   },
 });
 
