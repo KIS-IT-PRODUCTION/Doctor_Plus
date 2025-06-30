@@ -1035,7 +1035,7 @@ const styles = StyleSheet.create({
   },
   noSpecializationsText: {
     fontSize: 16,
-    fontFamily: "Mont-Regular",
+    fontFamily: "Mont-SemiBold",
     color: "#777777",
     textAlign: "center",
   },

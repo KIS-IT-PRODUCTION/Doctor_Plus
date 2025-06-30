@@ -184,8 +184,8 @@ const ValueBox = ({ children, t }) => {
 
 // --- Додаємо мапу прапорів ---
 const COUNTRY_FLAGS_MAP = {
-  "EN": "🇬🇧", // Використовуємо для 'english'
-  "UK": "🇺🇦", // Використовуємо для 'ukrainian'
+  "EN": "", // Використовуємо для 'english'
+  "UK": "", // Використовуємо для 'ukrainian'
 };
 
 const LanguageFlags = ({ languages }) => {
@@ -899,7 +899,7 @@ const Profile_doctor = ({ route }) => {
                           onPress={() => handleLanguageSelect(item.code)}
                         >
                           <Text style={styles.languageOptionText}>
-                            {t(item.nameKey)} {item.emoji}
+                            {t(item.nameKey)} 
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -963,7 +963,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F0F2F5',
     paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
-    paddingTop: Platform.OS === "ios" ? (StatusBar.currentHeight ? 5 : 10) : 0,
   },
   fullscreenContainer: {
     flex: 1,
@@ -987,7 +986,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 19,
     color: "#444",
-    // fontFamily: "Mont-Regular", // Якщо використовуєте кастомні шрифти, розкоментуйте
+    fontFamily: "Mont-Regular",
     fontWeight: "500",
   },
   errorContainer: {
@@ -1010,7 +1009,7 @@ const styles = StyleSheet.create({
     color: "#D32F2F",
     textAlign: "center",
     marginBottom: 30,
-    // fontFamily: "Mont-SemiBold",
+    fontFamily: "Mont-SemiBold",
     lineHeight: 28,
   },
   retryButton: {
@@ -1032,7 +1031,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 18,
     fontWeight: "bold",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   goToAnketaButton: {
     borderRadius: 30,
@@ -1103,7 +1102,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 5,
   },
   languageSelectButton: {
     borderRadius: 25,
@@ -1130,7 +1129,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerTitle: {
-    // fontFamily: "Mont-SemiBold",
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(22),
     textAlign: "center",
     alignItems: "center",
@@ -1383,12 +1382,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
-  },
+
   modalView: {
     margin: moderateScale(20),
     backgroundColor: "white",
@@ -1406,50 +1400,11 @@ const styles = StyleSheet.create({
     width: isLargeScreen ? "50%" : "90%",
     maxWidth: 400,
   },
-  modalIcon: {
-    marginBottom: moderateScale(15),
-  },
-  modalTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: moderateScale(15),
-    textAlign: "center",
-  },
-  modalText: {
-    fontSize: moderateScale(16),
-    color: "#555",
-    marginBottom: moderateScale(25),
-    textAlign: "center",
-    lineHeight: moderateScale(22),
-  },
-  modalButton: {
-    backgroundColor: "#0EB3EB",
-    borderRadius: moderateScale(10),
-    paddingVertical: moderateScale(12),
-    paddingHorizontal: moderateScale(20),
-    elevation: 2,
-    minWidth: moderateScale(180),
-    marginBottom: moderateScale(10),
-  },
-  modalButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    textAlign: "center",
-    fontSize: moderateScale(16),
-  },
-  modalCancelButton: {
-    backgroundColor: "#ccc",
-    borderRadius: moderateScale(10),
-    paddingVertical: moderateScale(10),
-    paddingHorizontal: moderateScale(18),
-    minWidth: moderateScale(180),
-  },
-  modalCancelButtonText: {
-    color: "#333",
-    fontWeight: "bold",
-    textAlign: "center",
-    fontSize: moderateScale(14),
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(14, 179, 235, 0.1)",
   },
   languageModalContent: {
     backgroundColor: "white",
@@ -1458,7 +1413,7 @@ const styles = StyleSheet.create({
     borderColor: "#0EB3EB",
     borderWidth: 1,
     alignItems: "center",
-    width: Dimensions.get("window").width * 0.8,
+    width: width * 0.8,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1468,17 +1423,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+ modalTitle: {
+    fontSize: 22,
+    fontFamily: "Mont-Bold",
+    marginBottom: 20,
+    color: "#0EB3EB",
+    textAlign: 'center',
+    flexWrap: 'wrap',
+  },
   languageOption: {
     paddingVertical: 15,
     width: "100%",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#rgba(14, 179, 235, 0.1)",
+    borderBottomColor: "rgba(14, 179, 235, 0.3)",
   },
   languageOptionText: {
     fontSize: 18,
-    fontWeight: "400",
+    fontFamily: "Mont-SemiBold",
     color: "#333333",
+    textAlign: 'center',
+    flexWrap: 'wrap',
   },
 });
 

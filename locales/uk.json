@@ -757,5 +757,21 @@
   "points_short": "балів",
   "initial_search_prompt": "Введіть у полі пошуку",
   "no_doctors_found":"На жаль за вашим запитом нікого не знайдено",
-  "messages_screen.header_title":"Повідомлення"
+  "messages_screen.header_title":"Повідомлення",
+    "hidden_message": "Приховане повідомлення",
+    "open": "Відкрити",
+    "hide": "Приховати",
+    "no_messages": "Повідомлень поки немає",
+    "waiting_for_bookings": "Нові бронювання та оновлення з'являться тут.",
+    "messages_screen.hide": "Сховати повідомлення",
+    "messages_screen.open": "Показати повідомлення",
+    "payment_statuses": {
+    "success": "Успішно",
+    "failure": "Невдача",
+    "error": "Помилка",
+    "declined": "Відхилено",
+    "pending": "В очікуванні",
+    "wait_secure": "Очікування 3D Secure",
+    "3ds_verify": "Перевірка 3D Secure"
+  }
 }

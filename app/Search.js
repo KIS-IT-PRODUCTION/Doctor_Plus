@@ -676,7 +676,7 @@ const Search = () => {
         <ScrollView contentContainerStyle={styles.doctorsListContainer}>
           {!hasUserInitiatedSearch && !loading && (
               <View style={{ alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="search" size={moderateScale(150)} color="#888" />
+                <Ionicons name="search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
                 <Text style={styles.initialSearchPrompt}>{t("initial_search_prompt")}</Text>
               </View>
           )}
@@ -694,7 +694,7 @@ const Search = () => {
             ))
           ) : !loading && hasUserInitiatedSearch && !searchError && doctors.length === 0 && (
              <View style={{ alignItems: "center",  justifyContent: "start" }}>
-                <Ionicons name="no-search" size={moderateScale(150)} color="#888" />
+                <Ionicons name="not-search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
             <Text style={styles.noDoctorsFound}>{t("no_doctors_found")}</Text>
             </View>
           )}

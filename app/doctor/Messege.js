@@ -41,7 +41,7 @@ export default function Message() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
-  const [hiddenMessageIds, setHiddenMessageIds] = useState(new Set());
+  // const [hiddenMessageIds, setHiddenMessageIds] = useState(new Set()); // ВИДАЛЕНО
 
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
@@ -343,13 +343,14 @@ export default function Message() {
     }
   }, [t]);
 
-  const handleMarkAsRead = useCallback(async (messageId) => {
+  // Універсальна функція для позначення будь-якого повідомлення як прочитаного
+  const markMessageAsRead = useCallback(async (messageId) => {
+    // Оптимістичне оновлення UI
     setMessages(prevMessages =>
       prevMessages.map(msg =>
         msg.id === messageId ? { ...msg, is_read: true } : msg
       )
     );
-    setHiddenMessageIds(prev => new Set(prev).add(messageId));
 
     try {
       const { error } = await supabase
@@ -358,28 +359,30 @@ export default function Message() {
         .eq('id', messageId);
 
       if (error) {
-        console.error("Error marking general notification as read in DB:", error.message);
+        console.error("Error marking message as read in DB:", error.message);
+        // Якщо помилка, відкочуємо оптимістичне оновлення
+        setMessages(prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === messageId ? { ...msg, is_read: false } : msg
+          )
+        );
         Alert.alert(t('error'), t('failed_to_update_notification_status'));
       } else {
-        console.log(`General notification ${messageId} marked as read in DB.`);
+        console.log(`Message ${messageId} marked as read in DB.`);
       }
     } catch (error) {
-      console.error("Network error marking general notification as read:", error.message);
+      console.error("Network error marking message as read:", error.message);
+      // Якщо помилка, відкочуємо оптимістичне оновлення
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === messageId ? { ...msg, is_read: false } : msg
+        )
+      );
       Alert.alert(t('error'), t('failed_to_update_notification_status'));
     }
   }, [t]);
 
-  const handleHideMessage = useCallback((messageId) => {
-    setHiddenMessageIds(prev => new Set(prev).add(messageId));
-  }, []);
-
-  const handleOpenMessage = useCallback((messageId) => {
-    setHiddenMessageIds(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(messageId);
-      return newSet;
-    });
-  }, []);
+  // handleHideMessage та handleOpenMessage ВИДАЛЕНО
 
   const updateBookingStatusAndNotify = useCallback(async (message, newStatus) => {
       if (!message || !message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId) {
@@ -399,7 +402,6 @@ export default function Message() {
       const bookingDate = message.rawData.booking_date || message.rawData.date;
       const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
       const doctorFinalName = doctorFullName || t('doctor');
-      // const bookingAmount = message.rawData.amount; // Це значення може бути неактуальним для всіх статусів
 
       if (typeof bookingDate !== 'string' || bookingDate.trim() === '' || typeof bookingTimeSlot !== 'string' || bookingTimeSlot.trim() === '') {
           console.error("Missing or invalid booking date or time slot in rawData.");
@@ -711,19 +713,7 @@ export default function Message() {
           </View>
         ) : (
           messages.map((message) => {
-            if (hiddenMessageIds.has(message.id)) {
-              return (
-                <View key={message.id} style={styles.hiddenMessageContainer}>
-                  <Text style={styles.hiddenMessageText}>
-                    {message.title} ({t('messages_screen.hidden_message')})
-                  </Text>
-                  <TouchableOpacity onPress={() => handleOpenMessage(message.id)} style={styles.openMessageButton}>
-                    <Ionicons name="eye-outline" size={moderateScale(20)} color="#0EB3EB" />
-                    <Text style={styles.openMessageButtonText}>{t('messages_screen.open')}</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            }
+            // Блок if (hiddenMessageIds.has(message.id)) { ... } ВИДАЛЕНО
 
             const isConfirmedBooking = message.type === 'new_booking' && message.rawData.status === 'confirmed';
             const isRejectedBooking = message.type === 'new_booking' && message.rawData.status === 'rejected';
@@ -739,7 +729,6 @@ export default function Message() {
             let cardBorderStyle = {};
             let showActions = false;
             let showStatusText = false;
-            let isGeneralMessage = false;
 
             if (isPendingBooking) {
                 cardColors = ['#E0F7FA', '#B2EBF2'];
@@ -762,8 +751,7 @@ export default function Message() {
             } else if (isPaymentPending) {
                 cardColors = ['#FFFDE7', '#FFF9C4'];
                 cardBorderStyle = styles.messageCardWarningBorder;
-            } else {
-                isGeneralMessage = true;
+            } else { // Будь-яке інше повідомлення
                 if (!message.is_read) {
                     cardColors = ['#FFFFFF', '#F0F8FF'];
                     cardBorderStyle = styles.messageCardUnreadBorder;
@@ -776,97 +764,107 @@ export default function Message() {
             return (
               <View key={message.id} style={styles.messageGroup}>
                 <View style={styles.dateAndTimestamp}>
-                  <Text style={styles.dateText}>{message.date}</Text>
-                  <Text style={styles.timestampText}>{message.time}</Text>
+                    <Text style={styles.dateText}>{message.date}</Text>
+                    <Text style={styles.timestampText}>{message.time}</Text>
                 </View>
                 <LinearGradient
                   colors={cardColors}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[
-                    styles.messageCard,
-                    cardBorderStyle,
-                    !message.is_read && styles.messageCardUnreadLeftBar,
-                  ]}
+                  style={[styles.messageCard, cardBorderStyle, !message.is_read && styles.unreadMessageCard]}
                 >
-                  <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
-                  <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
+                  <View style={styles.messageHeader}>
+                      <Text style={styles.messageTitle}>{message.title}</Text>
+                      {!message.is_read && ( // Показуємо кнопку "Позначити як прочитане", якщо повідомлення НЕ прочитане
+                          <TouchableOpacity
+                              onPress={() => markMessageAsRead(message.db_id || message.id)}
+                              style={styles.markAsReadButton}
+                          >
+                              <Ionicons name="checkmark-circle-outline" size={moderateScale(20)} color="#0EB3EB" />
+                              <Text style={styles.markAsReadButtonText}>{t('messages_screen.mark_as_read')}</Text>
+                          </TouchableOpacity>
+                      )}
+                  </View>
 
-                  {/* Секція для повідомлень про бронювання */}
+                  <Text style={styles.messageBody}>{message.body}</Text>
+
+                  {/* Додаткові деталі та дії для бронювань */}
                   {message.type === 'new_booking' && (
-                      <View>
-                          {message.rawData.patient_name && <Text style={styles.paymentDetailsText}>{t('patient')}: {message.rawData.patient_name}</Text>}
-                          {message.rawData.booking_date && <Text style={styles.paymentDetailsText}>{t('date')}: {message.rawData.booking_date}</Text>}
-                          {message.rawData.booking_time_slot && <Text style={styles.paymentDetailsText}>{t('time')}: {message.rawData.booking_time_slot}</Text>}
-                          {message.rawData.reason && <Text style={styles.paymentDetailsText}>{t('reason')}: {message.rawData.reason}</Text>}
-
-                          {isPendingBooking && showActions && (
-                              <View style={styles.bookingActionButtons}>
-                                  <TouchableOpacity
-                                      onPress={() => handleConfirmBooking(message)}
-                                      style={styles.actionButtonContainer}
-                                  >
-                                      <LinearGradient
-                                          colors={['#4CAF50', '#2E7D32']}
-                                          style={styles.actionButtonGradient}
-                                          start={{ x: 0, y: 0 }}
-                                          end={{ x: 1, y: 0 }}
-                                      >
-                                          <Text style={styles.actionButtonText}>{t('confirm_booking')}</Text>
-                                      </LinearGradient>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                      onPress={() => handleRejectBooking(message)}
-                                      style={styles.actionButtonContainer}
-                                  >
-                                      <LinearGradient
-                                          colors={['#D32F2F', '#B71C1C']}
-                                          style={styles.actionButtonGradient}
-                                          start={{ x: 0, y: 0 }}
-                                          end={{ x: 1, y: 0 }}
-                                      >
-                                          <Text style={styles.actionButtonText}>{t('reject_booking')}</Text>
-                                      </LinearGradient>
-                                  </TouchableOpacity>
-                              </View>
-                          )}
-
-                          {(isConfirmedBooking || isRejectedBooking) && showStatusText && (
-                              <Text style={[
-                                  styles.statusText,
-                                  isConfirmedBooking ? styles.confirmedText : styles.rejectedText
-                              ]}>
-                                  {isConfirmedBooking ? t('confirmed_read') : t('rejected_read')}
-                              </Text>
-                          )}
-                      </View>
-                  )}
-
-
-                  {/* Секція для платіжних повідомлень */}
-                  {(isPaymentReceived || isPaymentUpdate) && (
                     <View>
-                      <Text style={styles.paymentDetailsText}>
+                      <Text style={styles.cardText}>
                         {t('patient')}: {message.rawData.patient_name || t('not_specified')}
                       </Text>
-                      <Text style={styles.paymentDetailsText}>
-                        {t('booking_date_time')}: {message.rawData.booking_date || message.rawData.date} {message.rawData.booking_time_slot || message.rawData.time}
+                      <Text style={styles.cardText}>
+                        {t('date')}: {message.rawData.booking_date || message.date}
                       </Text>
-                      <Text style={styles.paymentDetailsText}>
-                        {t('amount')}: {message.rawData.amount || 'N/A'} {message.rawData.currency || ''}
+                      <Text style={styles.cardText}>
+                        {t('time')}: {message.rawData.booking_time_slot || message.time}
                       </Text>
-                      <Text style={styles.paymentDetailsText}>
-                        {t('payment_status')}:{" "}
-                        <Text
-                          style={[
-                            styles.paymentStatusValue,
-                            message.rawData.status === 'success' || message.rawData.is_paid === true ? styles.paymentStatusSuccess :
-                            (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined' ? styles.paymentStatusFailure : styles.paymentStatusPending)
-                          ]}
-                        >
-                          {t(`payment_status_${message.rawData.status || 'pending'}`)}
-                        </Text>
-                      </Text>
+
+                      {showActions && (
+                          <View style={styles.bookingActionButtons}>
+                              <TouchableOpacity
+                                  onPress={() => handleConfirmBooking(message)}
+                                  style={styles.actionButtonContainer}
+                              >
+                                  <LinearGradient
+                                      colors={['#4CAF50', '#2E7D32']}
+                                      style={styles.actionButtonGradient}
+                                      start={{ x: 0, y: 0 }}
+                                      end={{ x: 1, y: 0 }}
+                                  >
+                                      <Ionicons name="checkmark-done-circle-outline" size={moderateScale(20)} color="#FFFFFF" />
+                                      <Text style={styles.actionButtonText}>{t('confirm')}</Text>
+                                  </LinearGradient>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                  onPress={() => handleRejectBooking(message)}
+                                  style={styles.actionButtonContainer}
+                              >
+                                  <LinearGradient
+                                      colors={['#D32F2F', '#B71C1C']}
+                                      style={styles.actionButtonGradient}
+                                      start={{ x: 0, y: 0 }}
+                                      end={{ x: 1, y: 0 }}
+                                  >
+                                      <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#FFFFFF" />
+                                      <Text style={styles.actionButtonText}>{t('reject')}</Text>
+                                  </LinearGradient>
+                              </TouchableOpacity>
+                          </View>
+                      )}
+                      {showStatusText && (
+                          <Text style={[styles.statusText, isConfirmedBooking ? styles.confirmedText : styles.rejectedText]}>
+                              {isConfirmedBooking ? t('confirmed_status') : t('rejected_status')}
+                          </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Деталі платежу */}
+                  {(isPaymentReceived || isPaymentUpdate) && (
+                      <View>
+                          <Text style={styles.paymentDetailsText}>
+                              {t('payment_status')}:{" "}
+                              <Text style={[
+                                  styles.paymentStatusValue,
+                                  isPaymentSuccessful ? styles.paymentStatusSuccess :
+                                  isPaymentFailed ? styles.paymentStatusFailure :
+                                  styles.paymentStatusPending
+                              ]}>
+                                  {message.rawData.status ? t(`payment_statuses.${message.rawData.status}`) : t('not_specified')}
+                              </Text>
+                          </Text>
+                          <Text style={styles.paymentDetailsText}>
+                              {t('amount')}: {message.rawData.amount || 'N/A'} {message.rawData.currency || ''}
+                          </Text>
+                          <Text style={styles.paymentDetailsText}>
+                              {t('patient')}: {message.rawData.patient_name || t('not_specified')}
+                          </Text>
+                          <Text style={styles.paymentDetailsText}>
+                              {t('date')}: {message.rawData.booking_date || message.date}
+                          </Text>
+                          <Text style={styles.paymentDetailsText}>
+                              {t('time')}: {message.rawData.booking_time_slot || message.time}
+                          </Text>
 
                       {/* Умовне відображення для посилання на зустріч */}
                       {(message.rawData.is_paid || message.rawData.meet_link) && (
@@ -915,42 +913,7 @@ export default function Message() {
 
                     </View>
                   )}
-                  {/* Кнопки дій для загальних повідомлень */}
-                  {isGeneralMessage && (
-                      <View style={styles.generalMessageActions}>
-                          {!message.is_read ? (
-                            <TouchableOpacity
-                                onPress={() => handleMarkAsRead(message.id)}
-                                style={styles.actionButtonContainer} // Використовуємо той самий контейнер для градієнта
-                            >
-                                <LinearGradient
-                                  colors={['#0EB3EB', '#0A8BC2']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                                >
-                                  <Ionicons name="checkmark-done-circle-outline" size={moderateScale(20)} color="#FFFFFF" />
-                                  <Text style={styles.actionButtonText}>{t('messages_screen.mark_as_read')}</Text>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                          ) : (
-                            <TouchableOpacity
-                                onPress={() => handleHideMessage(message.id)}
-                                style={styles.actionButtonContainer} // Використовуємо той самий контейнер для градієнта
-                            >
-                                <LinearGradient
-                                  colors={['#6c757d', '#5a6268']}
-                                  style={styles.actionButtonGradient}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 0 }}
-                                >
-                                  <Ionicons name="eye-off-outline" size={moderateScale(20)} color="#FFFFFF" />
-                                  <Text style={styles.actionButtonText}>{t('messages_screen.hide')}</Text>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                          )}
-                      </View>
-                  )}
+                  {/* Блок generalMessageActions ВИДАЛЕНО, оскільки кнопка "Позначити як прочитане" тепер універсальна, а "Приховати" видалена. */}
                 </LinearGradient>
               </View>
             );
@@ -965,7 +928,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#f0f2f5",
-    // Об'єднано два padding на Platform.OS
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
   },
   header: {
@@ -973,7 +935,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: moderateScale(16),
-    paddingVertical: verticalScale(12),
+    paddingVertical: verticalScale(5),
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.2)",
@@ -1024,6 +986,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
+  unreadMessageCard: {
+    backgroundColor: '#F0F8FF', // Світло-блакитний фон для непрочитаних
+  },
   messageCardUnreadLeftBar: {
     borderLeftWidth: moderateScale(6),
     borderLeftColor: "#0EB3EB",
@@ -1052,11 +1017,32 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#0EB3EB',
   },
-  cardTitle: {
+  messageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: verticalScale(8),
+  },
+  messageTitle: {
     fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(16),
-    marginBottom: verticalScale(8),
     color: "#222",
+    flexShrink: 1,
+    marginRight: moderateScale(10),
+  },
+  markAsReadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: verticalScale(5),
+    paddingHorizontal: moderateScale(10),
+    borderRadius: moderateScale(20),
+    backgroundColor: 'rgba(14, 179, 235, 0.1)',
+  },
+  markAsReadButtonText: {
+    color: '#0EB3EB',
+    fontFamily: "Mont-Medium",
+    fontSize: moderateScale(12),
+    marginLeft: moderateScale(5),
   },
   cardText: {
     fontFamily: "Mont-Regular",
@@ -1068,28 +1054,28 @@ const styles = StyleSheet.create({
   bookingActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    borderRadius: 30, // Цей стиль на View не має ефекту на градієнтні кнопки всередині
-    marginTop: verticalScale(15), // Додано для відступу від попереднього контенту
+    borderRadius: 30,
+    marginTop: verticalScale(15),
   },
   actionButtonContainer: {
     flex: 1,
     marginHorizontal: moderateScale(7),
-    borderRadius: 30, // Додано сюди для округлення градієнта
-    overflow: 'hidden', // Обрізає градієнт за межами borderRadius
+    borderRadius: 30,
+    overflow: 'hidden',
   },
   actionButtonGradient: {
     paddingVertical: verticalScale(12),
     paddingHorizontal: moderateScale(18),
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 30, // Забезпечує округлення всередині
-    flexDirection: 'row', // Щоб іконка була поруч з текстом
+    borderRadius: 30,
+    flexDirection: 'row',
   },
   actionButtonText: {
     color: '#fff',
     fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(15),
-    marginLeft: moderateScale(5), // Відступ від іконки
+    marginLeft: moderateScale(5),
   },
   statusText: {
       fontFamily: "Mont-SemiBold",
@@ -1141,14 +1127,14 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   sendMeetLinkButton: {
-    padding: moderateScale(0), // Залишаємо 0, оскільки градієнт обробляє padding
+    padding: moderateScale(0),
   },
   sendMeetLinkButtonGradient: {
     paddingVertical: verticalScale(12),
     paddingHorizontal: moderateScale(15),
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row', // Щоб текст був по центру, якщо буде іконка
+    flexDirection: 'row',
   },
   sendMeetLinkButtonText: {
     color: '#fff',
@@ -1206,50 +1192,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(30),
     lineHeight: moderateScale(24),
   },
-  // Стилі для загальних повідомлень
-  generalMessageActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end', // Вирівнювання праворуч для кнопок "Прочитати"/"Приховати"
-    marginTop: verticalScale(15),
-    paddingTop: verticalScale(10),
-    borderTopWidth: 1,
-    borderTopColor: '#EEEEEE',
-  },
-  hiddenMessageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#E0E0E0',
-    borderRadius: moderateScale(10),
-    padding: moderateScale(15),
-    marginBottom: moderateScale(10),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  hiddenMessageText: {
-    fontSize: moderateScale(15),
-    fontStyle: 'italic',
-    color: '#666666',
-    flexShrink: 1,
-    marginRight: moderateScale(10),
-  },
-  openMessageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(8),
-    paddingVertical: moderateScale(8),
-    paddingHorizontal: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#0EB3EB',
-  },
-  openMessageButtonText: {
-    color: '#0EB3EB',
-    fontSize: moderateScale(14),
-    fontWeight: 'bold',
-    marginLeft: moderateScale(5),
-  },
+  // Стилі `generalMessageActions`, `hiddenMessageContainer`, `hiddenMessageText`, `openMessageButton`, `openMessageButtonText` ВИДАЛЕНО
 });

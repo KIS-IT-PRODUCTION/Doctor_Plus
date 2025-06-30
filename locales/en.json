@@ -755,5 +755,14 @@
   "go_to_profile_settings": "Go to Profile Settings",
   "maybe_later": "Maybe Later",
   "points_short": "points",
-  "messages_screen.header_title":"Messages"
+  "messages_screen.header_title":"Messages",
+    "payment_statuses": {
+    "success": "Success",
+    "failure": "Failure",
+    "error": "Error",
+    "declined": "Declined",
+    "pending": "Pending",
+    "wait_secure": "Awaiting 3D Secure",
+    "3ds_verify": "3D Secure Verification"
+  }
 }
