@@ -235,7 +235,7 @@ serve(async (req) => {
             const messages = [];
             messages.push({
                 to: patientPushToken,
-                sound: 'Гетьмана Петра Дорошенка вулиця.mp3', 
+                sound: 'default', 
                 title: title,
                 body: patientAlertBody,
                 data: {

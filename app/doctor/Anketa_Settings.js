@@ -844,6 +844,61 @@ const Anketa_Settings = () => {
     }
   };
 
+  const pickImage = async (setUriState) => {
+    console.log("Attempting to pick image...");
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log("Media library permission status:", status);
+
+    if (status !== "granted") {
+      Alert.alert(
+        "Потрібен дозвіл",
+        "Будь ласка, надайте дозволи до бібліотеки медіа для завантаження фотографій."
+      );
+      return;
+    }
+
+    console.log("Permissions granted. Launching image library...");
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
+
+      console.log("ImagePicker result:", result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedUri = result.assets[0].uri;
+        console.log("ImagePicker not canceled. Selected URI:", selectedUri);
+
+        if (Platform.OS === "web") {
+          let uriToSet;
+          if (
+            typeof selectedUri === "string" &&
+            selectedUri.startsWith("blob:")
+          ) {
+            uriToSet = selectedUri;
+          } else {
+            const response = await fetch(selectedUri);
+            const blob = await response.blob();
+            uriToSet = URL.createObjectURL(blob);
+          }
+          setUriState(uriToSet);
+        } else {
+          setUriState(selectedUri);
+        }
+      } else {
+        console.log("ImagePicker canceled by user or no asset selected.");
+        setUriState(null);
+      }
+    } catch (error) {
+      console.error("Error launching ImagePicker:", error);
+      Alert.alert("Помилка", `Не вдалося відкрити галерею: ${error.message}`);
+      setUriState(null);
+    }
+  };
+
   const handleSaveProfile = async () => {
     setProfileSaveError("");
 

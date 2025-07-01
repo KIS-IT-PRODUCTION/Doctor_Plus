@@ -17,7 +17,7 @@ import {
   StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg";
+import Icon from "../../assets/icon.svg"; // Переконайтеся, що шлях до SVG коректний
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
@@ -41,7 +41,6 @@ export default function Message() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
-  // const [hiddenMessageIds, setHiddenMessageIds] = useState(new Set()); // ВИДАЛЕНО
 
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
@@ -377,12 +376,10 @@ export default function Message() {
         prevMessages.map(msg =>
           msg.id === messageId ? { ...msg, is_read: false } : msg
         )
-      );
+      )
       Alert.alert(t('error'), t('failed_to_update_notification_status'));
     }
   }, [t]);
-
-  // handleHideMessage та handleOpenMessage ВИДАЛЕНО
 
   const updateBookingStatusAndNotify = useCallback(async (message, newStatus) => {
       if (!message || !message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId) {
@@ -683,6 +680,7 @@ export default function Message() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f0f2f5" />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={moderateScale(24)} color="#000" />
@@ -691,6 +689,7 @@ export default function Message() {
           {t("messages_screen.header_title")}
         </Text>
         <View>
+          {/* Переконайтеся, що Icon коректно імпортується та відображається */}
           <Icon width={moderateScale(50)} height={moderateScale(50)} />
         </View>
       </View>
@@ -713,8 +712,6 @@ export default function Message() {
           </View>
         ) : (
           messages.map((message) => {
-            // Блок if (hiddenMessageIds.has(message.id)) { ... } ВИДАЛЕНО
-
             const isConfirmedBooking = message.type === 'new_booking' && message.rawData.status === 'confirmed';
             const isRejectedBooking = message.type === 'new_booking' && message.rawData.status === 'rejected';
             const isPendingBooking = message.type === 'new_booking' && message.rawData.status === 'pending';
@@ -726,40 +723,55 @@ export default function Message() {
             const isPaymentPending = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
 
             let cardColors = ['#FFFFFF', '#FDFDFD'];
-            let cardBorderStyle = {};
+            let cardBorderStyle = styles.messageCardDefaultBorder; // За замовчуванням
             let showActions = false;
-            let showStatusText = false;
+            let showStatusText = false; // Використовуватимемо для відображення статусу в тексті
 
             if (isPendingBooking) {
-                cardColors = ['#E0F7FA', '#B2EBF2'];
+                cardColors = ['#E0F7FA', '#B2EBF2']; // Блакитні для очікування
                 cardBorderStyle = styles.messageCardPendingBorder;
                 showActions = true;
             } else if (isConfirmedBooking) {
-                cardColors = ['#E8F5E9', '#C8E6C9'];
+                cardColors = ['#E8F5E9', '#C8E6C9']; // Зелені для підтверджених
                 cardBorderStyle = styles.messageCardConfirmedBorder;
                 showStatusText = true;
             } else if (isRejectedBooking) {
-                cardColors = ['#FFEBEE', '#FFCDD2'];
+                cardColors = ['#FFEBEE', '#FFCDD2']; // Червоні для відхилених
                 cardBorderStyle = styles.messageCardRejectedBorder;
                 showStatusText = true;
             } else if (isPaymentSuccessful) {
-                cardColors = ['#E8F5E9', '#C8E6C9'];
+                cardColors = ['#E8F5E9', '#C8E6C9']; // Зелені для успішної оплати
                 cardBorderStyle = styles.messageCardConfirmedBorder;
             } else if (isPaymentFailed) {
-                cardColors = ['#FFEBEE', '#FFCDD2'];
+                cardColors = ['#FFEBEE', '#FFCDD2']; // Червоні для невдалої оплати
                 cardBorderStyle = styles.messageCardRejectedBorder;
             } else if (isPaymentPending) {
-                cardColors = ['#FFFDE7', '#FFF9C4'];
+                cardColors = ['#FFFDE7', '#FFF9C4']; // Жовті для очікування оплати
                 cardBorderStyle = styles.messageCardWarningBorder;
-            } else { // Будь-яке інше повідомлення
+            } else { // Будь-яке інше повідомлення (загальне)
                 if (!message.is_read) {
-                    cardColors = ['#FFFFFF', '#F0F8FF'];
+                    cardColors = ['#FFFFFF', '#F0F8FF']; // Легкий блакитний для непрочитаних
                     cardBorderStyle = styles.messageCardUnreadBorder;
                 } else {
-                    cardColors = ['#F8F8F8', '#ECECEC'];
+                    cardColors = ['#FFFFFF', '#FDFDFD']; // Дефолтний градієнт
                     cardBorderStyle = styles.messageCardDefaultBorder;
                 }
             }
+
+            const getStatusText = (type, status) => {
+              if (type === 'new_booking') {
+                if (status === 'confirmed') return t('booking_status_confirmed');
+                if (status === 'rejected') return t('booking_status_rejected');
+                if (status === 'pending') return t('booking_status_pending');
+              } else if (type === 'payment_received' || type === 'payment_update_doctor') {
+                if (status === 'success') return t('payment_status_success');
+                if (status === 'failure' || status === 'error' || status === 'declined') return t('payment_status_failed');
+                if (status === 'pending' || status === 'wait_secure' || status === '3ds_verify') return t('payment_status_pending');
+              }
+              return '';
+            };
+
+            const statusText = getStatusText(message.type, message.rawData.status);
 
             return (
               <View key={message.id} style={styles.messageGroup}>
@@ -773,22 +785,12 @@ export default function Message() {
                 >
                   <View style={styles.messageHeader}>
                       <Text style={styles.messageTitle}>{message.title}</Text>
-                      {!message.is_read && ( // Показуємо кнопку "Позначити як прочитане", якщо повідомлення НЕ прочитане
-                          <TouchableOpacity
-                              onPress={() => markMessageAsRead(message.db_id || message.id)}
-                              style={styles.markAsReadButton}
-                          >
-                              <Ionicons name="checkmark-circle-outline" size={moderateScale(20)} color="#0EB3EB" />
-                              <Text style={styles.markAsReadButtonText}>{t('messages_screen.mark_as_read')}</Text>
-                          </TouchableOpacity>
-                      )}
                   </View>
 
                   <Text style={styles.messageBody}>{message.body}</Text>
 
-                  {/* Додаткові деталі та дії для бронювань */}
                   {message.type === 'new_booking' && (
-                    <View>
+                    <View style={styles.bookingDetailsSection}>
                       <Text style={styles.cardText}>
                         {t('patient')}: {message.rawData.patient_name || t('not_specified')}
                       </Text>
@@ -833,15 +835,14 @@ export default function Message() {
                       )}
                       {showStatusText && (
                           <Text style={[styles.statusText, isConfirmedBooking ? styles.confirmedText : styles.rejectedText]}>
-                              {isConfirmedBooking ? t('confirmed_status') : t('rejected_status')}
+                              {statusText}
                           </Text>
                       )}
                     </View>
                   )}
 
-                  {/* Деталі платежу */}
                   {(isPaymentReceived || isPaymentUpdate) && (
-                      <View>
+                      <View style={styles.paymentDetailsSection}>
                           <Text style={styles.paymentDetailsText}>
                               {t('payment_status')}:{" "}
                               <Text style={[
@@ -866,7 +867,6 @@ export default function Message() {
                               {t('time')}: {message.rawData.booking_time_slot || message.time}
                           </Text>
 
-                      {/* Умовне відображення для посилання на зустріч */}
                       {(message.rawData.is_paid || message.rawData.meet_link) && (
                         <View style={styles.meetLinkInputContainer}>
                           <TextInput
@@ -875,6 +875,8 @@ export default function Message() {
                             placeholderTextColor="#888"
                             value={message.meetLinkInput}
                             onChangeText={(text) => handleMeetLinkInputChange(message.id, text)}
+                            keyboardType="url"
+                            autoCapitalize="none"
                           />
                           <TouchableOpacity
                             onPress={() => handleSendMeetLink(message)}
@@ -894,7 +896,6 @@ export default function Message() {
                         </View>
                       )}
 
-                      {/* Кнопка "Приєднатися до зустрічі" тільки якщо посилання є і воно не вводиться/редагується */}
                       {message.rawData.meet_link && (
                           <TouchableOpacity
                               onPress={() => Linking.openURL(message.rawData.meet_link)}
@@ -910,10 +911,18 @@ export default function Message() {
                               </LinearGradient>
                           </TouchableOpacity>
                       )}
-
                     </View>
                   )}
-                  {/* Блок generalMessageActions ВИДАЛЕНО, оскільки кнопка "Позначити як прочитане" тепер універсальна, а "Приховати" видалена. */}
+
+                  {!message.is_read && (
+                    <TouchableOpacity
+                      onPress={() => markMessageAsRead(message.db_id || message.id)}
+                      style={styles.markAsReadButtonCompact} // Використовуємо новий стиль
+                    >
+                        <Ionicons name="checkmark-circle-outline" size={moderateScale(16)} color="#0EB3EB" /> 
+                        <Text style={styles.markAsReadButtonTextCompact}>{t('messages_screen.mark_as_read')}</Text> 
+                    </TouchableOpacity>
+                  )}
                 </LinearGradient>
               </View>
             );
@@ -936,12 +945,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: moderateScale(16),
     paddingVertical: verticalScale(5),
+    backgroundColor: "#f0f2f5",
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: 25,
-    width: 48,
-    height: 48,
+    borderRadius: moderateScale(25),
+    width: moderateScale(48),
+    height: moderateScale(48),
     justifyContent: "center",
     alignItems: "center",
   },
@@ -975,7 +985,6 @@ const styles = StyleSheet.create({
     color: "#999",
   },
   messageCard: {
-    backgroundColor: "#fff",
     borderRadius: moderateScale(12),
     padding: moderateScale(18),
     shadowColor: "#000",
@@ -985,36 +994,27 @@ const styles = StyleSheet.create({
     elevation: 5,
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1.5,
   },
   unreadMessageCard: {
-    backgroundColor: '#F0F8FF', // Світло-блакитний фон для непрочитаних
-  },
-  messageCardUnreadLeftBar: {
-    borderLeftWidth: moderateScale(6),
-    borderLeftColor: "#0EB3EB",
+    // Стиль для фону, якщо повідомлення непрочитане (градієнт вже встановлює колір)
   },
   messageCardDefaultBorder: {
-    borderWidth: 1,
     borderColor: '#e0e0e0',
   },
   messageCardPendingBorder: {
-    borderWidth: 1.5,
     borderColor: '#0EB3EB',
   },
   messageCardConfirmedBorder: {
-    borderWidth: 1.5,
     borderColor: '#4CAF50',
   },
   messageCardRejectedBorder: {
-    borderWidth: 1.5,
     borderColor: '#D32F2F',
   },
   messageCardWarningBorder: {
-    borderWidth: 1.5,
     borderColor: '#FFA000',
   },
   messageCardUnreadBorder: {
-    borderWidth: 1.5,
     borderColor: '#0EB3EB',
   },
   messageHeader: {
@@ -1028,39 +1028,41 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(16),
     color: "#222",
     flexShrink: 1,
-    marginRight: moderateScale(10),
   },
-  markAsReadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: verticalScale(5),
-    paddingHorizontal: moderateScale(10),
-    borderRadius: moderateScale(20),
-    backgroundColor: 'rgba(14, 179, 235, 0.1)',
+  messageBody: {
+    fontFamily: "Mont-Regular",
+    fontSize: moderateScale(15),
+    color: "#555",
+    lineHeight: moderateScale(22),
+    marginBottom: verticalScale(10),
   },
-  markAsReadButtonText: {
-    color: '#0EB3EB',
-    fontFamily: "Mont-Medium",
-    fontSize: moderateScale(12),
-    marginLeft: moderateScale(5),
+  bookingDetailsSection: {
+    marginTop: verticalScale(10),
+    paddingTop: verticalScale(10),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  paymentDetailsSection: {
+    marginTop: verticalScale(10),
+    paddingTop: verticalScale(10),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   cardText: {
     fontFamily: "Mont-Regular",
     fontSize: moderateScale(14),
     color: "#555",
-    marginBottom: verticalScale(12),
-    lineHeight: moderateScale(22),
+    marginBottom: verticalScale(8),
   },
   bookingActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    borderRadius: 30,
     marginTop: verticalScale(15),
   },
   actionButtonContainer: {
     flex: 1,
     marginHorizontal: moderateScale(7),
-    borderRadius: 30,
+    borderRadius: moderateScale(30),
     overflow: 'hidden',
   },
   actionButtonGradient: {
@@ -1068,7 +1070,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(18),
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 30,
+    borderRadius: moderateScale(30),
     flexDirection: 'row',
   },
   actionButtonText: {
@@ -1135,6 +1137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    borderRadius: moderateScale(10),
   },
   sendMeetLinkButtonText: {
     color: '#fff',
@@ -1145,20 +1148,22 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(15),
     borderRadius: moderateScale(10),
     overflow: 'hidden',
-    alignSelf: 'center',
-    width: '80%',
+    alignSelf: 'stretch',
+    marginHorizontal: moderateScale(0),
   },
   meetLinkButtonGradient: {
     paddingVertical: verticalScale(12),
     paddingHorizontal: moderateScale(15),
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: moderateScale(10),
   },
   meetLinkButtonText: {
     color: '#fff',
     fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(15),
   },
+  // ВИДАЛЕНО: viewDetailsButton, viewDetailsButtonText
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1192,5 +1197,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(30),
     lineHeight: moderateScale(24),
   },
-  // Стилі `generalMessageActions`, `hiddenMessageContainer`, `hiddenMessageText`, `openMessageButton`, `openMessageButtonText` ВИДАЛЕНО
+  // *** МОДИФІКОВАНА КНОПКА "ПОЗНАЧИТИ ЯК ПРОЧИТАНЕ" ***
+  markAsReadButtonCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end', // Вирівнюємо до правого краю
+    marginTop: verticalScale(10), // Зменшений відступ
+    // backgroundColor: 'transparent', // Робимо фон прозорим
+    // borderTopWidth: 1, // Можна додати тонку лінію зверху
+    // borderTopColor: 'rgba(14, 179, 235, 0.1)', // Колір лінії
+    paddingVertical: verticalScale(5), // Зменшений вертикальний падінг
+    paddingHorizontal: moderateScale(10), // Зменшений горизонтальний падінг
+    alignSelf: 'flex-end', // Вирівнюємо саму кнопку до правого краю
+    // width: 'auto', // Ширина за вмістом
+    borderRadius: moderateScale(15), // Ледь заокруглені кути
+    backgroundColor: 'rgba(14, 179, 235, 0.1)', // Легкий фон
+  },
+  markAsReadButtonTextCompact: {
+    color: '#0EB3EB', // Колір тексту синій
+    fontFamily: "Mont-Medium", // Середня жирність
+    fontSize: moderateScale(12), // Зменшений розмір тексту
+    marginLeft: moderateScale(5), // Відступ від іконки
+  },
 });

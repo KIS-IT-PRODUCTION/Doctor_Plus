@@ -30,7 +30,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.kis-production.DOCTOR",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату.",
+        "NSCameraUsageDescription": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
       },
       "splash": {
         "image": "./assets/icon2.png",
@@ -68,6 +70,13 @@
             "DEFAULT"
           ]
         }
+      ],
+
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_MEDIA_LOCATION" 
       ]
     },
     "web": {
@@ -84,6 +93,13 @@
           "sounds": [
             "./assets/sms_meow.mp3"
           ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату.",
+          "cameraPermission": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
         }
       ]
     ]

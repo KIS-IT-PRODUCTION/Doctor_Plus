@@ -199,8 +199,7 @@
     "choose_another_doctor_button": "Обрати іншого лікаря",
     "questionnaire_title": "Анкета",
     "questionnaire_confirmed_text": "Привіт! Ваша анкета була підтверджена",
-    "no_messages": "Повідомлень поки немає.",
-    "waiting_for_bookings": "Тут з'являться нові запити на записи та важливі оновлення."
+    "mark_as_read": "Позначити як прочитане"
   },
   "patient_messages_screen": {
     "header_title": "Мої повідомлення",
@@ -765,13 +764,21 @@
     "waiting_for_bookings": "Нові бронювання та оновлення з'являться тут.",
     "messages_screen.hide": "Сховати повідомлення",
     "messages_screen.open": "Показати повідомлення",
-    "payment_statuses": {
+
+  "confirm": "Прийняти",
+  "reject_booking_title": "Відхилити бронювання?",
+
+  "booking_status_confirmed": "Бронювання підтверджено",
+  "booking_status_rejected": "Бронювання відхилено",
+  "booking_status_pending": "Очікує на підтвердження",
+  "currency": "Валюта",
+  "payment_statuses": {
     "success": "Успішно",
-    "failure": "Невдача",
+    "failure": "Невдало",
     "error": "Помилка",
     "declined": "Відхилено",
     "pending": "В очікуванні",
-    "wait_secure": "Очікування 3D Secure",
-    "3ds_verify": "Перевірка 3D Secure"
+    "wait_secure": "Очікує підтвердження",
+    "3ds_verify": "Очікує 3D Secure"
   }
 }
