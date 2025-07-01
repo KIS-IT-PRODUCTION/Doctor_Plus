@@ -27,7 +27,7 @@ import * as FileSystem from "expo-file-system";
 import { decode } from "base64-arraybuffer";
 
 const countries = [
-  { name: "Ukraine", code: "UA", emoji: "🇺🇦", timezone: "UTC+2" },
+ { name: "Ukraine", code: "UA", emoji: "🇺🇦", timezone: "UTC+2" },
   { name: "United Kingdom", code: "GB", emoji: "🇬🇧", timezone: "UTC+0" },
   { name: "United States", code: "US", emoji: "🇺🇸", timezone: "UTC-5" }, // Приклад: Східний час
   { name: "Canada", code: "CA", emoji: "🇨🇦", timezone: "UTC-6" }, // Приклад: Центральний час
@@ -223,7 +223,7 @@ const countries = [
 ];
 
 const consultationLanguages = [
-  { name: "english", code: "en", emoji: "" }, // Використовуємо емодзі для Британії, як для англійської
+ { name: "english", code: "en", emoji: "" }, // Використовуємо емодзі для Британії, як для англійської
   { name: "ukrainian", code: "uk", emoji: "" },
   { name: "german", code: "de", emoji: "" },
   { name: "Philippines", code: "PH", emoji: "🇵🇭", timezone: "UTC+8" },
@@ -419,7 +419,6 @@ const consultationLanguages = [
   { name: "Uruguay", code: "UY", emoji: "🇺🇾", timezone: "UTC-3" },
   { name: "Federated States of Micronesia", code: "FM", emoji: "🇫🇲", timezone: "UTC+10" },
   { name: "Fiji", code: "FJ", emoji: "🇫🇯", timezone: "UTC+12" },
-
 ];
 
 const specializations = [
@@ -845,61 +844,6 @@ const Anketa_Settings = () => {
     }
   };
 
-  const pickImage = async (setUriState) => {
-    console.log("Attempting to pick image...");
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    console.log("Media library permission status:", status);
-
-    if (status !== "granted") {
-      Alert.alert(
-        "Потрібен дозвіл",
-        "Будь ласка, надайте дозволи до бібліотеки медіа для завантаження фотографій."
-      );
-      return;
-    }
-
-    console.log("Permissions granted. Launching image library...");
-    try {
-      let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.7,
-      });
-
-      console.log("ImagePicker result:", result);
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedUri = result.assets[0].uri;
-        console.log("ImagePicker not canceled. Selected URI:", selectedUri);
-
-        if (Platform.OS === "web") {
-          let uriToSet;
-          if (
-            typeof selectedUri === "string" &&
-            selectedUri.startsWith("blob:")
-          ) {
-            uriToSet = selectedUri;
-          } else {
-            const response = await fetch(selectedUri);
-            const blob = await response.blob();
-            uriToSet = URL.createObjectURL(blob);
-          }
-          setUriState(uriToSet);
-        } else {
-          setUriState(selectedUri);
-        }
-      } else {
-        console.log("ImagePicker canceled by user or no asset selected.");
-        setUriState(null);
-      }
-    } catch (error) {
-      console.error("Error launching ImagePicker:", error);
-      Alert.alert("Помилка", `Не вдалося відкрити галерею: ${error.message}`);
-      setUriState(null);
-    }
-  };
-
   const handleSaveProfile = async () => {
     setProfileSaveError("");
 
@@ -1001,15 +945,15 @@ const Anketa_Settings = () => {
 
       const specializationsToSave = selectedSpecializations.map((spec) => spec.value);
       const languagesToSave = selectedConsultationLanguages.length > 0
-          ? selectedConsultationLanguages
-          : [i18n.language];
+            ? selectedConsultationLanguages
+            : [i18n.language];
 
       const { error: doctorProfileError } = await supabase
         .from("anketa_doctor")
         .upsert(
           [
             {
-              user_id: user.id,
+              // user_id: user.id, // Цей рядок видалено, щоб Supabase автоматично заповнював його за замовчуванням
               full_name: fullName.trim(),
               email: user.email,
               phone: "",
@@ -1017,8 +961,8 @@ const Anketa_Settings = () => {
               communication_languages: languagesToSave,
               specialization: specializationsToSave,
               experience_years: experienceYears,
-              work_experience: null,
-              education: null,
+              work_experience: null, // Переконайтеся, що ці поля мають відповідні значення, якщо вони не null
+              education: null, // Або видаліть їх, якщо вони не використовуються
               achievements: achievements.trim() || null,
               about_me: aboutMe.trim() || null,
               consultation_cost: consultationCost.trim() || null,
@@ -1102,6 +1046,7 @@ const Anketa_Settings = () => {
       { cancelable: false }
     );
   };
+
   return (
     <SafeAreaView
       style={{
@@ -1722,7 +1667,8 @@ const styles = StyleSheet.create({
     height: 48,
     zIndex: 1,
     justifyContent: "center",
-    alignItems: "center",},
+    alignItems: "center",
+  },
   languageDisplayContainer: {
     backgroundColor: "#0EB3EB",
     borderRadius: 10,

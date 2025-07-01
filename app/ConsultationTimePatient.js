@@ -16,7 +16,6 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../providers/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// --- КОНСТАНТИ ТА НАЛАШТУВАННЯ ---
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
 
@@ -601,17 +600,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   backButton: {
-    backgroundColor: 'rgba(14, 179, 235, 0.1)',
+    backgroundColor: "rgba(14, 179, 235, 0.2)",
     borderRadius: 25,
     width: 48,
     height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 18,
