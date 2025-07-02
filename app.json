@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/icon2.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff",
       "tabletImage": "./assets/icon.png",
@@ -35,7 +35,7 @@
         "NSCameraUsageDescription_uk": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
       },
       "splash": {
-        "image": "./assets/icon.png",
+        "image": "./assets/icon2.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
         "tabletImage": "./assets/icon.png",

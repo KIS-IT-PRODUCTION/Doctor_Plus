@@ -26,6 +26,40 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { decode } from "base64-arraybuffer";
 
+// Припускаємо, що countries визначено десь у вашому коді,
+// наприклад, у окремому файлі або прямо тут.
+// Для прикладу, додамо placeholder
+
+
+const specializations = [
+  { nameKey: "general_practitioner", value: "general_practitioner" },
+  { nameKey: "pediatrician", value: "pediatrician" },
+  { nameKey: "cardiologist", value: "cardiologist" },
+  { nameKey: "dermatologist", value: "dermatologist" },
+  { nameKey: "neurologist", value: "neurologist" },
+  { nameKey: "surgeon", value: "surgeon" },
+  { nameKey: "psychiatrist", value: "psychiatrist" },
+  { nameKey: "dentist", value: "dentist" },
+  { nameKey: "ophthalmologist", value: "ophthalmologist" },
+  { nameKey: "ent_specialist", value: "ent_specialist" },
+  { nameKey: "gastroenterologist", value: "gastroenterologist" },
+  { nameKey: "endocrinologist", value: "endocrinologist" },
+  { nameKey: "oncologist", value: "oncologist" },
+  { nameKey: "allergist", value: "allergist" },
+  { nameKey: "physiotherapist", value: "physiotherapist" },
+];
+
+const generateConsultationCostOptions = () => {
+  const options = [];
+  for (let i = 10; i <= 200; i += 5) {
+    options.push(i);
+  }
+  return options;
+};
+const consultationCostOptions = generateConsultationCostOptions();
+
+const experienceYearsOptions = Array.from({ length: 51 }, (_, i) => i);
+
 const countries = [
  { name: "Ukraine", code: "UA", emoji: "🇺🇦", timezone: "UTC+2" },
   { name: "United Kingdom", code: "GB", emoji: "🇬🇧", timezone: "UTC+0" },
@@ -420,36 +454,6 @@ const consultationLanguages = [
   { name: "Federated States of Micronesia", code: "FM", emoji: "🇫🇲", timezone: "UTC+10" },
   { name: "Fiji", code: "FJ", emoji: "🇫🇯", timezone: "UTC+12" },
 ];
-
-const specializations = [
-  { nameKey: "general_practitioner", value: "general_practitioner" },
-  { nameKey: "pediatrician", value: "pediatrician" },
-  { nameKey: "cardiologist", value: "cardiologist" },
-  { nameKey: "dermatologist", value: "dermatologist" },
-  { nameKey: "neurologist", value: "neurologist" },
-  { nameKey: "surgeon", value: "surgeon" },
-  { nameKey: "psychiatrist", value: "psychiatrist" },
-  { nameKey: "dentist", value: "dentist" },
-  { nameKey: "ophthalmologist", value: "ophthalmologist" },
-  { nameKey: "ent_specialist", value: "ent_specialist" },
-  { nameKey: "gastroenterologist", value: "gastroenterologist" },
-  { nameKey: "endocrinologist", value: "endocrinologist" },
-  { nameKey: "oncologist", value: "oncologist" },
-  { nameKey: "allergist", value: "allergist" },
-  { nameKey: "physiotherapist", value: "physiotherapist" },
-];
-
-const generateConsultationCostOptions = () => {
-  const options = [];
-  for (let i = 10; i <= 200; i += 5) {
-    options.push(i);
-  }
-  return options;
-};
-const consultationCostOptions = generateConsultationCostOptions();
-
-const experienceYearsOptions = Array.from({ length: 51 }, (_, i) => i);
-
 const Anketa_Settings = () => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -846,10 +850,12 @@ const Anketa_Settings = () => {
 
   const pickImage = async (setUriState) => {
     console.log("Attempting to pick image...");
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    console.log("Media library permission status:", status);
 
-    if (status !== "granted") {
+    // Перевірка та запит дозволів
+    const { status: mediaLibraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log("Media library permission status:", mediaLibraryStatus);
+
+    if (mediaLibraryStatus !== "granted") {
       Alert.alert(
         "Потрібен дозвіл",
         "Будь ласка, надайте дозволи до бібліотеки медіа для завантаження фотографій."
@@ -857,13 +863,20 @@ const Anketa_Settings = () => {
       return;
     }
 
+    // Додатково, для Android 10+ (API 29+), можуть бути потрібні дозволи на читання файлів
+    // Хоча ImagePicker зазвичай сам запитує необхідні дозволи, це може бути джерелом проблем.
+    // Якщо виникають проблеми на Android, розгляньте requestMediaLibraryPermissionsAsync.
+
     console.log("Permissions granted. Launching image library...");
     try {
-      let result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
+        // Додаємо `allowsMultipleSelection: false` щоб явно вказати вибір одного зображення.
+        // Це не впливає на ваш сценарій, але може бути корисним для більшої ясності.
+        allowsMultipleSelection: false,
       });
 
       console.log("ImagePicker result:", result);
@@ -880,21 +893,28 @@ const Anketa_Settings = () => {
           ) {
             uriToSet = selectedUri;
           } else {
+            // Для веб-платформи створюємо Blob URL
             const response = await fetch(selectedUri);
             const blob = await response.blob();
             uriToSet = URL.createObjectURL(blob);
           }
           setUriState(uriToSet);
         } else {
+          // Для нативних платформ використовуємо отриманий URI
           setUriState(selectedUri);
         }
       } else {
         console.log("ImagePicker canceled by user or no asset selected.");
+        // Якщо користувач скасував або нічого не вибрав, URI має бути null
         setUriState(null);
       }
     } catch (error) {
       console.error("Error launching ImagePicker:", error);
-      Alert.alert("Помилка", `Не вдалося відкрити галерею: ${error.message}`);
+      // Більш деталізоване повідомлення для користувача
+      Alert.alert(
+        "Помилка відкриття галереї",
+        `Виникла проблема під час спроби відкрити галерею. Будь ласка, спробуйте ще раз. Деталі: ${error.message}`
+      );
       setUriState(null);
     }
   };
@@ -1008,7 +1028,7 @@ const Anketa_Settings = () => {
         .upsert(
           [
             {
-              // user_id: user.id, // Цей рядок видалено, щоб Supabase автоматично заповнював його за замовчуванням
+              user_id: user.id, // Додано user_id
               full_name: fullName.trim(),
               email: user.email,
               phone: "",
@@ -1016,8 +1036,8 @@ const Anketa_Settings = () => {
               communication_languages: languagesToSave,
               specialization: specializationsToSave,
               experience_years: experienceYears,
-              work_experience: null, // Переконайтеся, що ці поля мають відповідні значення, якщо вони не null
-              education: null, // Або видаліть їх, якщо вони не використовуються
+              work_experience: null,
+              education: null,
               achievements: achievements.trim() || null,
               about_me: aboutMe.trim() || null,
               consultation_cost: consultationCost.trim() || null,
@@ -1101,12 +1121,14 @@ const Anketa_Settings = () => {
       { cancelable: false }
     );
   };
-
-  return (
+ return (
     <SafeAreaView
       style={{
         flex: 1,
         backgroundColor: "#fff",
+        // Рекомендується залишити paddingTop тут, якщо він адаптивний для великих екранів,
+        // або дозволити SafeAreaView обробляти його повністю.
+        // Залишмо 40 для прикладу, якщо він не є динамічним для isLargeScreen тут.
         paddingTop: isLargeScreen ? 40 : 40,
       }}
     >
@@ -1159,7 +1181,7 @@ const Anketa_Settings = () => {
 
               <TouchableOpacity
                 style={styles.uploadButton(width)}
-                onPress={() => pickImage(setPhotoUri)}
+                onPress={() => pickImage(setPhotoUri)} // Виправлена функція pickImage з попереднього файлу
               >
                 <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
               </TouchableOpacity>
@@ -1248,7 +1270,7 @@ const Anketa_Settings = () => {
             <View style={styles.uploadContainer}>
               <TouchableOpacity
                 style={styles.uploadButton(width)}
-                onPress={() => pickImage(setDiplomaUri)}
+                onPress={() => pickImage(setDiplomaUri)} // Виправлена функція pickImage з попереднього файлу
               >
                 <Text style={styles.uploadButtonText}>{t("upload_diploma")}</Text>
               </TouchableOpacity>
@@ -1266,7 +1288,7 @@ const Anketa_Settings = () => {
             <View style={styles.uploadContainer}>
               <TouchableOpacity
                 style={styles.uploadButton(width)}
-                onPress={() => pickImage(setCertificateUri)}
+                onPress={() => pickImage(setCertificateUri)} // Виправлена функція pickImage з попереднього файлу
               >
                 <Text style={styles.uploadButtonText}>
                   {t("upload_certificate")}
@@ -1486,6 +1508,7 @@ const Anketa_Settings = () => {
           <View style={styles.centeredView}>
             <View style={[styles.languageModalContent, styles.modalBorder]}>
               <ScrollView style={styles.modalScrollView}>
+                {/* Переконайтеся, що `consultationLanguages` визначено у вашому коді */}
                 {consultationLanguages.map((lang) => (
                   <Pressable
                     key={lang.code}
@@ -1499,7 +1522,7 @@ const Anketa_Settings = () => {
                           styles.countryItemTextSelected,
                       ]}
                     >
-                     {lang.emoji} {t(lang.name)} 
+                     {lang.emoji} {t(lang.name)}
                     </Text>
                   </Pressable>
                 ))}
@@ -1650,7 +1673,7 @@ const Anketa_Settings = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <Modal
+     <Modal
         animationType="fade"
         transparent={true}
         visible={isImageModalVisible}
@@ -1658,15 +1681,19 @@ const Anketa_Settings = () => {
       >
         <TouchableWithoutFeedback onPress={closeImageModal}>
           <View style={styles.fullScreenImageModalOverlay}>
+            {/* Обгортаємо зображення в окремий View, щоб TouchableWithoutFeedback завжди мав один дочірній елемент */}
             <TouchableWithoutFeedback>
-              {selectedImageUri && (
+              {selectedImageUri ? ( // Якщо selectedImageUri є, рендеримо Image
                 <Image
                   source={{ uri: selectedImageUri }}
                   style={styles.fullScreenImage}
                   resizeMode="contain"
                 />
+              ) : (
+                <View style={{ flex: 1 }} /> // Інакше рендеримо порожній View, щоб TouchableWithoutFeedback мав дочірній елемент
               )}
             </TouchableWithoutFeedback>
+
             <TouchableOpacity
               style={styles.closeImageModalButton}
               onPress={closeImageModal}
@@ -1700,11 +1727,12 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Regular",
   },
   container: (width, height) => ({
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
-    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
+    // Перегляньте ці paddingTop, вони можуть конфліктувати з SafeAreaView
+    // paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
+    // paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
     backgroundColor: "#fff",
     alignItems: "center",
-    paddingTop: 0,
+    paddingTop: 0, // Залишимо 0, якщо SafeAreaView обробляє відступи
     paddingHorizontal: width * 0.05,
     width: "100%",
   }),
@@ -1799,7 +1827,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    width: "90%",
+    width: "90%", // Можливо, варто використовувати width * 0.9, як і інші елементи
     marginBottom: 10,
   },
   avatarUploadContainer: {
@@ -1812,7 +1840,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0EB3EB",
     borderRadius: 555,
     paddingVertical: 15,
-    width: width * 0.9 * 0.75,
+    width: width * 0.9 * 0.75, // Переконайтеся, що це бажаний розмір кнопки
     height: 52,
     alignItems: "center",
     justifyContent: "center",
@@ -1898,7 +1926,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: "center",
   },
-  // Застосовано StyleSheet.absoluteFillObject
   centeredView: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -2096,7 +2123,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 40,
   }),
-  // Застосовано StyleSheet.absoluteFillObject
   fullScreenImageModalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
