@@ -28,8 +28,8 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TabBar_doctor from "../../components/TopBar_doctor";
-import { useAuth } from "../../providers/AuthProvider"; // Переконайтеся, що AuthProvider доступний
-import { useDoctorProfile } from "../../components/DoctorProfileContext"; // <-- НОВИЙ ІМПОРТ
+import { useAuth } from "../../providers/AuthProvider";
+import { useDoctorProfile } from "../../components/DoctorProfileContext";
 
 const { width, height } = Dimensions.get("window");
 const isLargeScreen = width > 768;
@@ -81,12 +81,12 @@ async function registerForPushNotificationsAsync(userId) {
       console.error(
         "Failed to get push token for push notification: Permissions not granted!"
       );
-      return; // Важливо: вийти, якщо дозволи не надано
+      return;
     }
 
     try {
       token = (
-        await Notifications.getExpoPushTokenAsync({
+        await Notifications.getExpoPushPushTokenAsync({
           projectId: "e2619b61-6ef5-4958-90bc-a400bbc8c50a",
         })
       ).data;
@@ -110,7 +110,7 @@ async function registerForPushNotificationsAsync(userId) {
         "Помилка",
         `Не вдалося отримати токен сповіщень: ${errorMessage}. Перевірте підключення.`
       );
-      return; // Важливо: вийти при помилці
+      return;
     }
   } else {
     Alert.alert(
@@ -121,7 +121,6 @@ async function registerForPushNotificationsAsync(userId) {
     return;
   }
 
-  // ЗБЕРЕЖЕННЯ ТОКЕНА В SUPABASE
   if (token && userId) {
     const { data, error } = await supabase
       .from("profile_doctor")
@@ -182,10 +181,9 @@ const ValueBox = ({ children, t }) => {
   );
 };
 
-// --- Додаємо мапу прапорів ---
 const COUNTRY_FLAGS_MAP = {
-   "EN": "🇬🇧", // Використовуємо для 'english'
-  "UK": "🇺🇦", // Використовуємо для 'ukrainian'
+   "EN": "🇬🇧",
+  "UK": "🇺🇦",
   "DE": "🇩🇪", // Germany/German
   "PH": "🇵🇭", // Philippines
   "HR": "🇭🇷", // Croatia
@@ -383,7 +381,6 @@ const COUNTRY_FLAGS_MAP = {
 
 const LanguageFlags = ({ languages }) => {
   const getFlag = (code) => {
-    // Перевіряємо, чи є такий код в нашій мапі, і повертаємо прапор
     return COUNTRY_FLAGS_MAP[String(code).toUpperCase()] || "❓";
   };
 
@@ -408,16 +405,14 @@ const LanguageFlags = ({ languages }) => {
 const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
-  const { session } = useAuth(); // Отримуємо сесію з AuthProvider
-  const { doctorData, isLoading, error, isConnected, fetchDoctorProfile } = useDoctorProfile(); // <-- ВИКОРИСТОВУЄМО ГЛОБАЛЬНИЙ СТАН
+  const { session } = useAuth();
+  const { doctorData, isLoading, error, isConnected, fetchDoctorProfile } = useDoctorProfile();
 
   const doctorIdFromParams = route.params?.doctorId ? String(route.params.doctorId) : null;
 
-  // Локальний стан, який все ще потрібен
   const [currentLoggedInDoctorId, setCurrentLoggedInDoctorId] = useState(null);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingTimeoutExpired, setLoadingTimeoutExpired] = useState(false);
   const timeoutRef = useRef(null);
 
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
@@ -433,33 +428,29 @@ const Profile_doctor = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
+  // Стан для модального вікна про незаповнений профіль
   const [isProfileCompletionModalVisible, setIsProfileCompletionModalVisible] = useState(false);
-  const [profileNotFound, setProfileNotFound] = useState(false); // Стан для відображення "профіль не заповнений"
 
   const [activeTab, setActiveTab] = useState("Profile_doctor");
 
-  // Анімовані значення для іконок
   const timeIconRotateAnim = useRef(new Animated.Value(0)).current;
   const settingsIconRotateAnim = useRef(new Animated.Value(0)).current;
 
-  // Ефект для запуску анімацій обертання іконок
   useEffect(() => {
     const startRotation = (animatedValue) => {
       animatedValue.setValue(0);
       Animated.timing(animatedValue, {
         toValue: 1,
-        duration: 3000, // Тривалість анімації (3 секунди)
+        duration: 3000,
         easing: Easing.linear,
         useNativeDriver: true,
       }).start(() => startRotation(animatedValue));
     };
 
-    // Запускаємо анімації для обох іконок
     startRotation(timeIconRotateAnim);
     startRotation(settingsIconRotateAnim);
-  }, []); // Пустий масив залежностей для запуску один раз при монтуванні
+  }, []);
 
-  // Інтерполяції для обертання
   const timeIconRotate = timeIconRotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -474,7 +465,6 @@ const Profile_doctor = ({ route }) => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-  // Отримуємо ID поточного залогіненого лікаря з сесії
   useEffect(() => {
     const userId = session?.user?.id;
     if (userId) {
@@ -504,18 +494,20 @@ const Profile_doctor = ({ route }) => {
     return isComplete;
   }, []);
 
-  // Логіка для модалки повноти профілю
+  // Цей ефект тепер відповідає лише за показ модального вікна про незаповнений профіль
   useEffect(() => {
-    if (doctorData && currentLoggedInDoctorId && doctorData.user_id === currentLoggedInDoctorId) {
+    // Показуємо модальне вікно тільки якщо:
+    // 1. Завантаження завершилося і немає помилки
+    // 2. Є дані профілю (навіть якщо вони неповні)
+    // 3. Це профіль поточного залогіненого лікаря (не чийсь інший)
+    // 4. Профіль не є повним
+    if (!isLoading && !error && doctorData && currentLoggedInDoctorId && doctorData.user_id === currentLoggedInDoctorId) {
       const isComplete = checkProfileCompleteness(doctorData);
       setIsProfileCompletionModalVisible(!isComplete);
-      // Встановлюємо profileNotFound, якщо doctorData існує, але по суті є порожнім об'єктом (код PGRST116)
-      setProfileNotFound(doctorData && Object.keys(doctorData).length === 0);
     } else {
-      setIsProfileCompletionModalVisible(false); // Ховаємо модалку, якщо це чужий профіль або даних немає
-      setProfileNotFound(false);
+      setIsProfileCompletionModalVisible(false); // Приховати модалку, якщо умови не відповідають
     }
-  }, [doctorData, currentLoggedInDoctorId, checkProfileCompleteness]);
+  }, [doctorData, isLoading, error, currentLoggedInDoctorId, checkProfileCompleteness]);
 
 
   useFocusEffect(
@@ -526,24 +518,23 @@ const Profile_doctor = ({ route }) => {
       const targetId = doctorIdFromParams || currentLoggedInDoctorId;
 
       if (targetId) {
-        // Викликаємо fetchDoctorProfile з контексту.
-        // `forceRefresh` встановлюємо в `false`, щоб функція використовувала кеш,
-        // якщо дані для цього `targetId` вже завантажені і не потрібне примусове оновлення.
         fetchDoctorProfile(targetId, false);
       } else {
         console.log("Profile_doctor: No target doctor ID (from params or session).");
-        // Обробка, якщо немає ID для завантаження
       }
 
-      // Обробка тайм-ауту для індикації зависання завантаження (незважаючи на контекст)
+      // Очищення таймауту при кожному фокусі
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      // Встановлення таймауту для випадку, якщо завантаження дуже довго триває
       timeoutRef.current = setTimeout(() => {
-        // Перевіряємо `isLoading` та `error` з контексту
+        // Якщо досі завантажується і немає помилки від провайдера, вивести Alert
         if (isLoading && !error) {
-          setLoadingTimeoutExpired(true);
-          console.log("Loading timeout expired. Showing retry/back buttons.");
+          Alert.alert(t("loading_timeout_title"), t("loading_timeout_message"), [
+            { text: t("retry_button"), onPress: onRetry },
+            { text: t("back_to_home_button"), onPress: onBackToHome },
+          ]);
         }
       }, 30000); // 30 секунд
 
@@ -552,17 +543,16 @@ const Profile_doctor = ({ route }) => {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
-        // Модалку про повноту профілю не скидаємо при blur, оскільки вона прив'язана до стану doctorData
-        // (якщо ви хочете, щоб вона з'являлася щоразу, коли користувач повертається на вкладку, то можна розкоментувати)
-        // setIsProfileCompletionModalVisible(false);
       };
     }, [
       t,
       doctorIdFromParams,
       currentLoggedInDoctorId,
-      fetchDoctorProfile, // Залежність на функцію з контексту
-      isLoading, // Залежність на стан з контексту
-      error, // Залежність на стан з контексту
+      fetchDoctorProfile,
+      isLoading,
+      error,
+      onRetry,
+      onBackToHome,
     ])
   );
 
@@ -639,7 +629,7 @@ const Profile_doctor = ({ route }) => {
   };
 
   const handleProfileDoctorSettingsPress = () => {
-    setIsProfileCompletionModalVisible(false); // Закриваємо модалку при переході до налаштувань
+    setIsProfileCompletionModalVisible(false); // Закриваємо модалку перед переходом
     navigation.navigate("Anketa_Settings");
   };
 
@@ -669,8 +659,6 @@ const Profile_doctor = ({ route }) => {
         navigation.navigate("Support_doctor");
         break;
       case "Profile_doctor":
-        // Ця вкладка вже активна, можна примусово оновити профіль, якщо потрібно
-        // fetchDoctorProfile(doctorIdFromParams || currentLoggedInDoctorId, true);
         break;
       default:
         break;
@@ -700,9 +688,9 @@ const Profile_doctor = ({ route }) => {
         typeof err === "object" &&
         err !== null &&
         "message" in err &&
-        typeof err.message === "string"
+        typeof e.message === "string"
       ) {
-        errorMessage = err.message;
+        errorMessage = e.message;
       }
       console.warn(
         "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
@@ -744,410 +732,409 @@ const Profile_doctor = ({ route }) => {
 
   const onRetry = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    // Скидаємо локальні стани, що впливають на відображення повноекранних заглушок
-    setLoadingTimeoutExpired(false);
-    // Профіль не знайдено і модалка про повноту контролюється через ефект на doctorData
-    setIsProfileCompletionModalVisible(false);
+    setIsProfileCompletionModalVisible(false); // Закриваємо модалку при повторній спробі
 
     const targetId = doctorIdFromParams || currentLoggedInDoctorId;
     if (targetId) {
       fetchDoctorProfile(targetId, true); // Примусове оновлення з контексту
     } else {
       console.warn("Retry failed: Doctor ID missing.");
-      // Помилка doctor_id_missing вже буде встановлена в контексті, якщо fetchDoctorProfile її виявить.
     }
   }, [doctorIdFromParams, currentLoggedInDoctorId, fetchDoctorProfile]);
 
-
   const onBackToHome = useCallback(() => {
-    navigation.navigate("HomeScreen"); // Або "Home_doctor", залежить від вашої навігації
+    navigation.navigate("HomeScreen");
   }, [navigation]);
 
   const onGoToAnketa = useCallback(() => {
-    setIsProfileCompletionModalVisible(false);
+    setIsProfileCompletionModalVisible(false); // Закриваємо модалку перед переходом
     navigation.navigate("Anketa_Settings");
   }, [navigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Скидаємо локальні стани
-    setLoadingTimeoutExpired(false);
-    setProfileNotFound(false);
-    setIsProfileCompletionModalVisible(false);
+    setIsProfileCompletionModalVisible(false); // Закриваємо модалку при оновленні
 
     const idToRefresh = doctorIdFromParams || currentLoggedInDoctorId;
     if (idToRefresh) {
-      await fetchDoctorProfile(idToRefresh, true); // Примусове оновлення з контексту
-      await fetchUnreadNotificationsCount(); // Оновлюємо також сповіщення
+      await fetchDoctorProfile(idToRefresh, true);
+      await fetchUnreadNotificationsCount();
     } else {
       console.warn("Cannot refresh: Doctor ID missing.");
     }
-    setRefreshing(false); // Завершуємо анімацію оновлення
+    setRefreshing(false);
   }, [fetchDoctorProfile, fetchUnreadNotificationsCount, doctorIdFromParams, currentLoggedInDoctorId]);
 
-  // Умова для відображення повноекранних станів (завантаження, помилка, відсутність зв'язку)
-  // Використовуємо стани з DoctorProfileContext
-  const shouldShowFullScreenState = isLoading || error || loadingTimeoutExpired || !isConnected || !doctorData || profileNotFound;
-
-  // Використовуємо doctorData з контексту
   const currentDoctor = doctorData || {};
 
+  // Логіка для відображення повноекранних станів:
+  // 1. Завантаження (коли isLoading = true)
+  // 2. Помилка або відсутність зв'язку (коли !isLoading і є error або немає isConnected)
+  // 3. Профіль не знайдено (коли !isLoading, немає doctorData, немає error, є isConnected)
+  // 4. Основний контент профілю
+  const showLoading = isLoading;
+  const showErrorMessage = !isLoading && (error || !isConnected);
+  const showProfileNotFound = !isLoading && !doctorData && !error && isConnected; // Профіль не знайдено, і немає інших активних помилок/завантаження
+
   return (
-      <SafeAreaView style={styles.container}>
-        {shouldShowFullScreenState ? (
-            <View style={styles.fullscreenContainer}>
-                {isLoading && !error && !loadingTimeoutExpired && isConnected && !profileNotFound ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#0EB3EB" />
-                        <Text style={styles.loadingText}>{t("loading_profile_data")}</Text>
-                    </View>
-                ) : (
-                    <View style={styles.errorContainer}>
-                        {(!isConnected || error || (profileNotFound && !isLoading)) && (
-                            <Ionicons name="alert-circle-outline" size={50} color="#D32F2F" />
-                        )}
-                        <Text style={styles.errorText}>
-                            {!isConnected
-                                ? t("check_connection")
-                                : profileNotFound && currentLoggedInDoctorId === doctorIdFromParams
-                                    ? t("profile_not_filled_message")
-                                    : error || t("doctor_not_found")}
-                        </Text>
-                        {profileNotFound && currentLoggedInDoctorId === doctorIdFromParams && (
-                            <TouchableOpacity
-                                style={styles.goToAnketaButton}
-                                onPress={onGoToAnketa}
-                            >
-                                <Text style={styles.goToAnketaButtonText}>{t("fill_profile")}</Text>
-                            </TouchableOpacity>
-                        )}
-                        {(!profileNotFound || currentLoggedInDoctorId !== doctorIdFromParams) && (
-                          <>
-                            <TouchableOpacity
-                                style={styles.retryButton}
-                                onPress={onRetry}
-                            >
-                                <Text style={styles.retryButtonText}>{t("retry")}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.backToHomeButton}
-                                onPress={onBackToHome}
-                            >
-                                <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
-                            </TouchableOpacity>
-                          </>
-                        )}
-                    </View>
-                )}
-            </View>
-        ) : (
-          <>
-            <View style={styles.header}>
+    <SafeAreaView style={styles.container}>
+      {showLoading ? (
+        // Блок завантаження
+        <View style={styles.fullscreenContainer}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0EB3EB" />
+            <Text style={styles.loadingText}>{t("loading_profile_data")}</Text>
+          </View>
+        </View>
+      ) : showErrorMessage ? (
+        // Блок помилки / відсутності зв'язку
+        <View style={styles.fullscreenContainer}>
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={50} color="#D32F2F" />
+            <Text style={styles.errorText}>
+              {!isConnected
+                ? t("check_connection")
+                : error || t("error_fetching_doctor_data_general")}
+            </Text>
+            <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+              <Text style={styles.retryButtonText}>{t("retry")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.backToHomeButton} onPress={onBackToHome}>
+              <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : showProfileNotFound ? (
+        // Блок "Профіль не знайдено"
+        <View style={styles.fullscreenContainer}>
+          <View style={styles.noDoctorContainer}>
+            <Ionicons name="information-circle-outline" size={50} color="#0EB3EB" />
+            <Text style={styles.noDoctorText}>
+              {currentLoggedInDoctorId === doctorIdFromParams
+                ? t("profile_not_filled_message") // Якщо це профіль поточного користувача, показуємо про заповнення
+                : t("doctor_not_found")} {/* Інакше - лікар не знайдений */}
+            </Text>
+            {currentLoggedInDoctorId === doctorIdFromParams && ( // Кнопка "Заповнити профіль" тільки для власника
               <TouchableOpacity
-                style={styles.languageSelectButton}
-                onPress={openLanguageModal}
+                style={styles.goToAnketaButton}
+                onPress={onGoToAnketa}
               >
-                  <Text style={styles.languageButtonText}>
-                    {displayedLanguageCode}
-                  </Text>
-                <Ionicons name="globe-outline" size={16} color="white" />
+                <Text style={styles.goToAnketaButtonText}>{t("fill_profile")}</Text>
               </TouchableOpacity>
-
-              <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
-              <TouchableOpacity
-                style={styles.notificationButton}
-                onPress={() => navigation.navigate("Messege")}
-              >
-                  <Ionicons name="notifications-outline" size={24} color="white" />
-                  {unreadNotificationsCount > 0 && (
-                    <View style={styles.notificationBadge}>
-                      <Text style={styles.notificationNumber}>
-                        {unreadNotificationsCount}
-                      </Text>
-                    </View>
-                  )}
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollViewContent}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  colors={["#0EB3EB", "#3F51B5"]}
-                  tintColor={"#0EB3EB"}
-                />
-              }
+            )}
+            <TouchableOpacity
+                style={styles.backToHomeButton}
+                onPress={onBackToHome}
             >
-              <View style={styles.doctorMainInfo}>
-                {(currentDoctor.avatar_url && !avatarError) ? (
-                  <View style={styles.avatarContainer}>
-                    {loadingAvatar && (
-                      <ActivityIndicator
-                        size="large"
-                        color="#0EB3EB"
-                        style={styles.avatarLoadingIndicator}
-                      />
-                    )}
-                    <Image
-                      source={{ uri: currentDoctor.avatar_url }}
-                      style={styles.avatar}
-                      onLoadStart={() => setLoadingAvatar(true)}
-                      onLoad={() => setLoadingAvatar(false)}
-                      onError={() => {
-                        setLoadingAvatar(false);
-                        setAvatarError(true);
-                        console.error("Error loading avatar image:", currentDoctor.avatar_url);
-                      }}
-                    />
+                <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        // Основний вміст профілю
+        <>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.languageSelectButton}
+              onPress={openLanguageModal}
+            >
+                <Text style={styles.languageButtonText}>
+                  {displayedLanguageCode}
+                </Text>
+              <Ionicons name="globe-outline" size={16} color="white" />
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate("Messege")}
+            >
+                <Ionicons name="notifications-outline" size={24} color="white" />
+                {unreadNotificationsCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationNumber}>
+                      {unreadNotificationsCount}
+                    </Text>
                   </View>
-                ) : (
-                  <Image
-                    source={{
-                      uri: "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo",
-                    }}
-                    style={styles.avatar}
-                  />
                 )}
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollViewContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={["#0EB3EB", "#3F51B5"]}
+                tintColor={"#0EB3EB"}
+              />
+            }
+          >
+            <View style={styles.doctorMainInfo}>
+              {(currentDoctor.avatar_url && !avatarError) ? (
+                <View style={styles.avatarContainer}>
+                  {loadingAvatar && (
+                    <ActivityIndicator
+                      size="large"
+                      color="#0EB3EB"
+                      style={styles.avatarLoadingIndicator}
+                    />
+                  )}
+                  <Image
+                    source={{ uri: currentDoctor.avatar_url }}
+                    style={styles.avatar}
+                    onLoadStart={() => setLoadingAvatar(true)}
+                    onLoad={() => setLoadingAvatar(false)}
+                    onError={() => {
+                      setLoadingAvatar(false);
+                      setAvatarError(true);
+                      console.error("Error loading avatar image:", currentDoctor.avatar_url);
+                    }}
+                  />
+                </View>
+              ) : (
+                <Image
+                  source={{
+                    uri: "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo",
+                  }}
+                  style={styles.avatar}
+                />
+              )}
+              <View style={styles.doctorDetails}>
+                <Text style={styles.doctorName}>
+                  {currentDoctor.full_name || t("not_specified")}
+                </Text>
+                <View style={styles.infoRowDynamic}>
+                  <Text style={styles.label}>{t("rating")}:</Text>
+                  <ValueBox t={t}>
+                    {Array.from({ length: getStarRating(currentDoctor.profile_doctor?.doctor_points) }).map((_, i) => (
+                      <Ionicons key={`star-full-${i}`} name="star" size={18} color="#FFD700" />
+                    ))}
+                    {Array.from({ length: 5 - getStarRating(currentDoctor.profile_doctor?.doctor_points) }).map((_, i) => (
+                      <Ionicons key={`star-outline-${i}`} name="star-outline" size={18} color="#ccc" />
+                    ))}
+                  </ValueBox>
+                </View>
+                <View style={styles.infoRowDynamic}>
+                  <Text style={styles.label}>{t("communication_language")}:</Text>
+                  <ValueBox t={t}>
+                    <LanguageFlags languages={getLanguages(currentDoctor.communication_languages)} />
+                  </ValueBox>
+                </View>
 
-                <View style={styles.doctorDetails}>
-                  <Text style={styles.doctorName}>
-                    {currentDoctor.full_name || t("not_specified")}
-                  </Text>
+                <View style={styles.infoRowDynamic}>
+                  <Text style={styles.label}>{t("specialization")}:</Text>
+                  <ValueBox t={t}>{getSpecializations(currentDoctor.specialization)}</ValueBox>
+                </View>
 
-                  <View style={styles.infoRowDynamic}>
-                    <Text style={styles.label}>{t("rating")}:</Text>
-                    <ValueBox t={t}>
-                      {Array.from({ length: getStarRating(currentDoctor.profile_doctor?.doctor_points) }).map((_, i) => (
-                        <Ionicons key={`star-full-${i}`} name="star" size={18} color="#FFD700" />
-                      ))}
-                      {Array.from({ length: 5 - getStarRating(currentDoctor.profile_doctor?.doctor_points) }).map((_, i) => (
-                        <Ionicons key={`star-outline-${i}`} name="star-outline" size={18} color="#ccc" />
-                      ))}
-                    </ValueBox>
-                  </View>
-                  <View style={styles.infoRowDynamic}>
-                    <Text style={styles.label}>{t("communication_language")}:</Text>
-                    <ValueBox t={t}>
-                      <LanguageFlags languages={getLanguages(currentDoctor.communication_languages)} />
-                    </ValueBox>
-                  </View>
+                <View style={styles.infoRowDynamic}>
+                  <Text style={styles.label}>{t("work_experience")}:</Text>
+                  <ValueBox t={t}>{formatYearsText(currentDoctor.experience_years)}</ValueBox>
+                </View>
 
-                  <View style={styles.infoRowDynamic}>
-                    <Text style={styles.label}>{t("specialization")}:</Text>
-                    <ValueBox t={t}>{getSpecializations(currentDoctor.specialization)}</ValueBox>
-                  </View>
+                <View style={styles.infoRowDynamic}>
+                  <Text style={styles.label}>{t("work_location")}:</Text>
+                  <ValueBox t={t}>{currentDoctor.work_location || t("not_specified")}</ValueBox>
+                </View>
 
-                  <View style={styles.infoRowDynamic}>
-                    <Text style={styles.label}>{t("work_experience")}:</Text>
-                    <ValueBox t={t}>{formatYearsText(currentDoctor.experience_years)}</ValueBox>
-                  </View>
-
-                  <View style={styles.infoRowDynamic}>
-                    <Text style={styles.label}>{t("work_location")}:</Text>
-                    <ValueBox t={t}>{currentDoctor.work_location || t("not_specified")}</ValueBox>
-                  </View>
-
-                  <View style={styles.infoRowDynamic}>
-                    <Text style={styles.label}>{t("consultation_cost")}:</Text>
-                    <ValueBox t={t}>
-                      {currentDoctor.consultation_cost ? `$${currentDoctor.consultation_cost}` : t("not_specified")}
-                    </ValueBox>
-                  </View>
+                <View style={styles.infoRowDynamic}>
+                  <Text style={styles.label}>{t("consultation_cost")}:</Text>
+                  <ValueBox t={t}>
+                    {currentDoctor.consultation_cost ? `$${currentDoctor.consultation_cost}` : t("not_specified")}
+                  </ValueBox>
                 </View>
               </View>
+            </View>
 
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleChooseConsultationTime}
-              >
-                  <Animated.View style={{ transform: [{ rotate: timeIconRotate }] }}>
-                      <Ionicons name="time-outline" size={24} color="white" style={styles.buttonIcon} />
-                  </Animated.View>
-                  <Text style={styles.actionButtonText}>
-                    {t("choose_consultation_time")}
-                  </Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleChooseConsultationTime}
+            >
+                <Animated.View style={{ transform: [{ rotate: timeIconRotate }] }}>
+                    <Ionicons name="time-outline" size={24} color="white" style={styles.buttonIcon} />
+                </Animated.View>
+                <Text style={styles.actionButtonText}>
+                  {t("choose_consultation_time")}
+                </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleProfileDoctorSettingsPress}
-              >
-                  <Animated.View style={{ transform: [{ rotate: settingsIconRotate }] }}>
-                      <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
-                  </Animated.View>
-                  <Text style={styles.actionButtonText}>
-                    {t("profile_doctor_settings")}
-                  </Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleProfileDoctorSettingsPress}
+            >
+                <Animated.View style={{ transform: [{ rotate: settingsIconRotate }] }}>
+                    <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
+                </Animated.View>
+                <Text style={styles.actionButtonText}>
+                  {t("profile_doctor_settings")}
+                </Text>
+            </TouchableOpacity>
 
-              <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
+            <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
 
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionHeader}>{t("about_me")}</Text>
+              <Text style={styles.sectionContent}>
+                {currentDoctor.about_me || t("not_specified_full")}
+              </Text>
+            </View>
+
+            {currentDoctor.achievements && currentDoctor.achievements.length > 0 && (
               <View style={styles.sectionContainer}>
-                <Text style={styles.sectionHeader}>{t("about_me")}</Text>
+                <Text style={styles.sectionHeader}>{t("achievements")}</Text>
                 <Text style={styles.sectionContent}>
-                  {currentDoctor.about_me || t("not_specified_full")}
+                  {currentDoctor.achievements}
                 </Text>
               </View>
+            )}
 
-              {currentDoctor.achievements && currentDoctor.achievements.length > 0 && (
-                <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionHeader}>{t("achievements")}</Text>
-                  <Text style={styles.sectionContent}>
-                    {currentDoctor.achievements}
-                  </Text>
-                </View>
-              )}
-
-              {currentDoctor.diploma_url && !diplomaError ? (
-                <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
-                  <View style={styles.imageWrapper}>
-                    {loadingDiploma && (
-                      <ActivityIndicator
-                        size="large"
-                        color="#0EB3EB"
-                        style={styles.imageLoadingIndicator}
-                      />
-                    )}
-                    <Image
-                      source={{ uri: currentDoctor.diploma_url }}
-                      style={styles.documentImage}
-                      onLoadStart={() => setLoadingDiploma(true)}
-                      onLoad={() => setLoadingDiploma(false)}
-                      onError={() => {
-                        setLoadingDiploma(false);
-                        setDiplomaError(true);
-                        console.error("Error loading diploma image:", currentDoctor.diploma_url);
-                      }}
+            {currentDoctor.diploma_url && !diplomaError ? (
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
+                <View style={styles.imageWrapper}>
+                  {loadingDiploma && (
+                    <ActivityIndicator
+                      size="large"
+                      color="#0EB3EB"
+                      style={styles.imageLoadingIndicator}
                     />
-                  </View>
+                  )}
+                  <Image
+                    source={{ uri: currentDoctor.diploma_url }}
+                    style={styles.documentImage}
+                    onLoadStart={() => setLoadingDiploma(true)}
+                    onLoad={() => setLoadingDiploma(false)}
+                    onError={() => {
+                      setLoadingDiploma(false);
+                      setDiplomaError(true);
+                      console.error("Error loading diploma image:", currentDoctor.diploma_url);
+                    }}
+                  />
                 </View>
-              ) : (
-                <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
-                  <View style={styles.imageWrapper}>
-                    <Text style={styles.noImageText}>{t("no_diploma_photo")}</Text>
-                  </View>
+              </View>
+            ) : (
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
+                <View style={styles.imageWrapper}>
+                  <Text style={styles.noImageText}>{t("no_diploma_photo")}</Text>
                 </View>
-              )}
-
-              {currentDoctor.certificate_photo_url && !certificateError ? (
-                <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
-                  <View style={styles.imageWrapper}>
-                    {loadingCertificate && (
-                      <ActivityIndicator
-                        size="large"
-                        color="#0EB3EB"
-                        style={styles.imageLoadingIndicator}
-                      />
-                    )}
-                    <Image
-                      source={{ uri: currentDoctor.certificate_photo_url }}
-                      style={styles.documentImage}
-                      onLoadStart={() => setLoadingCertificate(true)}
-                      onLoad={() => setLoadingCertificate(false)}
-                      onError={() => {
-                        setLoadingCertificate(false);
-                        setCertificateError(true);
-                        console.error("Error loading certificate image:", currentDoctor.certificate_photo_url);
-                      }}
+              </View>
+            )}
+            {currentDoctor.certificate_photo_url && !certificateError ? (
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
+                <View style={styles.imageWrapper}>
+                  {loadingCertificate && (
+                    <ActivityIndicator
+                      size="large"
+                      color="#0EB3EB"
+                      style={styles.imageLoadingIndicator}
                     />
-                  </View>
+                  )}
+                  <Image
+                    source={{ uri: currentDoctor.certificate_photo_url }}
+                    style={styles.documentImage}
+                    onLoadStart={() => setLoadingCertificate(true)}
+                    onLoad={() => setLoadingCertificate(false)}
+                    onError={() => {
+                      setLoadingCertificate(false);
+                      setCertificateError(true);
+                      console.error("Error loading certificate image:", currentDoctor.certificate_photo_url);
+                    }}
+                  />
                 </View>
-              ) : (
-                <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
-                  <View style={styles.imageWrapper}>
-                    <Text style={styles.noImageText}>{t("no_certificate_photo")}</Text>
-                  </View>
+              </View>
+            ) : (
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
+                <View style={styles.imageWrapper}>
+                  <Text style={styles.noImageText}>{t("no_certificate_photo")}</Text>
                 </View>
-              )}
+              </View>
+            )}
+          </ScrollView>
 
-            </ScrollView>
+          {/* Modal for Language Selection */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={isLanguageModalVisible}
+            onRequestClose={closeLanguageModal}
+          >
+            <TouchableWithoutFeedback onPress={closeLanguageModal}>
+              <View style={styles.modalOverlay}>
+                <TouchableWithoutFeedback
+                  onPress={() => {
+                    /* Залишаємо порожнім, щоб не закривати модалку при натисканні всередині */
+                  }}
+                >
+                  <View style={styles.languageModalContent}>
+                    <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
+                    {languagesForModal.map((item) => (
+                      <TouchableOpacity
+                        key={item.code}
+                        style={styles.languageOption}
+                        onPress={() => handleLanguageSelect(item.code)}
+                      >
+                        <Text style={styles.languageOptionText}>
+                          {t(item.nameKey)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
 
-            {/* Modal for Language Selection */}
+          {/* New Modal for Fill Profile Prompt */}
+          {/* Ця модалка з'являється тільки якщо showProfileNotFound = false, тобто основний контент профілю вже відображається */}
+          {(!showLoading && !showErrorMessage && !showProfileNotFound) && currentLoggedInDoctorId === doctorIdFromParams && (
             <Modal
               animationType="fade"
               transparent={true}
-              visible={isLanguageModalVisible}
-              onRequestClose={closeLanguageModal}
+              visible={isProfileCompletionModalVisible}
+              onRequestClose={() => {
+                setIsProfileCompletionModalVisible(false);
+              }}
             >
-              <TouchableWithoutFeedback onPress={closeLanguageModal}>
-                <View style={styles.modalOverlay}>
-                  <TouchableWithoutFeedback
-                    onPress={() => {
-                      /* Залишаємо порожнім, щоб не закривати модалку при натисканні всередині */
-                    }}
-                  >
-                    <View style={styles.languageModalContent}>
-                      <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
-                      {languagesForModal.map((item) => (
-                        <TouchableOpacity
-                          key={item.code}
-                          style={styles.languageOption}
-                          onPress={() => handleLanguageSelect(item.code)}
-                        >
-                          <Text style={styles.languageOptionText}>
-                            {t(item.nameKey)} 
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </TouchableWithoutFeedback>
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
-
-            {/* New Modal for Fill Profile Prompt */}
-            {currentLoggedInDoctorId === doctorIdFromParams && (
-              <Modal
-                animationType="fade"
-                transparent={true}
-                visible={isProfileCompletionModalVisible}
-                onRequestClose={() => {
-                  setIsProfileCompletionModalVisible(false);
-                }}
+              <Pressable
+                style={styles.modalOverlay}
+                onPressOut={() => setIsProfileCompletionModalVisible(false)}
               >
-                <Pressable
-                  style={styles.modalOverlay}
-                  onPressOut={() => setIsProfileCompletionModalVisible(false)}
-                >
-                  <TouchableWithoutFeedback>
-                    <View style={styles.modalView}>
-                      <Ionicons
-                        name="information-circle-outline"
-                        size={scale(60)}
-                        color="#0EB3EB"
-                        style={styles.modalIcon}
-                      />
-                      <Text style={styles.modalTitle}>{t("complete_profile_title")}</Text>
-                      <Text style={styles.modalText}>{t("complete_profile_message")}</Text>
-                      <TouchableOpacity
-                        style={styles.modalButton}
-                        onPress={onGoToAnketa}
-                      >
-                        <Text style={styles.modalButtonText}>{t("go_to_profile_settings")}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.modalCancelButton}
-                        onPress={() => setIsProfileCompletionModalVisible(false)}
-                      >
-                        <Text style={styles.modalCancelButtonText}>{t("maybe_later")}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableWithoutFeedback>
-                </Pressable>
-              </Modal>
-            )}
+                <TouchableWithoutFeedback>
+                  <View style={styles.modalView}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={scale(60)}
+                      color="#0EB3EB"
+                      style={styles.modalIcon}
+                    />
+                    <Text style={styles.modalTitle}>{t("complete_profile_title")}</Text>
+                    <Text style={styles.modalText}>{t("complete_profile_message")}</Text>
+                    <TouchableOpacity
+                      style={styles.modalButton}
+                      onPress={onGoToAnketa}
+                    >
+                      <Text style={styles.modalButtonText}>{t("go_to_profile_settings")}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.modalCancelButton}
+                      onPress={() => setIsProfileCompletionModalVisible(false)}
+                    >
+                      <Text style={styles.modalCancelButtonText}>{t("maybe_later")}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableWithoutFeedback>
+              </Pressable>
+            </Modal>
+          )}
 
-            <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
-          </>
-        )}
-      </SafeAreaView>
+          <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
+        </>
+      )}
+    </SafeAreaView>
   );
 };
 
@@ -1329,10 +1316,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "absolute",
     left: 0,
-    // top: 0,
     paddingVertical: 10,
     right: 0,
-    // bottom: 0,
   },
   notificationButton: {
     width: width * 0.12,
@@ -1488,7 +1473,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
-    fontWeight: "bold",
     marginLeft: 10,
     textAlign: "center",
     flex: 1,
@@ -1633,7 +1617,7 @@ const styles = StyleSheet.create({
   },
   languageOptionText: {
     fontSize: 18,
-    fontFamily: "Mont-SemiBold",
+    fontFamily: "Mont-Regular",
     color: "#333333",
     textAlign: 'center',
     flexWrap: 'wrap',

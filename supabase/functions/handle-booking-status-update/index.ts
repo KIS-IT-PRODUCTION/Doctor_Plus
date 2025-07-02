@@ -1,9 +1,8 @@
-import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Expo } from 'https://esm.sh/expo-server-sdk@3.7.0';
+// supabase/functions/handle-booking-status-update/index.ts
 
-// Якщо у вас є файл з типізацією бази даних, розкоментуйте та вкажіть правильний шлях:
-// import { Database } from '../_shared/database.types.ts'; 
+import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
+import { createClient } from '@supabase/supabase-js'; // Імпорт з deno.json
+import { Expo } from 'expo-server-sdk'; // Імпорт з deno.json
 
 const expo = new Expo();
 
@@ -15,39 +14,100 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Supabase environment variables (URL or Service Role Key) are not set.");
 }
 
-async function getPatientExpoPushToken(supabaseClient: any, patientId: string): Promise<string | null> {
+/**
+ * Допоміжна функція для отримання токена сповіщень та бажаної мови пацієнта.
+ * Використовує таблицю 'profiles' та колонку 'language'.
+ */
+async function getPatientNotificationData(supabaseClient: any, patientId: string): Promise<{ token: string | null; language: string | null }> {
     if (!patientId) {
-        console.warn("getPatientExpoPushToken: patientId is null or undefined.");
-        return null;
+        console.warn("getPatientNotificationData: patientId is null or undefined.");
+        return { token: null, language: null };
     }
 
     try {
         const { data: profile, error } = await supabaseClient
-            .from('profiles')
-            .select('notification_token')
+            .from('profiles') // Використовуємо таблицю 'profiles' для пацієнтів
+            .select('notification_token, language') // Вибираємо колонку 'language'
             .eq('user_id', patientId)
             .single();
 
         if (error) {
             if (error.code === 'PGRST116') {
-                console.warn(`getPatientExpoPushToken: No profile found for patient ${patientId}.`);
+                console.warn(`getPatientNotificationData: No profile found for patient ${patientId}.`);
             } else {
-                console.error(`getPatientExpoPushToken: Error fetching Expo Push Token for patient ${patientId}:`, error.message);
+                console.error(`getPatientNotificationData: Error fetching data for patient ${patientId}:`, error.message);
             }
-            return null;
+            return { token: null, language: null };
         }
 
-        if (profile && profile.notification_token) {
-            return profile.notification_token;
-        }
-
-        console.warn(`getPatientExpoPushToken: Patient ${patientId} has a profile but no notification_token found.`);
-        return null;
+        return {
+            token: profile?.notification_token || null,
+            language: profile?.language || null, // Використовуємо profile.language
+        };
     } catch (e: any) {
-        console.error(`getPatientExpoPushToken: Unexpected error for patient ${patientId}:`, e.message || e);
-        return null;
+        console.error(`getPatientNotificationData: Unexpected error for patient ${patientId}:`, e.message || e);
+        return { token: null, language: null };
     }
 }
+
+/**
+ * Словник перекладів для сповіщень.
+ * Ключі - це ідентифікатори текстів, значення - об'єкти з перекладами для кожної мови.
+ * Деякі значення є функціями, щоб можна було передавати динамічні дані (наприклад, ім'я лікаря).
+ */
+const translations = {
+    // booking_confirmed
+    bookingConfirmedTitle: {
+        uk: `Ваше бронювання підтверджено! ✅`,
+        en: `Your booking has been confirmed! ✅`,
+    },
+    bookingConfirmedBody: {
+        uk: (doctorName: string, date: string, time: string, amount: number) => `Лікар ${doctorName} підтвердив вашу консультацію на ${date} о ${time}. Сума до сплати: ${amount} UAH. Чекаємо на вас!`,
+        en: (doctorName: string, date: string, time: string, amount: number) => `Doctor ${doctorName} has confirmed your consultation on ${date} at ${time}. Amount due: ${amount} UAH. We look forward to seeing you!`,
+    },
+    bookingConfirmedAlertBody: {
+        uk: (doctorName: string, date: string, time: string) => `Ваш запис до лікаря ${doctorName} на ${date} о ${time} підтверджено.`,
+        en: (doctorName: string, date: string, time: string) => `Your appointment with Dr. ${doctorName} on ${date} at ${time} has been confirmed.`,
+    },
+
+    // booking_rejected
+    bookingRejectedTitle: {
+        uk: `Ваше бронювання відхилено ❌`,
+        en: `Your booking has been rejected ❌`,
+    },
+    bookingRejectedBody: {
+        uk: (doctorName: string, date: string, time: string) => `На жаль, лікар ${doctorName} відхилив вашу консультацію на ${date} о ${time}. Будь ласка, оберіть інший час або зверніться до лікаря.`,
+        en: (doctorName: string, date: string, time: string) => `Unfortunately, Dr. ${doctorName} has rejected your consultation on ${date} at ${time}. Please choose another time or contact the doctor.`,
+    },
+    bookingRejectedAlertBody: {
+        uk: (doctorName: string, date: string, time: string) => `Ваш запис до лікаря ${doctorName} на ${date} о ${time} відхилено.`,
+        en: (doctorName: string, date: string, time: string) => `Your appointment with Dr. ${doctorName} on ${date} at ${time} has been rejected.`,
+    },
+
+    // meet_link_notification (для send-meet-link-notification, але можна додати сюди для повноти)
+    // meetLinkTitle: { /* ... */ },
+    // meetLinkBody: { /* ... */ },
+    // meetLinkAlertBody: { /* ... */ },
+};
+
+/**
+ * Допоміжна функція для безпечного отримання перекладу.
+ * Якщо переклад для обраної мови відсутній, використовується українська (uk) як мова за замовчуванням.
+ */
+const getTranslation = (key: keyof typeof translations, lang: string, ...args: any[]) => {
+    const defaultLang = 'uk'; // Мова за замовчуванням
+    // Забезпечуємо, що обрана мова є однією з підтримуваних ('uk' або 'en')
+    const selectedLang = (lang === 'en' || lang === 'uk') ? lang : defaultLang;
+
+    const translation = translations[key]?.[selectedLang];
+
+    if (typeof translation === 'function') {
+        return translation(...args);
+    }
+    // Повертаємо переклад, або переклад за замовчуванням, або повідомлення про відсутність
+    return translation || translations[key]?.[defaultLang] || `Translation missing for ${key} in ${selectedLang}`;
+};
+
 
 serve(async (req) => {
     const corsHeaders = {
@@ -92,7 +152,6 @@ serve(async (req) => {
         const doctor_name_from_client = requestBody.doctor_name;
 
         // **Детальна валідація вхідних даних**
-        // ДОДАНО: Перевірка на наявність 'amount' у запиті для підтверджених бронювань
         if (
             !booking ||
             typeof booking !== 'object' ||
@@ -102,7 +161,6 @@ serve(async (req) => {
             !('status' in booking) || typeof booking.status !== 'string' || !['confirmed', 'rejected'].includes(booking.status.toLowerCase()) ||
             !('booking_date' in booking) || typeof booking.booking_date !== 'string' || booking.booking_date.trim() === '' ||
             !('booking_time_slot' in booking) || typeof booking.booking_time_slot !== 'string' || booking.booking_time_slot.trim() === '' ||
-            // Якщо статус 'confirmed', amount має бути присутнім і бути числом
             (booking.status.toLowerCase() === 'confirmed' && (!('amount' in booking) || typeof booking.amount !== 'number' || booking.amount <= 0))
         ) {
             const missingFields: string[] = [];
@@ -123,7 +181,7 @@ serve(async (req) => {
             );
         }
 
-        const { id: booking_id, patient_id, doctor_id, status, booking_date, booking_time_slot, amount } = booking; // ДОДАНО: amount
+        const { id: booking_id, patient_id, doctor_id, status, booking_date, booking_time_slot, amount } = booking;
 
 
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -163,6 +221,15 @@ serve(async (req) => {
             console.log(`Doctor name received from client: ${doctor_full_name}`);
         }
 
+        // --- ПОЧАТОК ЛОГІКИ БАГАТОМОВНОСТІ ---
+
+        // 1. Отримання Expo Push Token та preferred_language пацієнта
+        const { token: patientPushToken, language: patientPreferredLanguage } = await getPatientNotificationData(supabaseAdmin, patient_id);
+
+        // Визначаємо мову для сповіщення. За замовчуванням - українська.
+        const effectiveLanguage = patientPreferredLanguage === 'en' ? 'en' : 'uk';
+        console.log(`Sending notification to patient ${patient_id} in language: ${effectiveLanguage}`);
+
         let title: string;
         let body: string;
         let notification_type: string;
@@ -170,16 +237,16 @@ serve(async (req) => {
 
         switch (status.toLowerCase()) {
             case 'confirmed':
-                title = `Ваше бронювання підтверджено! ✅`;
-                body = `Лікар ${doctor_full_name} підтвердив вашу консультацію на ${booking_date} о ${booking_time_slot}. Сума до сплати: ${amount} UAH. Чекаємо на вас!`; // ДОДАНО: сума в тексті
+                title = getTranslation('bookingConfirmedTitle', effectiveLanguage);
+                body = getTranslation('bookingConfirmedBody', effectiveLanguage, doctor_full_name, booking_date, booking_time_slot, amount);
                 notification_type = 'booking_confirmed';
-                patientAlertBody = `Ваш запис до лікаря ${doctor_full_name} на ${booking_date} о ${booking_time_slot} підтверджено.`;
+                patientAlertBody = getTranslation('bookingConfirmedAlertBody', effectiveLanguage, doctor_full_name, booking_date, booking_time_slot);
                 break;
             case 'rejected':
-                title = `Ваше бронювання відхилено ❌`;
-                body = `На жаль, лікар ${doctor_full_name} відхилив вашу консультацію на ${booking_date} о ${booking_time_slot}. Будь ласка, оберіть інший час або зверніться до лікаря.`;
+                title = getTranslation('bookingRejectedTitle', effectiveLanguage);
+                body = getTranslation('bookingRejectedBody', effectiveLanguage, doctor_full_name, booking_date, booking_time_slot);
                 notification_type = 'booking_rejected';
-                patientAlertBody = `Ваш запис до лікаря ${doctor_full_name} на ${booking_date} о ${booking_time_slot} відхилено.`;
+                patientAlertBody = getTranslation('bookingRejectedAlertBody', effectiveLanguage, doctor_full_name, booking_date, booking_time_slot);
                 break;
             default:
                 console.warn(`Невідомий статус бронювання: ${status}. Сповіщення не буде відправлено.`);
@@ -188,15 +255,18 @@ serve(async (req) => {
                 });
         }
 
+        // --- КІНЕЦЬ ЛОГІКИ БАГАТОМОВНОСТІ ---
+
+
         // 1. Збереження сповіщення в таблиці `patient_notifications`
         console.log(`Saving notification to patient_notifications for patient ${patient_id}...`);
         const { data: notification, error: insertError } = await supabaseAdmin
             .from('patient_notifications')
             .insert({
                 patient_id: patient_id,
-                booking_id: booking_id, // **ВАЖЛИВО: Нове поле booking_id**
-                title: title,
-                body: body,
+                booking_id: booking_id,
+                title: title, // Використовуємо перекладений заголовок
+                body: body,   // Використовуємо перекладений текст
                 notification_type: notification_type,
                 data: { // Зберігаємо додаткові дані як jsonb
                     booking_id: booking_id,
@@ -204,10 +274,9 @@ serve(async (req) => {
                     booking_date: booking_date,
                     booking_time_slot: booking_time_slot,
                     status: status,
-                    // ДОДАНО: amount для сповіщень про підтвердження
                     ...(notification_type === 'booking_confirmed' && { amount: amount }),
+                    notification_language: effectiveLanguage, // Зберігаємо мову, якою було надіслано сповіщення
                 },
-                // is_read: false, // ВИДАЛЕНО: Якщо поле is_read видалено з таблиці БД
             })
             .select()
             .single();
@@ -227,17 +296,15 @@ serve(async (req) => {
         }
         console.log(`Notification saved successfully with ID: ${notification.id}`);
 
-        // 2. Отримання Expo Push Token пацієнта
-        const patientPushToken = await getPatientExpoPushToken(supabaseAdmin, patient_id);
-
+        // 2. Надсилання Expo Push Notification
         if (patientPushToken && Expo.isExpoPushToken(patientPushToken)) {
             console.log(`Found valid Expo Push Token for patient ${patient_id}. Attempting to send push notification.`);
             const messages = [];
             messages.push({
                 to: patientPushToken,
                 sound: 'default', 
-                title: title,
-                body: patientAlertBody,
+                title: title,          // Використовуємо перекладений заголовок
+                body: patientAlertBody, // Використовуємо перекладений текст для алерт-сповіщення
                 data: {
                     db_id: notification.id,
                     type: notification_type,
@@ -247,8 +314,8 @@ serve(async (req) => {
                     booking_date: booking_date,
                     booking_time_slot: booking_time_slot,
                     patient_id: patient_id,
-                    // ДОДАНО: amount для push-сповіщень про підтвердження
                     ...(notification_type === 'booking_confirmed' && { amount: amount }),
+                    notification_language: effectiveLanguage, // Додаємо мову сповіщення в data payload
                 },
             });
 

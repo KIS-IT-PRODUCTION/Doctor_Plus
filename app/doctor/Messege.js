@@ -57,9 +57,11 @@ export default function Message() {
     const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(now);
 
     setMessages(prevMessages => {
+      // Визначаємо універсальний ID для повідомлення, пріоритет віддаємо db_id (з бази даних)
+      const uniqueMessageId = data && data.db_id ? data.db_id : (Date.now().toString() + Math.random().toString(36).substring(2, 9));
+
       const isDuplicate = prevMessages.some(msg =>
-        (data && data.db_id && msg.db_id === data.db_id) ||
-        (msg.title === title && msg.body === body && msg.date === messageDate && msg.time === messageTime && msg.type === (data.type || 'general'))
+        msg.id === uniqueMessageId // Порівнюємо за єдиним ID
       );
 
       if (isDuplicate) {
@@ -72,8 +74,8 @@ export default function Message() {
 
       return [
         {
-          id: data && data.db_id ? data.db_id : (Date.now().toString() + Math.random().toString(36).substring(2, 9)),
-          db_id: data && data.db_id ? data.db_id : null,
+          id: uniqueMessageId, // Використовуємо універсальний ID тут
+          db_id: data && data.db_id ? data.db_id : null, // Зберігаємо оригінальний db_id, якщо є
           title: title,
           body: body,
           date: messageDate,
@@ -97,7 +99,7 @@ export default function Message() {
     }
 
     if (!isRefreshing) setLoading(true);
-    else setRefreshing(true);
+    else setRefreshing(false); // Залишаємо loading true, поки refresh не завершиться
 
     console.log("Fetching notifications for doctor (user ID):", doctorUserId);
     try {
@@ -121,8 +123,8 @@ export default function Message() {
         const messageType = rawData.type || 'general';
 
         return {
-          id: notif.id,
-          db_id: notif.id,
+          id: notif.id, // ID повідомлення з бази даних
+          db_id: notif.id, // Дублюємо для послідовності, або можна використовувати тільки 'id'
           title: notif.title,
           body: notif.body,
           date: new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at)),
@@ -130,7 +132,7 @@ export default function Message() {
           is_read: notif.is_read,
           type: messageType,
           rawData: { ...rawData, status: messageStatus },
-          meetLinkInput: rawData.meet_link ? rawData.meet_link : '',
+          meetLinkInput: rawData.meet_link ? rawData.meet_link : '', // Завантажуємо meet_link з rawData
         };
       });
 
@@ -571,7 +573,7 @@ export default function Message() {
     );
   }, []);
 
-  const handleSendMeetLink = useCallback(async (message) => {
+const handleSendMeetLink = useCallback(async (message) => {
     const meetLink = message.meetLinkInput;
 
     if (!meetLink || meetLink.trim() === '') {
@@ -583,12 +585,14 @@ export default function Message() {
         return;
     }
 
-    if (!message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId) {
+    // Додав перевірку на message.db_id, оскільки вона потрібна для оновлення doctor_notifications
+    if (!message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId || !message.db_id) {
         console.error("Missing essential data for sending meet link:", {
             rawData: message.rawData,
             booking_id: message.rawData?.booking_id,
             patient_id: message.rawData?.patient_id,
             currentDoctorUserId: currentDoctorUserId,
+            message_db_id: message.db_id // Для відладки
         });
         Alert.alert(t('error'), t('invalid_booking_data_for_meet_link'));
         return;
@@ -599,8 +603,10 @@ export default function Message() {
     const bookingDate = message.rawData.booking_date || message.rawData.date;
     const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
     const doctorFinalName = doctorFullName || t('doctor');
+    const notificationDbId = message.db_id; // ID повідомлення в doctor_notifications
 
     try {
+        // 1. Оновлюємо посилання в базі даних patient_bookings
         const { error: updateBookingError } = await supabase
             .from('patient_bookings')
             .update({ meet_link: meetLink })
@@ -612,6 +618,41 @@ export default function Message() {
         }
         console.log(`Meet link for booking ${bookingId} updated in patient_bookings.`);
 
+        // --- НОВИЙ КРОК: ОНОВЛЕННЯ doctor_notifications ---
+        // 2. Отримуємо поточні дані повідомлення з doctor_notifications
+        const { data: currentNotificationData, error: fetchNotifError } = await supabase
+            .from('doctor_notifications')
+            .select('data')
+            .eq('id', notificationDbId)
+            .single();
+
+        if (fetchNotifError) {
+            console.warn("Warning: Error fetching current notification data from doctor_notifications, proceeding without updating notification's rawData:", fetchNotifError.message);
+            // Ми продовжимо без оновлення doctor_notifications, якщо не вдалося завантажити
+            // або викинемо помилку, якщо вважаємо це критичним
+        }
+
+        let updatedRawDataForNotification = currentNotificationData?.data || {};
+        updatedRawDataForNotification.meet_link = meetLink; // Додаємо/оновлюємо meet_link
+
+        const { error: updateNotifError } = await supabase
+            .from('doctor_notifications')
+            .update({
+                data: updatedRawDataForNotification, // Зберігаємо оновлені дані
+                is_read: true // Можна відразу позначити як прочитане, якщо лікар взаємодіяв
+            })
+            .eq('id', notificationDbId);
+
+        if (updateNotifError) {
+            console.error("Error updating meet_link in doctor_notifications:", updateNotifError.message);
+            // Надайте користувачеві повідомлення про помилку збереження в історії
+            Alert.alert(t('error'), t('failed_to_save_meet_link_in_notification_history'));
+        } else {
+            console.log(`Meet link for notification ${notificationDbId} updated in doctor_notifications.`);
+        }
+        // --- КІНЕЦЬ НОВОГО КРОКУ ---
+
+        // 3. Викликаємо Edge Function для надсилання сповіщення пацієнту
         const sendMeetLinkUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/send-meet-link-notification';
         const { data: { session } } = await supabase.auth.getSession();
         const accessToken = session?.access_token;
@@ -632,14 +673,14 @@ export default function Message() {
 
         console.log("Calling send-meet-link-notification with data:", JSON.stringify(meetLinkPayload, null, 2));
 
-       const response = await fetch(edgeFunctionUrl, {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  // 'Authorization': `Bearer ${accessToken}`, // <--- ВИДАЛІТЬ ЦЕЙ РЯДОК
-              },
-              body: JSON.stringify(payload),
-          });
+        const response = await fetch(sendMeetLinkUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(meetLinkPayload),
+        });
 
         if (!response.ok) {
             let errorText = `HTTP Error sending meet link: ${response.status} ${response.statusText}`;
@@ -661,13 +702,28 @@ export default function Message() {
         console.log('Meet link notification sent successfully. Response:', await response.json());
         Alert.alert(t('success'), t('meet_link_sent_successfully'));
 
-        await markAsReadAndStatus(message.db_id, message.rawData.status, true);
+        // 4. ОНОВЛЮЄМО ЛОКАЛЬНИЙ СТАН `messages` ДЛЯ ВІДОБРАЖЕННЯ ПОСИЛАННЯ
+        setMessages(prevMessages =>
+            prevMessages.map(msg =>
+                msg.id === message.id
+                    ? {
+                        ...msg,
+                        meetLinkInput: meetLink, // Зберігаємо введене посилання в meetLinkInput
+                        rawData: {
+                            ...msg.rawData,
+                            meet_link: meetLink // Зберігаємо посилання також в rawData.meet_link
+                        },
+                        is_read: true // Позначаємо повідомлення як прочитане
+                    }
+                    : msg
+            )
+        );
 
     } catch (error) {
         console.error("Error sending meet link:", error.message);
         Alert.alert(t('error'), `${t('failed_to_send_meet_link')}: ${error.message}`);
     }
-  }, [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus]);
+}, [t, currentDoctorUserId, doctorFullName]);
 
   if (loading && !refreshing) {
     return (
@@ -867,6 +923,7 @@ export default function Message() {
                               {t('time')}: {message.rawData.booking_time_slot || message.time}
                           </Text>
 
+                      {/* Умова показу поля введення meet_link: якщо оплачено або посилання вже існує */}
                       {(message.rawData.is_paid || message.rawData.meet_link) && (
                         <View style={styles.meetLinkInputContainer}>
                           <TextInput
@@ -896,6 +953,7 @@ export default function Message() {
                         </View>
                       )}
 
+                      {/* Кнопка "Приєднатися до зустрічі" відображається, якщо meet_link існує */}
                       {message.rawData.meet_link && (
                           <TouchableOpacity
                               onPress={() => Linking.openURL(message.rawData.meet_link)}
@@ -1163,7 +1221,6 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(15),
   },
-  // ВИДАЛЕНО: viewDetailsButton, viewDetailsButtonText
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1197,26 +1254,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(30),
     lineHeight: moderateScale(24),
   },
-  // *** МОДИФІКОВАНА КНОПКА "ПОЗНАЧИТИ ЯК ПРОЧИТАНЕ" ***
   markAsReadButtonCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end', // Вирівнюємо до правого краю
-    marginTop: verticalScale(10), // Зменшений відступ
-    // backgroundColor: 'transparent', // Робимо фон прозорим
-    // borderTopWidth: 1, // Можна додати тонку лінію зверху
-    // borderTopColor: 'rgba(14, 179, 235, 0.1)', // Колір лінії
-    paddingVertical: verticalScale(5), // Зменшений вертикальний падінг
-    paddingHorizontal: moderateScale(10), // Зменшений горизонтальний падінг
-    alignSelf: 'flex-end', // Вирівнюємо саму кнопку до правого краю
-    // width: 'auto', // Ширина за вмістом
-    borderRadius: moderateScale(15), // Ледь заокруглені кути
-    backgroundColor: 'rgba(14, 179, 235, 0.1)', // Легкий фон
+    justifyContent: 'flex-end',
+    marginTop: verticalScale(10),
+    paddingVertical: verticalScale(5),
+    paddingHorizontal: moderateScale(10),
+    alignSelf: 'flex-end',
+    borderRadius: moderateScale(15),
+    backgroundColor: 'rgba(14, 179, 235, 0.1)',
   },
   markAsReadButtonTextCompact: {
-    color: '#0EB3EB', // Колір тексту синій
-    fontFamily: "Mont-Medium", // Середня жирність
-    fontSize: moderateScale(12), // Зменшений розмір тексту
-    marginLeft: moderateScale(5), // Відступ від іконки
+    color: '#0EB3EB',
+    fontFamily: "Mont-Medium",
+    fontSize: moderateScale(12),
+    marginLeft: moderateScale(5),
   },
 });

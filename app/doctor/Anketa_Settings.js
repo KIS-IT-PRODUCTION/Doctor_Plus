@@ -30,7 +30,6 @@ import { decode } from "base64-arraybuffer";
 // наприклад, у окремому файлі або прямо тут.
 // Для прикладу, додамо placeholder
 
-
 const specializations = [
   { nameKey: "general_practitioner", value: "general_practitioner" },
   { nameKey: "pediatrician", value: "pediatrician" },
@@ -454,6 +453,12 @@ const consultationLanguages = [
   { name: "Federated States of Micronesia", code: "FM", emoji: "🇫🇲", timezone: "UTC+10" },
   { name: "Fiji", code: "FJ", emoji: "🇫🇯", timezone: "UTC+12" },
 ];
+const generalAppLanguages = [
+  { nameKey: "english", code: "en", emoji: "" },
+  { nameKey: "ukrainian", code: "uk", emoji: "" },
+];
+
+
 const Anketa_Settings = () => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -496,6 +501,7 @@ const Anketa_Settings = () => {
   const [profileSaveError, setProfileSaveError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isDeletingProfile, setIsDeletingProfile] = useState(false); // Новий стан для видалення
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
@@ -583,6 +589,12 @@ const Anketa_Settings = () => {
           setCountry(userCountry || null);
           setConsultationCost(data.consultation_cost?.toString() || "");
 
+          // Встановлення загальної мови додатку з бази даних
+          if (data.language) {
+            i18n.changeLanguage(data.language);
+            setDisplayedLanguageCode(data.language.toUpperCase());
+          }
+
           let fetchedCommunicationLanguages = [];
           if (data.communication_languages) {
             if (Array.isArray(data.communication_languages)) {
@@ -660,10 +672,50 @@ const Anketa_Settings = () => {
   const openGeneralLanguageModal = () => setIsGeneralLanguageModalVisible(true);
   const closeGeneralLanguageModal = () =>
     setIsGeneralLanguageModalVisible(false);
-  const handleGeneralLanguageSelect = (langCode) => {
+  
+  // Оновлена функція для збереження мови інтерфейсу в БД
+  const handleGeneralLanguageSelect = async (langCode) => {
+    // 1. Змінюємо мову i18n
     i18n.changeLanguage(langCode);
+    setDisplayedLanguageCode(langCode.toUpperCase()); // Оновлюємо відображуваний код мови
     closeGeneralLanguageModal();
+
+    // 2. Зберігаємо вибрану мову в Supabase
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user || !user.id) {
+        console.error("User not authenticated for language save:", userError?.message || "User ID not found.");
+        Alert.alert(t("error_title"), t("error_not_authenticated_for_language"));
+        return;
+      }
+
+      // Оновлення колонки 'language' для поточного користувача
+      const { error } = await supabase
+        .from("profile_doctor") // Ваша таблиця
+        .upsert(
+          {
+            user_id: user.id,
+            language: langCode, // Зберігаємо обраний код мови
+          },
+          { onConflict: "user_id" } // Якщо запис існує, оновлюємо, якщо ні - створюємо
+        );
+
+      if (error) {
+        console.error("Error saving general app language:", error.message);
+        Alert.alert(t("error_title"), t("error_saving_language"));
+      } else {
+        console.log("General app language saved successfully:", langCode);
+      }
+    } catch (err) {
+      console.error("General error saving app language:", err);
+      Alert.alert(t("error_title"), t("error_general_save_language_failed"));
+    }
   };
+
 
   const openConsultationLanguageModal = () => {
     setIsConsultationLanguageModalVisible(true);
@@ -863,10 +915,6 @@ const Anketa_Settings = () => {
       return;
     }
 
-    // Додатково, для Android 10+ (API 29+), можуть бути потрібні дозволи на читання файлів
-    // Хоча ImagePicker зазвичай сам запитує необхідні дозволи, це може бути джерелом проблем.
-    // Якщо виникають проблеми на Android, розгляньте requestMediaLibraryPermissionsAsync.
-
     console.log("Permissions granted. Launching image library...");
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -874,8 +922,6 @@ const Anketa_Settings = () => {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
-        // Додаємо `allowsMultipleSelection: false` щоб явно вказати вибір одного зображення.
-        // Це не впливає на ваш сценарій, але може бути корисним для більшої ясності.
         allowsMultipleSelection: false,
       });
 
@@ -910,7 +956,6 @@ const Anketa_Settings = () => {
       }
     } catch (error) {
       console.error("Error launching ImagePicker:", error);
-      // Більш деталізоване повідомлення для користувача
       Alert.alert(
         "Помилка відкриття галереї",
         `Виникла проблема під час спроби відкрити галерею. Будь ласка, спробуйте ще раз. Деталі: ${error.message}`
@@ -1074,24 +1119,6 @@ const Anketa_Settings = () => {
     }
   };
 
-  const { width, height } = dimensions;
-  const isLargeScreen = width > 768;
-
-  const generalAppLanguages = [
-    { nameKey: "english", code: "en", emoji: "" },
-    { nameKey: "ukrainian", code: "uk", emoji: "" },
-  ];
-
-  useEffect(() => {
-    const cleanupUris = [photoUri, diplomaUri, certificateUri].filter(
-      (uri) => Platform.OS === "web" && uri && uri.startsWith("blob:")
-    );
-
-    return () => {
-      cleanupUris.forEach((uri) => URL.revokeObjectURL(uri));
-    };
-  }, [photoUri, diplomaUri, certificateUri]);
-
   const handleSignOut = async () => {
     Alert.alert(
       t("logout_confirm_title"),
@@ -1121,14 +1148,175 @@ const Anketa_Settings = () => {
       { cancelable: false }
     );
   };
- return (
+
+  const handleDeleteProfile = async () => {
+    Alert.alert(
+      t("delete_profile_confirm_title"),
+      t("delete_profile_confirm_message"),
+      [
+        {
+          text: t("cancel"),
+          style: "cancel",
+          onPress: () => console.log("Deletion canceled"),
+        },
+        {
+          text: t("delete"),
+          style: "destructive",
+          onPress: async () => {
+            setIsDeletingProfile(true);
+            try {
+              const {
+                data: { user },
+                error: userError,
+              } = await supabase.auth.getUser();
+
+              if (userError || !user || !user.id) {
+                console.error(
+                  "User not authenticated for deletion:",
+                  userError?.message || "User ID not found."
+                );
+                Alert.alert(
+                  t("error_title"),
+                  t("error_not_authenticated_for_deletion")
+                );
+                setIsDeletingProfile(false);
+                return;
+              }
+
+              const userId = user.id;
+
+              // Отримуємо URL-адреси файлів для видалення зі Storage
+              const { data: profileData, error: fetchError } = await supabase
+                .from("anketa_doctor")
+                .select("avatar_url, diploma_url, certificate_photo_url")
+                .eq("user_id", userId)
+                .single();
+
+              if (fetchError && fetchError.code !== "PGRST116") {
+                console.error(
+                  "Error fetching profile data for deletion:",
+                  fetchError.message
+                );
+                Alert.alert(
+                  t("error_title"),
+                  t("error_fetching_data_for_deletion")
+                );
+                setIsDeletingProfile(false);
+                return;
+              }
+
+              const getFilePathFromUrl = (url) => {
+                if (!url) return null;
+                const parts = url.split('/');
+                const publicIndex = parts.indexOf('public');
+                if (publicIndex !== -1 && publicIndex + 2 < parts.length) {
+                    return parts.slice(publicIndex + 2).join('/'); // Path after /public/bucket_name/
+                }
+                return null;
+              };
+
+              const filesToDelete = [];
+              if (profileData) {
+                if (profileData.avatar_url) {
+                    const avatarPath = getFilePathFromUrl(profileData.avatar_url);
+                    if (avatarPath) filesToDelete.push({ path: avatarPath, bucket: "avatars" });
+                }
+                if (profileData.diploma_url) {
+                    const diplomaPath = getFilePathFromUrl(profileData.diploma_url);
+                    if (diplomaPath) filesToDelete.push({ path: diplomaPath, bucket: "avatars" });
+                }
+                if (profileData.certificate_photo_url) {
+                    const certificatePath = getFilePathFromUrl(profileData.certificate_photo_url);
+                    if (certificatePath) filesToDelete.push({ path: certificatePath, bucket: "avatars" });
+                }
+              }
+
+              for (const file of filesToDelete) {
+                console.log(`Attempting to delete file: ${file.path} from bucket: ${file.bucket}`);
+                const { error: storageError } = await supabase.storage
+                  .from(file.bucket)
+                  .remove([file.path]);
+
+                if (storageError) {
+                  console.warn(
+                    `Warning: Could not delete file ${file.path}:`,
+                    storageError.message
+                  );
+                }
+              }
+              console.log("Storage files deletion attempted.");
+
+              // Видаляємо запис профілю лікаря з таблиці `anketa_doctor`
+              const { error: deleteProfileError } = await supabase
+                .from("anketa_doctor")
+                .delete()
+                .eq("user_id", userId);
+
+              if (deleteProfileError) {
+                console.error(
+                  "Error deleting doctor profile:",
+                  deleteProfileError.message
+                );
+                Alert.alert(
+                  t("error_title"),
+                  t("error_deleting_profile_data")
+                );
+                setIsDeletingProfile(false);
+                return;
+              }
+              console.log("Doctor profile data deleted.");
+
+              // Важливо: Видалення користувача з Supabase Auth на клієнтській стороні:
+              // Supabase не надає прямий клієнтський API для видалення *самого себе* з Auth таблиці без дозволів адміністратора.
+              // Метод `supabase.auth.admin.deleteUser(userId)` потребує Service Role Key, який НЕ ПОВИНЕН бути доступний на фронтенді.
+              // Найбезпечніший спосіб - це використати Edge Function або власний бекенд для цієї операції.
+              // Тут ми просто розлогінюємо користувача. Якщо обліковий запис має бути повністю видалений,
+              // це потрібно реалізувати на серверній стороні.
+              const { error: signOutError } = await supabase.auth.signOut();
+              if (signOutError) {
+                console.warn("Warning: Error signing out after deletion:", signOutError.message);
+              }
+              console.log("User signed out.");
+
+
+              Alert.alert(t("success_title"), t("success_profile_deleted"));
+              navigation.navigate("HomeScreen");
+            } catch (err) {
+              console.error("Загальна помилка при видаленні профілю:", err);
+              Alert.alert(
+                t("error_title"),
+                t("error_general_deletion_failed")
+              );
+            } finally {
+              setIsDeletingProfile(false);
+            }
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
+
+  const { width, height } = dimensions;
+  const isLargeScreen = width > 768;
+
+  useEffect(() => {
+    const cleanupUris = [photoUri, diplomaUri, certificateUri].filter(
+      (uri) => Platform.OS === "web" && uri && uri.startsWith("blob:")
+    );
+
+    return () => {
+      cleanupUris.forEach((uri) => URL.revokeObjectURL(uri));
+    };
+  }, [photoUri, diplomaUri, certificateUri]);
+
+
+  return (
     <SafeAreaView
       style={{
         flex: 1,
         backgroundColor: "#fff",
-        // Рекомендується залишити paddingTop тут, якщо він адаптивний для великих екранів,
-        // або дозволити SafeAreaView обробляти його повністю.
-        // Залишмо 40 для прикладу, якщо він не є динамічним для isLargeScreen тут.
         paddingTop: isLargeScreen ? 40 : 40,
       }}
     >
@@ -1181,7 +1369,7 @@ const Anketa_Settings = () => {
 
               <TouchableOpacity
                 style={styles.uploadButton(width)}
-                onPress={() => pickImage(setPhotoUri)} // Виправлена функція pickImage з попереднього файлу
+                onPress={() => pickImage(setPhotoUri)}
               >
                 <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
               </TouchableOpacity>
@@ -1270,7 +1458,7 @@ const Anketa_Settings = () => {
             <View style={styles.uploadContainer}>
               <TouchableOpacity
                 style={styles.uploadButton(width)}
-                onPress={() => pickImage(setDiplomaUri)} // Виправлена функція pickImage з попереднього файлу
+                onPress={() => pickImage(setDiplomaUri)}
               >
                 <Text style={styles.uploadButtonText}>{t("upload_diploma")}</Text>
               </TouchableOpacity>
@@ -1288,7 +1476,7 @@ const Anketa_Settings = () => {
             <View style={styles.uploadContainer}>
               <TouchableOpacity
                 style={styles.uploadButton(width)}
-                onPress={() => pickImage(setCertificateUri)} // Виправлена функція pickImage з попереднього файлу
+                onPress={() => pickImage(setCertificateUri)}
               >
                 <Text style={styles.uploadButtonText}>
                   {t("upload_certificate")}
@@ -1409,6 +1597,22 @@ const Anketa_Settings = () => {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Кнопка видалення профілю */}
+            <TouchableOpacity
+              style={styles.deleteProfileButton(width)}
+              onPress={handleDeleteProfile}
+              disabled={isDeletingProfile}
+            >
+              {isDeletingProfile ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.deleteProfileButtonText}>
+                  {t("delete_profile")}
+                </Text>
+              )}
+            </TouchableOpacity>
+
           </View>
         )}
       </ScrollView>
@@ -1727,12 +1931,9 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Regular",
   },
   container: (width, height) => ({
-    // Перегляньте ці paddingTop, вони можуть конфліктувати з SafeAreaView
-    // paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
-    // paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
     backgroundColor: "#fff",
     alignItems: "center",
-    paddingTop: 0, // Залишимо 0, якщо SafeAreaView обробляє відступи
+    paddingTop: 0,
     paddingHorizontal: width * 0.05,
     width: "100%",
   }),
@@ -1771,7 +1972,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "absolute",
     left: 0,
-    // top: 0,
     paddingVertical: 10,
     right: 0,
     fontFamily: "Mont-SemiBold",
@@ -1827,7 +2027,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    width: "90%", // Можливо, варто використовувати width * 0.9, як і інші елементи
+    width: "90%",
     marginBottom: 10,
   },
   avatarUploadContainer: {
@@ -1840,7 +2040,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0EB3EB",
     borderRadius: 555,
     paddingVertical: 15,
-    width: width * 0.9 * 0.75, // Переконайтеся, що це бажаний розмір кнопки
+    width: width * 0.9 * 0.75,
     height: 52,
     alignItems: "center",
     justifyContent: "center",
@@ -2138,6 +2338,23 @@ const styles = StyleSheet.create({
     top: Platform.OS === "ios" ? 50 : 20,
     right: 20,
     zIndex: 1,
+  },
+  // Нові стилі для кнопки видалення профілю
+  deleteProfileButton: (width) => ({
+    backgroundColor: "#FF3B30", // Червоний колір для кнопки видалення
+    borderRadius: 555,
+    paddingVertical: 15,
+    width: width * 0.9,
+    height: 52,
+    alignItems: "center",
+    marginTop: 10, // Відступ від попередніх елементів
+    marginBottom: 20,
+  }),
+  deleteProfileButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
 

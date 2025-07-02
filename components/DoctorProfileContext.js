@@ -1,19 +1,22 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '../providers/supabaseClient'; // Переконайтеся, що шлях правильний
+import { supabase } from '../providers/supabaseClient';
 import NetInfo from "@react-native-community/netinfo";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "../providers/AuthProvider"; // Припускаємо, що у вас є AuthProvider
+import { useAuth } from "../providers/AuthProvider";
 
 const DoctorProfileContext = createContext(null);
 
 export const DoctorProfileProvider = ({ children }) => {
   const { t } = useTranslation();
-  const { session } = useAuth(); // Отримуємо сесію для currentLoggedInDoctorId
+  const { session } = useAuth();
   const [doctorData, setDoctorData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Починаємо з true, оскільки ми будемо завантажувати при старті
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
-  const hasLoadedInitially = useRef({}); // Кеш для відстеження, чи завантажувались дані для конкретного ID
+
+  // Використовуємо useRef для відстеження, чи був здійснений запит для конкретного userId
+  // Це запобігає повторним запитам, якщо дані вже завантажені або відомо, що профілю немає.
+  const fetchedUserIds = useRef(new Set());
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -24,17 +27,21 @@ export const DoctorProfileProvider = ({ children }) => {
 
   const fetchDoctorProfile = useCallback(async (userId, forceRefresh = false) => {
     if (!userId) {
-      console.warn("DoctorProfileProvider: No user ID provided for fetching profile.");
+      console.warn("DoctorProfileProvider: No user ID provided for fetching profile. Resetting state.");
+      setDoctorData(null);
       setIsLoading(false);
-      setError(t("doctor_id_missing"));
+      setError(null);
+      // Важливо: не додаємо null userId до fetchedUserIds
       return;
     }
 
-    // Якщо дані вже завантажені і не потрібне примусове оновлення
-    if (!forceRefresh && doctorData && doctorData.user_id === userId && hasLoadedInitially.current[userId]) {
-      console.log(`DoctorProfileProvider: Data for doctor ${userId} already cached. Skipping fetch.`);
-      setIsLoading(false);
-      setError(null);
+    // Якщо це не примусове оновлення і ми вже завантажували дані для цього користувача,
+    // і немає активної помилки, яка б вимагала повторної спроби,
+    // тоді просто повертаємося.
+    if (!forceRefresh && fetchedUserIds.current.has(userId)) {
+      console.log(`DoctorProfileProvider: Data for doctor ${userId} already fetched. Skipping fetch.`);
+      setIsLoading(false); // Переконаємось, що індикатор завантаження вимкнений
+      setError(null); // Переконаємось, що помилка очищена, якщо дані вже є.
       return;
     }
 
@@ -53,55 +60,57 @@ export const DoctorProfileProvider = ({ children }) => {
         .single();
 
       if (fetchError) {
-        console.error("DoctorProfileProvider: Error fetching doctor data:", fetchError);
         if (fetchError.code === "PGRST116") {
-          setDoctorData({ // Ініціалізуємо порожнім об'єктом, щоб уникнути "loading stuck"
-            full_name: null, avatar_url: null, communication_languages: [], specialization: [],
-            experience_years: null, work_location: null, consultation_cost: null, about_me: null,
-            achievements: null, certificate_photo_url: null, diploma_url: null,
-            profile_doctor: { doctor_points: null }, user_id: userId
-          });
+          console.log(`DoctorProfileProvider: Profile not found for user ${userId}.`);
+          setDoctorData(null);
           setError(t("profile_not_found"));
         } else {
-          setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
+          console.error("DoctorProfileProvider: Error fetching doctor data:", fetchError);
           setDoctorData(null);
+          setError(`${t("error_fetching_doctor_data")}: ${fetchError.message}`);
         }
-        hasLoadedInitially.current[userId] = false;
       } else {
         setDoctorData(data);
         setError(null);
-        hasLoadedInitially.current[userId] = true;
         console.log("DoctorProfileProvider: Profile data fetched successfully.");
       }
+      // Після будь-якої спроби (успішної чи ні), позначаємо, що ми намагалися завантажити дані для цього userId
+      fetchedUserIds.current.add(userId);
     } catch (err) {
       console.error("DoctorProfileProvider: Unexpected error during data fetch:", err);
-      setError(`${t("unexpected_error")}: ${err.message || String(err)}`);
       setDoctorData(null);
-      hasLoadedInitially.current[userId] = false;
+      setError(`${t("unexpected_error")}: ${err.message || String(err)}`);
+      // Якщо виникла несподівана помилка, можливо, варто очистити fetchedUserIds для цього користувача
+      // щоб дозволити повторну спробу пізніше, якщо це не проблема з даними.
+      fetchedUserIds.current.delete(userId);
     } finally {
       setIsLoading(false);
     }
-  }, [t, doctorData]); // Додаємо doctorData в залежності, якщо використовуєте його всередині для логіки
+  }, [t]); // Залежність тільки від `t`
 
-  // Завантажуємо профіль при зміні сесії або налаштувань мови
+  // Цей useEffect буде запускатися лише при зміні сесії або `fetchDoctorProfile`
   useEffect(() => {
     const userId = session?.user?.id;
     if (userId) {
-      fetchDoctorProfile(userId, false); // Намагаємося завантажити, якщо ще не завантажено
+      // При першому завантаженні або зміні користувача, завжди викликаємо fetchDoctorProfile
+      // forceRefresh = true, щоб переконатися, що дані оновляться при зміні користувача
+      // Або коли ми просто хочемо, щоб провайдер сам завантажив дані
+      fetchDoctorProfile(userId, false); // Змінив на false, оскільки `fetchedUserIds` вже керує кешуванням
     } else {
       setDoctorData(null);
       setIsLoading(false);
-      setError(null); // Скинути помилки, якщо користувач вийшов
+      setError(null);
+      fetchedUserIds.current.clear(); // Очищаємо кеш при виході користувача
       console.log("DoctorProfileProvider: No user session, clearing profile data.");
     }
-  }, [session, fetchDoctorProfile]);
+  }, [session, fetchDoctorProfile]); // Залежності: session та useCallback-ований fetchDoctorProfile
 
   const value = {
     doctorData,
     isLoading,
     error,
     isConnected,
-    fetchDoctorProfile, // Функція для примусового оновлення
+    fetchDoctorProfile,
   };
 
   return (
