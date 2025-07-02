@@ -187,7 +187,21 @@
     "general_practitioner": "Терапевт"
   },
 "header_title": "Повідомлення",
+
+
   "messages_screen": {
+    "patient": "Пацієнт",
+    "not_specified": "Не вказано",
+    "date": "Дата",
+    "time": "Час",
+    "confirm": "Підтвердити",
+    "reject": "Відхилити",
+    "payment_status": "Статус оплати",
+    "amount": "Сума",
+    "enter_meet_link_placeholder": "Введіть посилання на зустріч",
+    "update_meet_link": "Оновити посилання",
+    "send_meet_link": "Надіслати посилання",
+    "join_meet": "Приєднатися до зустрічі",
     "today": "Сьогодні",
     "yesterday": "Вчора",
     "consultation_confirmation_title": "Підтвердження консультації",
@@ -257,14 +271,28 @@
     "authorName": "Яремій Роман",
     "reviewText": "Запис до лікаря займає буквально кілька секунд. Все зрозуміло, без черг, а особливо сподобалося, що можна одразу поспілкуватися з лікарем у чаті. Інтерфейс простий, кольори приємні. Рекомендую всім, хто цінує свій час!"
   },
-  "writeReview": {
-    "titleLabel": "Заголовок",
-    "titlePlaceholder": "Введіть заголовок відгуку",
-    "reviewTextLabel": "Напишіть відгук",
-    "reviewTextPlaceholder": "Поділіться своїм досвідом...",
-    "yourRatingLabel": "Ваша оцінка",
-    "submitButton": "Надіслати"
-  },
+
+ 
+   
+    "failed_to_get_patient_profile_data": "Не вдалося отримати дані профілю пацієнта.",
+    "failed_to_get_doctor_cost": "Не вдалося отримати вартість консультації лікаря.",
+    "failed_to_get_user_info_or_profile": "Не вдалося отримати інформацію про користувача або профіль.",
+    "booked_by_other": "Заброньовано іншим",
+    "no_slot_selected": "Не вибрано жодного слоту",
+    "failed_to_get_patient_name": "Не вдалося отримати повне ім'я пацієнта. Бронювання неможливе.",
+    "consultation_cost_not_loaded_yet": "Вартість консультації ще не завантажена. Будь ласка, спробуйте ще раз.",
+    "attention": "Увага",
+    "this_consultation_is_free_confirm_booking": "Ця консультація безкоштовна. Підтвердити бронювання?",
+    "failed_to_book": "Не вдалося забронювати",
+    "failed_to_send_notification_for_slot": "Не вдалося надіслати сповіщення для слоту",
+    "failed_to_book_slot_error": "Помилка бронювання слоту",
+    "booking_summary": "Підсумок бронювання",
+    "successfully_booked_slots": "Успішно заброньовано слотів",
+    "failed_slots": "Неуспішних слотів",
+    "no_slots_could_be_booked": "Жодного слоту не вдалося забронювати.",
+
+
+
 
   "sort": "Сортувати",
   "rating": "Рейтинг",
@@ -780,5 +808,21 @@
     "pending": "В очікуванні",
     "wait_secure": "Очікує підтвердження",
     "3ds_verify": "Очікує 3D Secure"
-  }
+  },
+  
+  "writeReview": {
+    "validationErrorTitle": "Помилка валідації",
+    "validationErrorMessage": "Будь ласка, заповніть усі поля та поставте оцінку (зірочки).",
+    "loginRequired": "Ви не авторизовані. Будь ласка, увійдіть.",
+    "submitError": "Не вдалося надіслати відгук.",
+    "submitSuccess": "Ваш відгук успішно надіслано.",
+    "unexpectedError": "Неочікувана помилка:",
+    "fullNameLabel": "Ваше повне ім'я:",
+    "fullNamePlaceholder": "Введіть ваше ПІБ",
+    "reviewTextLabel": "Ваш відгук:",
+    "reviewTextPlaceholder": "Напишіть ваш відгук тут...",
+    "yourRatingLabel": "Ваша оцінка:",
+    "submitButton": "Надіслати відгук"
+  
+}
 }

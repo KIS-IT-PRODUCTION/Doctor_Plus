@@ -38,7 +38,7 @@
         "backgroundColor": "#ffffff",
         "tabletImage": "./assets/icon.png",
         "tabletBackgroundColor": "#ffffff",
-        "darkModeImage": "./assets/icon.png",
+        "darkModeImage": "./assets/icon2.png",
         "darkModeBackgroundColor": "#ffffff"
       }
     },
