@@ -15,9 +15,7 @@
       "tabletImage": "./assets/icon.png",
       "tabletBackgroundColor": "#ffffff",
       "darkModeImage": "./assets/icon.png",
-      "darkModeBackgroundColor": "#ffffff",
-      "width": "5%",
-      "height": "5%"
+      "darkModeBackgroundColor": "#ffffff"
     },
     "extra": {
       "supabaseUrl": "https://yslchkbmupuyxgidnzrb.supabase.co",
@@ -31,11 +29,13 @@
       "bundleIdentifier": "com.kis-production.DOCTOR",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату.",
-        "NSCameraUsageDescription": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
+        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
+        "NSPhotoLibraryUsageDescription_uk": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату.",
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates.",
+        "NSCameraUsageDescription_uk": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
       },
       "splash": {
-        "image": "./assets/icon2.png",
+        "image": "./assets/icon.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
         "tabletImage": "./assets/icon.png",
@@ -51,7 +51,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.kis_production.DOCTOR",
-      "googleServicesFile": "./google-services.json", 
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -71,12 +71,11 @@
           ]
         }
       ],
-
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
-        "android.permission.ACCESS_MEDIA_LOCATION" 
+        "android.permission.ACCESS_MEDIA_LOCATION"
       ]
     },
     "web": {
@@ -98,8 +97,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату.",
-          "cameraPermission": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
+          "photosPermission": {
+            "en": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
+            "uk": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату."
+          },
+          "cameraPermission": {
+            "en": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates.",
+            "uk": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
+          }
         }
       ]
     ]

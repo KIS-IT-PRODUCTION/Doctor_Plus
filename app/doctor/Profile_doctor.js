@@ -184,8 +184,201 @@ const ValueBox = ({ children, t }) => {
 
 // --- Додаємо мапу прапорів ---
 const COUNTRY_FLAGS_MAP = {
-  "EN": "", // Використовуємо для 'english'
-  "UK": "", // Використовуємо для 'ukrainian'
+   "EN": "🇬🇧", // Використовуємо для 'english'
+  "UK": "🇺🇦", // Використовуємо для 'ukrainian'
+  "DE": "🇩🇪", // Germany/German
+  "PH": "🇵🇭", // Philippines
+  "HR": "🇭🇷", // Croatia
+  "CF": "🇨🇫", // Central African Republic
+  "TD": "🇹🇩", // Chad
+  "CZ": "🇨🇿", // Czechia
+  "CL": "🇨🇱", // Chile
+  "ME": "🇲🇪", // Montenegro
+  "LK": "🇱🇰", // Sri Lanka
+  "JM": "🇯🇲", // Jamaica
+  "UA": "🇺🇦", // Ukraine
+  "GB": "🇬🇧", // United Kingdom
+  "US": "🇺🇸", // United States
+  "CA": "🇨🇦", // Canada
+  "FR": "🇫🇷", // France
+  "PL": "🇵🇱", // Poland
+  "IT": "🇮🇹", // Italy
+  "ES": "🇪🇸", // Spain
+  "JP": "🇯🇵", // Japan
+  "CN": "🇨🇳", // China
+  "IN": "🇮🇳", // India
+  "AU": "🇦🇺", // Australia
+  "BR": "🇧🇷", // Brazil
+  "TR": "🇹🇷", // Turkey
+  "SE": "🇸🇪", // Sweden
+  "CH": "🇨🇭", // Switzerland
+  "NL": "🇳🇱", // Netherlands
+  "NO": "🇳🇴", // Norway
+  "DK": "🇩🇰", // Denmark
+  "FI": "🇫🇮", // Finland
+  "ZA": "🇿🇦", // South Africa
+  "MX": "🇲🇽", // Mexico
+  "KR": "🇰🇷", // South Korea
+  "AR": "🇦🇷", // Argentina
+  "IE": "🇮🇪", // Ireland
+  "NZ": "🇳🇿", // New Zealand
+  "SG": "🇸🇬", // Singapore
+  "IL": "🇮🇱", // Israel
+  "MY": "🇲🇾", // Malaysia
+  "TH": "🇹🇭", // Thailand
+  "VN": "🇻🇳", // Vietnam
+  "ID": "🇮🇩", // Indonesia
+  "EG": "🇪🇬", // Egypt
+  "NG": "🇳🇬", // Nigeria
+  "SA": "🇸🇦", // Saudi Arabia
+  "AE": "🇦🇪", // United Arab Emirates
+  "KW": "🇰🇼", // Kuwait
+  "QA": "🇶🇦", // Qatar
+  "AT": "🇦🇹", // Austria
+  "AZ": "🇦🇿", // Azerbaijan
+  "AL": "🇦🇱", // Albania
+  "DZ": "🇩🇿", // Algeria
+  "AO": "🇦🇴", // Angola
+  "AD": "🇦🇩", // Andorra
+  "AG": "🇦🇬", // Antigua and Barbuda
+  "AF": "🇦🇫", // Afghanistan
+  "BS": "🇧🇸", // Bahamas
+  "BD": "🇧🇩", // Bangladesh
+  "BB": "🇧🇧", // Barbados
+  "BH": "🇧🇭", // Bahrain
+  "BZ": "🇧🇿", // Belize
+  "BE": "🇧🇪", // Belgium
+  "BJ": "🇧🇯", // Benin
+  "BY": "🇧🇾", // Belarus
+  "BG": "🇧🇬", // Bulgaria
+  "BO": "🇧🇴", // Bolivia
+  "BA": "🇧🇦", // Bosnia and Herzegovina
+  "BW": "🇧🇼", // Botswana
+  "BN": "🇧🇳", // Brunei
+  "BF": "🇧🇫", // Burkina Faso
+  "BI": "🇧🇮", // Burundi
+  "BT": "🇧🇹", // Bhutan
+  "VU": "🇻🇺", // Vanuatu
+  "VE": "🇻🇪", // Venezuela
+  "AM": "🇦🇲", // Armenia
+  "GA": "🇬🇦", // Gabon
+  "HT": "🇭🇹", // Haiti
+  "GM": "🇬🇲", // Gambia
+  "GH": "🇬🇭", // Ghana
+  "GY": "🇬🇾", // Guyana
+  "GT": "🇬🇹", // Guatemala
+  "GN": "🇬🇳", // Guinea
+  "GW": "🇬🇼", // Guinea-Bissau
+  "HN": "🇭🇳", // Honduras
+  "GD": "🇬🇩", // Grenada
+  "GR": "🇬🇷", // Greece
+  "GE": "🇬🇪", // Georgia
+  "DJ": "🇩🇯", // Djibouti
+  "DM": "🇩🇲", // Dominica
+  "DO": "🇩🇴", // Dominican Republic
+  "CD": "🇨🇩", // DR Congo
+  "EC": "🇪🇨", // Ecuador
+  "GQ": "🇬🇶", // Equatorial Guinea
+  "ER": "🇪🇷", // Eritrea
+  "SZ": "🇸🇿", // Eswatini
+  "EE": "🇪🇪", // Estonia
+  "ET": "🇪🇹", // Ethiopia
+  "YE": "🇾🇪", // Yemen
+  "ZM": "🇿🇲", // Zambia
+  "ZW": "🇿🇼", // Zimbabwe
+  "IR": "🇮🇷", // Iran
+  "IS": "🇮🇸", // Iceland
+  "IQ": "🇮🇶", // Iraq
+  "JO": "🇯🇴", // Jordan
+  "CV": "🇨🇻", // Cape Verde
+  "KZ": "🇰🇿", // Kazakhstan
+  "KH": "🇰🇭", // Cambodia
+  "CM": "🇨🇲", // Cameroon
+  "KE": "🇰🇪", // Kenya
+  "KG": "🇰🇬", // Kyrgyzstan
+  "CY": "🇨🇾", // Cyprus
+  "KI": "🇰🇮", // Kiribati
+  "CO": "🇨🇴", // Colombia
+  "KM": "🇰🇲", // Comoros
+  "CR": "🇨🇷", // Costa Rica
+  "CI": "🇨🇮", // Ivory Coast
+  "CU": "🇨🇺", // Cuba
+  "LA": "🇱🇦", // Laos
+  "LV": "🇱🇻", // Latvia
+  "LS": "🇱🇸", // Lesotho
+  "LT": "🇱🇹", // Lithuania
+  "LR": "🇱🇷", // Liberia
+  "LB": "🇱🇧", // Lebanon
+  "LY": "🇱🇾", // Libya
+  "LI": "🇱🇮", // Liechtenstein
+  "LU": "🇱🇺", // Luxembourg
+  "MM": "🇲🇲", // Myanmar
+  "MU": "🇲🇺", // Mauritius
+  "MR": "🇲🇷", // Mauritania
+  "MG": "🇲🇬", // Madagascar
+  "MW": "🇲🇼", // Malawi
+  "ML": "🇲🇱", // Mali
+  "MV": "🇲🇻", // Maldives
+  "MT": "🇲🇹", // Malta
+  "MA": "🇲🇦", // Morocco
+  "MH": "🇲🇭", // Marshall Islands
+  "MZ": "🇲🇿", // Mozambique
+  "MD": "🇲🇩", // Moldova
+  "MC": "🇲🇨", // Monaco
+  "MN": "🇲🇳", // Mongolia
+  "NA": "🇳🇦", // Namibia
+  "NR": "🇳🇷", // Nauru
+  "NP": "🇳🇵", // Nepal
+  "NE": "🇳🇪", // Niger
+  "NI": "🇳🇮", // Nicaragua
+  "OM": "🇴🇲", // Oman
+  "PK": "🇵🇰", // Pakistan
+  "PW": "🇵🇼", // Palau
+  "PA": "🇵🇦", // Panama
+  "PG": "🇵🇬", // Papua New Guinea
+  "PY": "🇵🇾", // Paraguay
+  "PE": "🇵🇪", // Peru
+  "SS": "🇸🇸", // South Sudan
+  "KP": "🇰🇵", // North Korea
+  "MK": "🇲🇰", // North Macedonia
+  "PT": "🇵🇹", // Portugal
+  "CG": "🇨🇬", // Republic of the Congo
+  "RU": "🇷🇺", // Russia
+  "RW": "🇷🇼", // Rwanda
+  "RO": "🇷🇴", // Romania
+  "SV": "🇸🇻", // El Salvador
+  "WS": "🇼🇸", // Samoa
+  "SM": "🇸🇲", // San Marino
+  "ST": "🇸🇹", // Sao Tome and Principe
+  "SC": "🇸🇨", // Seychelles
+  "SN": "🇸🇳", // Senegal
+  "VC": "🇻🇨", // Saint Vincent and the Grenadines
+  "KN": "🇰🇳", // Saint Kitts and Nevis
+  "LC": "🇱🇨", // Saint Lucia
+  "RS": "🇷🇸", // Serbia
+  "SY": "🇸🇾", // Syria
+  "SK": "🇸🇰", // Slovakia
+  "SI": "🇸🇮", // Slovenia
+  "SB": "🇸🇧", // Solomon Islands
+  "SO": "🇸🇴", // Somalia
+  "SD": "🇸🇩", // Sudan
+  "SR": "🇸🇷", // Suriname
+  "TL": "🇹🇱", // East Timor
+  "SL": "🇸🇱", // Sierra Leone
+  "TJ": "🇹🇯", // Tajikistan
+  "TZ": "🇹🇿", // Tanzania
+  "TG": "🇹🇬", // Togo
+  "TO": "🇹🇴", // Tonga
+  "TT": "🇹🇹", // Trinidad and Tobago
+  "TV": "🇹🇻", // Tuvalu
+  "TN": "🇹🇳", // Tunisia
+  "TM": "🇹🇲", // Turkmenistan
+  "UG": "🇺🇬", // Uganda
+  "HU": "🇭🇺", // Hungary
+  "UZ": "🇺🇿", // Uzbekistan
+  "UY": "🇺🇾", // Uruguay
+  "FM": "🇫🇲", // Federated States of Micronesia
+  "FJ": "🇫🇯", // Fiji
 };
 
 const LanguageFlags = ({ languages }) => {

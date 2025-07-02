@@ -42,7 +42,9 @@ import ResetPasswordScreen from "./app/doctor/ResetPasswordScreen";
 import TabBar_doctor from "./components/TopBar_doctor";
 
 import { DoctorProfileProvider } from "./components/DoctorProfileContext";
+import { enableScreens } from 'react-native-screens';
 
+enableScreens();
 SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();

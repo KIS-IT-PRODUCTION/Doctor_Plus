@@ -632,14 +632,14 @@ export default function Message() {
 
         console.log("Calling send-meet-link-notification with data:", JSON.stringify(meetLinkPayload, null, 2));
 
-        const response = await fetch(sendMeetLinkUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify(meetLinkPayload),
-        });
+       const response = await fetch(edgeFunctionUrl, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  // 'Authorization': `Bearer ${accessToken}`, // <--- ВИДАЛІТЬ ЦЕЙ РЯДОК
+              },
+              body: JSON.stringify(payload),
+          });
 
         if (!response.ok) {
             let errorText = `HTTP Error sending meet link: ${response.status} ${response.statusText}`;

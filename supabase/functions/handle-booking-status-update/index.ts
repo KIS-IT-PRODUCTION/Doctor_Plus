@@ -25,7 +25,7 @@ async function getPatientExpoPushToken(supabaseClient: any, patientId: string): 
         const { data: profile, error } = await supabaseClient
             .from('profiles')
             .select('notification_token')
-            .eq('id', patientId)
+            .eq('user_id', patientId)
             .single();
 
         if (error) {
