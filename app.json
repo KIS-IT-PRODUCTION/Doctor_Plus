@@ -30,9 +30,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
-        "NSPhotoLibraryUsageDescription_uk": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату.",
-        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates.",
-        "NSCameraUsageDescription_uk": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates."
       },
       "splash": {
         "image": "./assets/icon2.png",
@@ -97,14 +95,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": {
-            "en": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
-            "uk": "Дозвольте $(PRODUCT_NAME) доступ до ваших фотографій для вибору фото профілю, диплому чи сертифікату."
-          },
-          "cameraPermission": {
-            "en": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates.",
-            "uk": "Дозвольте $(PRODUCT_NAME) доступ до вашої камери для зйомки фото профілю, диплому чи сертифікату."
-          }
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates."
         }
       ]
     ]
