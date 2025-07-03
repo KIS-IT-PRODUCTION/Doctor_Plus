@@ -36,7 +36,7 @@
         "image": "./assets/icon2.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
-        "tabletImage": "./assets/icon.png",
+        "tabletImage": "./assets/icon2.png",
         "tabletBackgroundColor": "#ffffff",
         "darkModeImage": "./assets/icon2.png",
         "darkModeBackgroundColor": "#ffffff"

@@ -86,7 +86,7 @@ async function registerForPushNotificationsAsync(userId) {
 
     try {
       token = (
-        await Notifications.getExpoPushPushTokenAsync({
+        await Notifications.getExpoPushTokenAsync({
           projectId: "e2619b61-6ef5-4958-90bc-a400bbc8c50a",
         })
       ).data;
@@ -387,7 +387,6 @@ const LanguageFlags = ({ languages }) => {
   if (!languages || languages.length === 0) {
     return null;
   }
-
   return (
     <View style={styles.flagsContainer}>
       {languages.map(
@@ -1621,6 +1620,30 @@ const styles = StyleSheet.create({
     color: "#333333",
     textAlign: 'center',
     flexWrap: 'wrap',
+  },
+   modalButton: {
+    backgroundColor: "#0EB3EB",
+    borderRadius: moderateScale(10),
+    paddingVertical: moderateScale(5),
+    paddingHorizontal: moderateScale(20),
+    elevation: 2,
+    minWidth: moderateScale(80),
+    marginBottom: moderateScale(10),
+  },
+  modalButtonText: {
+    color: "white",
+    textAlign: "center",
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-SemiBold",
+
+  },
+  modalText: {
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-Regular",
+    color: "#555",
+    marginBottom: moderateScale(25),
+    textAlign: "center",
+    lineHeight: moderateScale(22),
   },
 });
 

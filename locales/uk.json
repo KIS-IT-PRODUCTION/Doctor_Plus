@@ -162,7 +162,7 @@
     "traumatologist": "Травматолог",
     "pediatrician": "Педіатр",
     "gynecologist": "Гінеколог",
-    "ent": "ЛОР",
+    "categories.ent_specialist": "ЛОР",
     "surgeon": "Хірург",
     "cardiologist": "Кардіолог",
     "dentist": "Стоматолог",
@@ -186,9 +186,10 @@
     "anesthesiologist": "Анестезіолог",
     "general_practitioner": "Терапевт"
   },
+  "not_specified_full": "Не вказано",
+    "delete_profile": "Видалити профіль",
+
 "header_title": "Повідомлення",
-
-
   "messages_screen": {
     "patient": "Пацієнт",
     "not_specified": "Не вказано",

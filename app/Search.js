@@ -60,7 +60,7 @@ const specializationsList = [
   { value: "psychiatrist", nameKey: "categories.psychiatrist" },
   { value: "dentist", nameKey: "categories.dentist" },
   { value: "ophthalmologist", nameKey: "categories.ophthalmologist" },
-  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
+  { value: "categories.ent_specialist", nameKey: "ent_specialist" },
   { value: "gastroenterologist", nameKey: "categories.gastroenterologist" },
   { value: "endocrinologist", nameKey: "categories.endocrinologist" },
   { value: "oncologist", nameKey: "categories.oncologist" },

@@ -40,7 +40,7 @@ const specializations = [
   { nameKey: "psychiatrist", value: "psychiatrist" },
   { nameKey: "dentist", value: "dentist" },
   { nameKey: "ophthalmologist", value: "ophthalmologist" },
-  { nameKey: "ent_specialist", value: "ent_specialist" },
+  { nameKey: "ent_specialist", value: "categories.ent_specialist" },
   { nameKey: "gastroenterologist", value: "gastroenterologist" },
   { nameKey: "endocrinologist", value: "endocrinologist" },
   { nameKey: "oncologist", value: "oncologist" },

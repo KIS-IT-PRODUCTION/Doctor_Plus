@@ -162,7 +162,7 @@
     "traumatologist": "Traumatologist",
     "pediatrician": "Pediatrician",
     "gynecologist": "Gynecologist",
-    "ent": "ENT",
+    "categories.ent_specialist": "ENT",
     "surgeon": "Surgeon",
     "cardiologist": "Cardiologist",
     "dentist": "Dentist",
@@ -186,6 +186,8 @@
     "anesthesiologist": "Anesthesiologist",
     "general_practitioner": "General Practitioner"
   },
+    "not_specified_full": "Not specified",
+    "delete_profile": "Delete profile",
   "header_title": "Messages",
   "messages_screen": {
     "today": "Today",

@@ -61,10 +61,7 @@ const allDoctorSpecializations = [
   { key: "rheumatologist", nameKey: "categories.rheumatologist" },
   { key: "oncologist", nameKey: "categories.oncologist" },
   { key: "allergist", nameKey: "categories.allergist" },
-  {
-    key: "infectiousDiseasesSpecialist",
-    nameKey: "categories.infectiousDiseasesSpecialist",
-  },
+  {key: "infectiousDiseasesSpecialist",nameKey: "categories.infectiousDiseasesSpecialist"},
   { key: "psychiatrist", nameKey: "categories.psychiatrist" },
   { key: "psychologist", nameKey: "categories.psychologist" },
   { key: "physiotherapist", nameKey: "categories.physiotherapist" },
