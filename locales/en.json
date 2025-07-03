@@ -188,6 +188,7 @@
   },
     "not_specified_full": "Not specified",
     "delete_profile": "Delete profile",
+    "status_pending": "Waiting check",
   "header_title": "Messages",
   "messages_screen": {
     "today": "Today",

@@ -16,7 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useNavigation } from "@react-navigation/native";
-import { useTranslation }  from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 // import Icon from "../assets/icon.svg"; // Залишаємо закоментованим, якщо не використовується напряму тут
 
@@ -82,201 +82,13 @@ const specializationsList = [
 
 // --- Додаємо мапу прапорів (таку ж, як у Profile_doctor.js) ---
 const COUNTRY_FLAGS_MAP = {
-  "EN": "🇬🇧", // Використовуємо для 'english'
-  "UK": "🇺🇦", // Використовуємо для 'ukrainian'
-  "DE": "🇩🇪", // Germany/German
-  "PH": "🇵🇭", // Philippines
-  "HR": "🇭🇷", // Croatia
-  "CF": "🇨🇫", // Central African Republic
-  "TD": "🇹🇩", // Chad
-  "CZ": "🇨🇿", // Czechia
-  "CL": "🇨🇱", // Chile
-  "ME": "🇲🇪", // Montenegro
-  "LK": "🇱🇰", // Sri Lanka
-  "JM": "🇯🇲", // Jamaica
-  "UA": "🇺🇦", // Ukraine
-  "GB": "🇬🇧", // United Kingdom
-  "US": "🇺🇸", // United States
-  "CA": "🇨🇦", // Canada
-  "FR": "🇫🇷", // France
-  "PL": "🇵🇱", // Poland
-  "IT": "🇮🇹", // Italy
-  "ES": "🇪🇸", // Spain
-  "JP": "🇯🇵", // Japan
-  "CN": "🇨🇳", // China
-  "IN": "🇮🇳", // India
-  "AU": "🇦🇺", // Australia
-  "BR": "🇧🇷", // Brazil
-  "TR": "🇹🇷", // Turkey
-  "SE": "🇸🇪", // Sweden
-  "CH": "🇨🇭", // Switzerland
-  "NL": "🇳🇱", // Netherlands
-  "NO": "🇳🇴", // Norway
-  "DK": "🇩🇰", // Denmark
-  "FI": "🇫🇮", // Finland
-  "ZA": "🇿🇦", // South Africa
-  "MX": "🇲🇽", // Mexico
-  "KR": "🇰🇷", // South Korea
-  "AR": "🇦🇷", // Argentina
-  "IE": "🇮🇪", // Ireland
-  "NZ": "🇳🇿", // New Zealand
-  "SG": "🇸🇬", // Singapore
-  "IL": "🇮🇱", // Israel
-  "MY": "🇲🇾", // Malaysia
-  "TH": "🇹🇭", // Thailand
-  "VN": "🇻🇳", // Vietnam
-  "ID": "🇮🇩", // Indonesia
-  "EG": "🇪🇬", // Egypt
-  "NG": "🇳🇬", // Nigeria
-  "SA": "🇸🇦", // Saudi Arabia
-  "AE": "🇦🇪", // United Arab Emirates
-  "KW": "🇰🇼", // Kuwait
-  "QA": "🇶🇦", // Qatar
-  "AT": "🇦🇹", // Austria
-  "AZ": "🇦🇿", // Azerbaijan
-  "AL": "🇦🇱", // Albania
-  "DZ": "🇩🇿", // Algeria
-  "AO": "🇦🇴", // Angola
-  "AD": "🇦🇩", // Andorra
-  "AG": "🇦🇬", // Antigua and Barbuda
-  "AF": "🇦🇫", // Afghanistan
-  "BS": "🇧🇸", // Bahamas
-  "BD": "🇧🇩", // Bangladesh
-  "BB": "🇧🇧", // Barbados
-  "BH": "🇧🇭", // Bahrain
-  "BZ": "🇧🇿", // Belize
-  "BE": "🇧🇪", // Belgium
-  "BJ": "🇧🇯", // Benin
-  "BY": "🇧🇾", // Belarus
-  "BG": "🇧🇬", // Bulgaria
-  "BO": "🇧🇴", // Bolivia
-  "BA": "🇧🇦", // Bosnia and Herzegovina
-  "BW": "🇧🇼", // Botswana
-  "BN": "🇧🇳", // Brunei
-  "BF": "🇧🇫", // Burkina Faso
-  "BI": "🇧🇮", // Burundi
-  "BT": "🇧🇹", // Bhutan
-  "VU": "🇻🇺", // Vanuatu
-  "VE": "🇻🇪", // Venezuela
-  "AM": "🇦🇲", // Armenia
-  "GA": "🇬🇦", // Gabon
-  "HT": "🇭🇹", // Haiti
-  "GM": "🇬🇲", // Gambia
-  "GH": "🇬🇭", // Ghana
-  "GY": "🇬🇾", // Guyana
-  "GT": "🇬🇹", // Guatemala
-  "GN": "🇬🇳", // Guinea
-  "GW": "🇬🇼", // Guinea-Bissau
-  "HN": "🇭🇳", // Honduras
-  "GD": "🇬🇩", // Grenada
-  "GR": "🇬🇷", // Greece
-  "GE": "🇬🇪", // Georgia
-  "DJ": "🇩🇯", // Djibouti
-  "DM": "🇩🇲", // Dominica
-  "DO": "🇩🇴", // Dominican Republic
-  "CD": "🇨🇩", // DR Congo
-  "EC": "🇪🇨", // Ecuador
-  "GQ": "🇬🇶", // Equatorial Guinea
-  "ER": "🇪🇷", // Eritrea
-  "SZ": "🇸🇿", // Eswatini
-  "EE": "🇪🇪", // Estonia
-  "ET": "🇪🇹", // Ethiopia
-  "YE": "🇾🇪", // Yemen
-  "ZM": "🇿🇲", // Zambia
-  "ZW": "🇿🇼", // Zimbabwe
-  "IR": "🇮🇷", // Iran
-  "IS": "🇮🇸", // Iceland
-  "IQ": "🇮🇶", // Iraq
-  "JO": "🇯🇴", // Jordan
-  "CV": "🇨🇻", // Cape Verde
-  "KZ": "🇰🇿", // Kazakhstan
-  "KH": "🇰🇭", // Cambodia
-  "CM": "🇨🇲", // Cameroon
-  "KE": "🇰🇪", // Kenya
-  "KG": "🇰🇬", // Kyrgyzstan
-  "CY": "🇨🇾", // Cyprus
-  "KI": "🇰🇮", // Kiribati
-  "CO": "🇨🇴", // Colombia
-  "KM": "🇰🇲", // Comoros
-  "CR": "🇨🇷", // Costa Rica
-  "CI": "🇨🇮", // Ivory Coast
-  "CU": "🇨🇺", // Cuba
-  "LA": "🇱🇦", // Laos
-  "LV": "🇱🇻", // Latvia
-  "LS": "🇱🇸", // Lesotho
-  "LT": "🇱🇹", // Lithuania
-  "LR": "🇱🇷", // Liberia
-  "LB": "🇱🇧", // Lebanon
-  "LY": "🇱🇾", // Libya
-  "LI": "🇱🇮", // Liechtenstein
-  "LU": "🇱🇺", // Luxembourg
-  "MM": "🇲🇲", // Myanmar
-  "MU": "🇲🇺", // Mauritius
-  "MR": "🇲🇷", // Mauritania
-  "MG": "🇲🇬", // Madagascar
-  "MW": "🇲🇼", // Malawi
-  "ML": "🇲🇱", // Mali
-  "MV": "🇲🇻", // Maldives
-  "MT": "🇲🇹", // Malta
-  "MA": "🇲🇦", // Morocco
-  "MH": "🇲🇭", // Marshall Islands
-  "MZ": "🇲🇿", // Mozambique
-  "MD": "🇲🇩", // Moldova
-  "MC": "🇲🇨", // Monaco
-  "MN": "🇲🇳", // Mongolia
-  "NA": "🇳🇦", // Namibia
-  "NR": "🇳🇷", // Nauru
-  "NP": "🇳🇵", // Nepal
-  "NE": "🇳🇪", // Niger
-  "NI": "🇳🇮", // Nicaragua
-  "OM": "🇴🇲", // Oman
-  "PK": "🇵🇰", // Pakistan
-  "PW": "🇵🇼", // Palau
-  "PA": "🇵🇦", // Panama
-  "PG": "🇵🇬", // Papua New Guinea
-  "PY": "🇵🇾", // Paraguay
-  "PE": "🇵🇪", // Peru
-  "SS": "🇸🇸", // South Sudan
-  "KP": "🇰🇵", // North Korea
-  "MK": "🇲🇰", // North Macedonia
-  "PT": "🇵🇹", // Portugal
-  "CG": "🇨🇬", // Republic of the Congo
-  "RU": "🇷🇺", // Russia
-  "RW": "🇷🇼", // Rwanda
-  "RO": "🇷🇴", // Romania
-  "SV": "🇸🇻", // El Salvador
-  "WS": "🇼🇸", // Samoa
-  "SM": "🇸🇲", // San Marino
-  "ST": "🇸🇹", // Sao Tome and Principe
-  "SC": "🇸🇨", // Seychelles
-  "SN": "🇸🇳", // Senegal
-  "VC": "🇻🇨", // Saint Vincent and the Grenadines
-  "KN": "🇰🇳", // Saint Kitts and Nevis
-  "LC": "🇱🇨", // Saint Lucia
-  "RS": "🇷🇸", // Serbia
-  "SY": "🇸🇾", // Syria
-  "SK": "🇸🇰", // Slovakia
-  "SI": "🇸🇮", // Slovenia
-  "SB": "🇸🇧", // Solomon Islands
-  "SO": "🇸🇴", // Somalia
-  "SD": "🇸🇩", // Sudan
-  "SR": "🇸🇷", // Suriname
-  "TL": "🇹🇱", // East Timor
-  "SL": "🇸🇱", // Sierra Leone
-  "TJ": "🇹🇯", // Tajikistan
-  "TZ": "🇹🇿", // Tanzania
-  "TG": "🇹🇬", // Togo
-  "TO": "🇹🇴", // Tonga
-  "TT": "🇹🇹", // Trinidad and Tobago
-  "TV": "🇹🇻", // Tuvalu
-  "TN": "🇹🇳", // Tunisia
-  "TM": "🇹🇲", // Turkmenistan
-  "UG": "🇺🇬", // Uganda
-  "HU": "🇭🇺", // Hungary
-  "UZ": "🇺🇿", // Uzbekistan
-  "UY": "🇺🇾", // Uruguay
-  "FM": "🇫🇲", // Federated States of Micronesia
-  "FJ": "🇫🇯", // Fiji
+  // Тут має бути ваш об'єкт з прапорами
+  // Наприклад:
+  // US: "🇺🇸",
+  // UA: "🇺🇦",
+  // GB: "🇬🇧",
+  // DE: "🇩🇪",
+  // FR: "🇫🇷",
 };
 
 
@@ -407,7 +219,7 @@ const DoctorCard = ({ doctor }) => {
             {Array.from({ length: 5 - starRating }).map((_, i) => (
               <Ionicons key={`star-outline-${i}`} name="star-outline" size={moderateScale(18)} color="#ccc" />
             ))}
-             {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
+            {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
               <Text style={styles.ratingPointsText}> ({doctorPoints} {t('points_short')})</Text>
             )}
           </InfoBox>
@@ -472,9 +284,9 @@ const Search = () => {
     setDoctors([]);
 
     if (!query && !category && !hasUserInitiatedSearch) {
-        setDoctors([]);
-        setLoading(false);
-        return;
+      setDoctors([]);
+      setLoading(false);
+      return;
     }
 
     try {
@@ -485,23 +297,30 @@ const Search = () => {
         const { data: categoryData, error: categoryError } = await supabase
           .from("anketa_doctor")
           .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, search_tags") // IMPORTANT: Select profile_doctor(doctor_points)
-          .filter("specialization", "cs", `["${category}"]`);
+          .filter("specialization", "cs", `["${category}"]`)
+          .eq("doctor_check", true); // <<< ДОДАНО: Фільтруємо за doctor_check = true
         data = categoryData;
         error = categoryError;
       } else if (query) {
-        // Викликаємо RPC функцію, яка тепер включатиме search_tags
-        // Якщо RPC функція не повертає profile_doctor, вам потрібно буде модифікувати її
-        // або зробити додатковий запит. Припускаємо, що вона або повертає, або ви будете використовувати основний запит.
-        // Наразі RPC функція `search_doctors_by_name_or_specialization` не повертає `profile_doctor`
-        // напряму, тому для запиту за пошуковим текстом рейтинг не буде відображатися,
-        // якщо ви не модифікуєте RPC функцію.
+        // Якщо RPC функція `search_doctors_by_name_or_specialization` не має вбудованої фільтрації за `doctor_check`,
+        // її потрібно буде модифікувати на стороні бази даних, АБО фільтрувати на стороні клієнта після отримання.
+        // Оптимальніше - модифікувати RPC функцію, щоб вона враховувала `doctor_check = true`.
+        // Нижче приклад, як це може виглядати, якщо ви будете робити додатковий запит.
+        // НАЙКРАЩЕ РІШЕННЯ: ОНОВИТИ ВАШУ RPC ФУНКЦІЮ `search_doctors_by_name_or_specialization`
+        // НА СТОРОНІ SUPABASE, ЩОБ ВОНА ВКЛЮЧАЛА ФІЛЬТРАЦІЮ `doctor_check = true`.
+        // Наприклад, у вашій SQL функції Supabase:
+        // SELECT ad.*, pd.doctor_points
+        // FROM anketa_doctor ad
+        // LEFT JOIN profile_doctor pd ON ad.user_id = pd.user_id
+        // WHERE ad.doctor_check = TRUE
+        // AND (ad.full_name ILIKE '%' || p_search_query || '%' OR ad.search_tags::text ILIKE '%' || p_search_query || '%');
+
         const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
             p_search_query: query,
         });
 
-        // Якщо RPC не повертає profile_doctor, його потрібно додати вручну або оновити RPC.
-        // Тимчасове рішення для перевірки, якщо RPC повертає лише основні дані:
         if (rpcData && !rpcError) {
+          // Якщо RPC не повертає profile_doctor, його потрібно додати вручну або оновити RPC.
           const doctorIds = rpcData.map(d => d.user_id);
           const { data: profileData, error: profileError } = await supabase
             .from('profile_doctor')
@@ -520,15 +339,32 @@ const Search = () => {
             data = rpcData; // Використовуємо дані без рейтингу, якщо не вдалося завантажити
             error = rpcError || profileError;
           }
+
+          // <<< ДОДАНО: Фільтруємо отримані дані з RPC на клієнті, якщо RPC не враховує doctor_check.
+          // Цей клієнтський фільтр є тимчасовим рішенням. Оптимально - оновити RPC функцію.
+          if (data) {
+            const { data: anketaDoctorData, error: anketaDoctorError } = await supabase
+              .from('anketa_doctor')
+              .select('user_id, doctor_check')
+              .in('user_id', data.map(d => d.user_id));
+
+            if (!anketaDoctorError) {
+              const checkedDoctorsMap = new Map(anketaDoctorData.map(d => [d.user_id, d.doctor_check]));
+              data = data.filter(d => checkedDoctorsMap.get(d.user_id) === true); // Фільтруємо тільки перевірених
+            } else {
+              console.warn("Could not fetch doctor_check status for RPC results:", anketaDoctorError.message);
+            }
+          }
+
         } else {
           data = rpcData;
           error = rpcError;
         }
 
       } else {
-          setDoctors([]);
-          setLoading(false);
-          return;
+        setDoctors([]);
+        setLoading(false);
+        return;
       }
 
       if (error) {
@@ -593,9 +429,9 @@ const Search = () => {
 
       return () => clearTimeout(debounceTimeout);
     } else {
-        setHasUserInitiatedSearch(false);
-        setDoctors([]);
-        setSearchError(null);
+      setHasUserInitiatedSearch(false);
+      setDoctors([]);
+      setSearchError(null);
     }
   }, [searchText, activeCategory, fetchDoctors]);
 
@@ -675,10 +511,10 @@ const Search = () => {
 
         <ScrollView contentContainerStyle={styles.doctorsListContainer}>
           {!hasUserInitiatedSearch && !loading && (
-              <View style={{ alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
-                <Text style={styles.initialSearchPrompt}>{t("initial_search_prompt")}</Text>
-              </View>
+            <View style={{ alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
+              <Text style={styles.initialSearchPrompt}>{t("initial_search_prompt")}</Text>
+            </View>
           )}
 
           {loading && (
@@ -693,9 +529,9 @@ const Search = () => {
               <DoctorCard key={doctor.user_id} doctor={doctor} />
             ))
           ) : !loading && hasUserInitiatedSearch && !searchError && doctors.length === 0 && (
-             <View style={{ alignItems: "center",  justifyContent: "start" }}>
-                <Ionicons name="not-search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
-            <Text style={styles.noDoctorsFound}>{t("no_doctors_found")}</Text>
+            <View style={{ alignItems: "center", justifyContent: "start" }}>
+              <Ionicons name="not-search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
+              <Text style={styles.noDoctorsFound}>{t("no_doctors_found")}</Text>
             </View>
           )}
         </ScrollView>

@@ -85,7 +85,7 @@ const specializationsList = [
 const COUNTRY_FLAGS_MAP = {
   "EN": "🇬🇧", // Використовуємо для 'english'
   "UK": "🇺🇦", // Використовуємо для 'ukrainian'
- 
+
 };
 
 
@@ -218,7 +218,7 @@ const DoctorCard = ({ doctor }) => {
             {Array.from({ length: 5 - starRating }).map((_, i) => (
               <Ionicons key={`star-outline-${i}`} name="star-outline" size={moderateScale(18)} color="#ccc" />
             ))}
-             {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
+              {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
               <Text style={styles.ratingPointsText}> ({doctorPoints} {t('points_short')})</Text>
             )}
           </InfoBox>
@@ -238,6 +238,14 @@ const DoctorCard = ({ doctor }) => {
           label={t("work_experience")}
           value={formatYearsText(doctor.experience_years)}
         />
+        {/* New InfoBox for `doctor_check` - assuming it exists and you want to display it */}
+        {doctor.doctor_check && (
+          <InfoBox label={t("status")} value={t("available_for_consultations")} />
+        )}
+        {/* InfoBox for doctor_check being true */}
+        {doctor.doctor_check && (
+          <InfoBox label={t("verification_status")} value={t("verified_doctor")} />
+        )}
         <InfoBox label={t("time_in_app")} value={doctor.time_in_app || t("not_specified")} />
         <InfoBox
           label={t("consultations_count")}
@@ -291,17 +299,22 @@ const ChooseSpecial = () => {
       let data = [];
       let fetchError = null;
 
+      // Base query for all doctors, always filtering by doctor_check = true
+      let query = supabase
+        .from("anketa_doctor")
+        .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, doctor_check") // Include doctor_check and doctor_check
+        .eq("doctor_check", true); // Filter by doctor_check = true
+
       if (initialSpecialization) {
-        // Вибірка за спеціалізацією
-        const { data: categoryData, error: categoryError } = await supabase
-          .from("anketa_doctor")
-          .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url")
+        // Add specialization filter if present
+        const { data: categoryData, error: categoryError } = await query
           .filter("specialization", "cs", `["${initialSpecialization}"]`);
-        
+
         data = categoryData;
         fetchError = categoryError;
       } else if (searchQuery) {
-        // Пошук за запитом
+        // Special handling for RPC function which returns a flat structure
+        // We'll filter doctor_check = true after fetching, if RPC doesn't support it directly
         const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
             p_search_query: searchQuery,
         });
@@ -313,13 +326,12 @@ const ChooseSpecial = () => {
             setLoading(false);
             return;
         }
-        data = rpcData;
-        fetchError = rpcError;
+        // Filter doctor_check on the client side for RPC results if not filtered by RPC
+        data = rpcData.filter(doctor => doctor.doctor_check === true);
+        fetchError = rpcError; // Although filtered, keep track of RPC errors
       } else {
-          // Завантаження всіх лікарів, якщо немає ні спеціалізації, ні пошукового запиту
-          const { data: allDoctorsData, error: allDoctorsError } = await supabase
-            .from("anketa_doctor")
-            .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url");
+          // If no specialization or search query, fetch all doctors with doctor_check = true
+          const { data: allDoctorsData, error: allDoctorsError } = await query;
           data = allDoctorsData;
           fetchError = allDoctorsError;
       }
@@ -329,27 +341,22 @@ const ChooseSpecial = () => {
         setError(`${t("error_fetching_doctors")}: ${fetchError.message}`);
         setDoctors([]);
       } else {
-        // Обробка отриманих даних для всіх лікарів
         const processedDoctors = data.map((doctor) => {
-          // Нормалізуємо profile_doctor до масиву для консистентного доступу до doctor_points
           let normalizedProfileDoctor = null;
           if (doctor.profile_doctor) {
             if (Array.isArray(doctor.profile_doctor)) {
               normalizedProfileDoctor = doctor.profile_doctor;
             } else {
-              // Якщо profile_doctor є об'єктом, обгортаємо його в масив
               normalizedProfileDoctor = [doctor.profile_doctor];
             }
           }
 
-          // Отримуємо мови, перетворюючи їх на верхній регістр та фільтруючи за COUNTRY_FLAGS_MAP
           const parsedCommunicationLanguages = getParsedArray(doctor.communication_languages).map(lang => {
             if (typeof lang === 'object' && lang !== null && lang.code) {
               return String(lang.code).toUpperCase();
             }
             return String(lang).toUpperCase();
-          }).filter(code => COUNTRY_FLAGS_MAP[code]); // Фільтруємо, щоб були лише ті, для яких є прапори
-
+          }).filter(code => COUNTRY_FLAGS_MAP[code]);
 
           let timeInAppDisplay = t("not_specified");
           if (doctor.created_at) {
@@ -371,15 +378,13 @@ const ChooseSpecial = () => {
 
           return {
             ...doctor,
-            profile_doctor: normalizedProfileDoctor, // Використовуємо нормалізовану версію
+            profile_doctor: normalizedProfileDoctor,
             communication_languages: parsedCommunicationLanguages,
             time_in_app: timeInAppDisplay,
           };
         });
 
-        // Застосовуємо сортування на стороні клієнта відповідно до вибраної опції
         const sortedDoctors = [...processedDoctors].sort((a, b) => {
-          // Доступ до doctor_points як елемента масиву, враховуючи нормалізацію
           const pointsA = a.profile_doctor?.[0]?.doctor_points || 0;
           const pointsB = b.profile_doctor?.[0]?.doctor_points || 0;
 
@@ -392,9 +397,9 @@ const ChooseSpecial = () => {
               return (a.consultation_cost || 0) - (b.consultation_cost || 0);
             case "price_desc":
               return (b.consultation_cost || 0) - (a.consultation_cost || 0);
-            case "rating_desc": // Сортування за рейтингом (спадання)
+            case "rating_desc":
               return pointsB - pointsA;
-            case "rating_asc": // Сортування за рейтингом (зростання)
+            case "rating_asc":
               return pointsA - pointsB;
             default:
               return 0;
@@ -410,19 +415,19 @@ const ChooseSpecial = () => {
     } finally {
       setLoading(false);
     }
-  }, [t, initialSpecialization, searchQuery, currentSortOption]); // currentSortOption додано до залежностей
+  }, [t, initialSpecialization, searchQuery, currentSortOption]);
 
   useEffect(() => {
     fetchDoctors();
   }, [fetchDoctors]);
 
   const sortOptions = [
-    { label: t("sort_by_rating_desc"), value: "rating_desc" }, // Нова опція сортування
-    { label: t("sort_by_rating_asc"), value: "rating_asc" },   // Нова опція сортування
-    { label: t("sort_by_experience_desc"), value: "experience_desc" }, // Переклад
-    { label: t("sort_by_experience_asc"), value: "experience_asc" },   // Переклад
-    { label: t("sort_by_price_asc"), value: "price_asc" },             // Переклад
-    { label: t("sort_by_price_desc"), value: "price_desc" },           // Переклад
+    { label: t("sort_by_rating_desc"), value: "rating_desc" },
+    { label: t("sort_by_rating_asc"), value: "rating_asc" },
+    { label: t("sort_by_experience_desc"), value: "experience_desc" },
+    { label: t("sort_by_experience_asc"), value: "experience_asc" },
+    { label: t("sort_by_price_asc"), value: "price_asc" },
+    { label: t("sort_by_price_desc"), value: "price_desc" },
   ];
 
   const handleBackPress = () => {
@@ -469,7 +474,6 @@ const ChooseSpecial = () => {
     closeSortModal();
   };
 
-  // Get translated specialization for header
   const getHeaderTitle = () => {
     if (initialSpecialization) {
       const spec = specializationsList.find(
@@ -512,7 +516,6 @@ const ChooseSpecial = () => {
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.rightIcon}>
           {/* <Icon width={50} height={50} /> */}
-          {/* Якщо Icon з assets/icon.svg не використовується, можна видалити */}
         </View>
       </View>
 

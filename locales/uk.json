@@ -188,7 +188,8 @@
   },
   "not_specified_full": "Не вказано",
     "delete_profile": "Видалити профіль",
-
+    "status_pending": "Очікує підтвердження",
+    
 "header_title": "Повідомлення",
   "messages_screen": {
     "patient": "Пацієнт",

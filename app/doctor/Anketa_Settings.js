@@ -20,7 +20,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../../providers/supabaseClient";
+import { supabase } from "../../providers/supabaseClient"; // Original Supabase import
 import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
@@ -458,7 +458,6 @@ const generalAppLanguages = [
   { nameKey: "ukrainian", code: "uk", emoji: "" },
 ];
 
-
 const Anketa_Settings = () => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -480,6 +479,7 @@ const Anketa_Settings = () => {
   const [searchTags, setSearchTags] = useState("");
   const [bankDetails, setBankDetails] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [doctorCheckStatus, setDoctorCheckStatus] = useState(false); // Додано стан для doctor_check
 
   const [isCountryModalVisible, setIsCountryModalVisible] = useState(false);
   const [isGeneralLanguageModalVisible, setIsGeneralLanguageModalVisible] =
@@ -650,6 +650,7 @@ const Anketa_Settings = () => {
           setSearchTags(data.search_tags || "");
           setBankDetails(data.bank_details || "");
           setAgreedToTerms(data.agreed_to_terms || false);
+          setDoctorCheckStatus(data.doctor_check || false); // Завантаження статусу doctor_check
         }
       } catch (err) {
         console.error("Загальна помилка під час завантаження профілю:", err);
@@ -672,7 +673,7 @@ const Anketa_Settings = () => {
   const openGeneralLanguageModal = () => setIsGeneralLanguageModalVisible(true);
   const closeGeneralLanguageModal = () =>
     setIsGeneralLanguageModalVisible(false);
-  
+
   // Оновлена функція для збереження мови інтерфейсу в БД
   const handleGeneralLanguageSelect = async (langCode) => {
     // 1. Змінюємо мову i18n
@@ -692,10 +693,9 @@ const Anketa_Settings = () => {
         Alert.alert(t("error_title"), t("error_not_authenticated_for_language"));
         return;
       }
-
       // Оновлення колонки 'language' для поточного користувача
       const { error } = await supabase
-        .from("profile_doctor") // Ваша таблиця
+        .from("profile_doctor")
         .upsert(
           {
             user_id: user.id,
@@ -715,7 +715,6 @@ const Anketa_Settings = () => {
       Alert.alert(t("error_title"), t("error_general_save_language_failed"));
     }
   };
-
 
   const openConsultationLanguageModal = () => {
     setIsConsultationLanguageModalVisible(true);
@@ -1065,8 +1064,8 @@ const Anketa_Settings = () => {
 
       const specializationsToSave = selectedSpecializations.map((spec) => spec.value);
       const languagesToSave = selectedConsultationLanguages.length > 0
-            ? selectedConsultationLanguages
-            : [i18n.language];
+        ? selectedConsultationLanguages
+        : [i18n.language];
 
       const { error: doctorProfileError } = await supabase
         .from("anketa_doctor")
@@ -1076,13 +1075,13 @@ const Anketa_Settings = () => {
               user_id: user.id, // Додано user_id
               full_name: fullName.trim(),
               email: user.email,
-              phone: "",
+              phone: "", // Телефон відсутній у формі, залишаємо порожнім
               country: country?.name || null,
               communication_languages: languagesToSave,
               specialization: specializationsToSave,
               experience_years: experienceYears,
-              work_experience: null,
-              education: null,
+              work_experience: null, // Поле відсутнє у формі, залишаємо null
+              education: null, // Поле відсутнє у формі, залишаємо null
               achievements: achievements.trim() || null,
               about_me: aboutMe.trim() || null,
               consultation_cost: consultationCost.trim() || null,
@@ -1093,8 +1092,8 @@ const Anketa_Settings = () => {
               diploma_url: diplomaUrl,
               certificate_photo_url: certUrl,
               work_location: workLocation.trim() || null,
-              is_verified: false,
               agreed_to_terms: agreedToTerms,
+              doctor_check: doctorCheckStatus, // Зберігаємо поточний статус doctor_check
             },
           ],
           { onConflict: "user_id" }
@@ -1311,13 +1310,12 @@ const Anketa_Settings = () => {
     };
   }, [photoUri, diplomaUri, certificateUri]);
 
-
   return (
     <SafeAreaView
       style={{
         flex: 1,
         backgroundColor: "#fff",
-        paddingTop: isLargeScreen ? 40 : 40,
+        paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
       }}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -1328,8 +1326,7 @@ const Anketa_Settings = () => {
           </View>
         ) : (
           <View style={styles.container(width, height)}>
-            <StatusBar style="auto" />
-
+            {/* --- Секція заголовка --- */}
             <View style={styles.headerContainer}>
               <TouchableOpacity
                 style={styles.backButton}
@@ -1340,6 +1337,8 @@ const Anketa_Settings = () => {
               <Text style={styles.title(isLargeScreen)}>
                 {t("doctor_profile_title")}
               </Text>
+
+            
               <TouchableOpacity
                 style={styles.languageDisplayContainer}
                 onPress={openGeneralLanguageModal}
@@ -1351,7 +1350,16 @@ const Anketa_Settings = () => {
                 </View>
               </TouchableOpacity>
             </View>
+  {/* Відображення статусу перевірки лікаря */}
+              {doctorCheckStatus !== undefined && (
+                <View style={styles.doctorStatusContainer(doctorCheckStatus)}>
+                  <Text style={styles.doctorStatusText}>
+                    {doctorCheckStatus ? t("status_confirmed") : t("status_pending")}
+                  </Text>
+                </View>
+              )}
 
+            {/* --- Секція фото профілю --- */}
             <Text style={styles.inputLabel}>{t("upload_photo")}</Text>
             <View style={styles.avatarUploadContainer}>
               {photoUri ? (
@@ -1374,6 +1382,8 @@ const Anketa_Settings = () => {
                 <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
               </TouchableOpacity>
             </View>
+
+            {/* --- Кнопка виходу --- */}
             <TouchableOpacity
               style={styles.signOutButtonAboveSearch}
               onPress={handleSignOut}
@@ -1381,6 +1391,8 @@ const Anketa_Settings = () => {
               <Ionicons name="log-out-outline" size={24} color="white" />
               <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
             </TouchableOpacity>
+
+            {/* --- Поля форми --- */}
             <Text style={styles.inputLabel}>{t("country")}</Text>
             <TouchableOpacity
               style={styles.selectButton(width)}
@@ -1393,7 +1405,7 @@ const Anketa_Settings = () => {
               </Text>
             </TouchableOpacity>
 
-            <Text style={styles.inputLabel}>ПІБ</Text>
+            <Text style={styles.inputLabel}>{t("fullname_label")}</Text>
             <View style={styles.inputContainer(width)}>
               <TextInput
                 style={styles.input}
@@ -1454,6 +1466,7 @@ const Anketa_Settings = () => {
               </Text>
             </TouchableOpacity>
 
+            {/* --- Завантаження документів --- */}
             <Text style={styles.inputLabel}>{t("upload_diploma")}</Text>
             <View style={styles.uploadContainer}>
               <TouchableOpacity
@@ -1492,6 +1505,7 @@ const Anketa_Settings = () => {
               )}
             </View>
 
+            {/* --- Досвід та місцезнаходження --- */}
             <Text style={styles.inputLabel}>{t("work_experience")}</Text>
             <TouchableOpacity
               style={styles.selectButton(width)}
@@ -1512,6 +1526,7 @@ const Anketa_Settings = () => {
               />
             </View>
 
+            {/* --- Досягнення та Про мене --- */}
             <Text style={styles.inputLabel}>{t("achievements")}</Text>
             <View style={styles.inputContainer(width)}>
               <TextInput
@@ -1535,6 +1550,7 @@ const Anketa_Settings = () => {
               />
             </View>
 
+            {/* --- Деталі консультації та банківська інформація --- */}
             <Text style={styles.inputLabel}>
               {t("consultation_cost_range")}
             </Text>
@@ -1570,6 +1586,7 @@ const Anketa_Settings = () => {
               />
             </View>
 
+            {/* --- Згода з умовами --- */}
             <View style={styles.agreementContainer}>
               <Switch
                 trackColor={{ false: "#767577", true: "#0EB3EB" }}
@@ -1581,6 +1598,7 @@ const Anketa_Settings = () => {
               <Text style={styles.agreementText}>{t("agree_to_terms")}</Text>
             </View>
 
+            {/* --- Кнопки збереження та видалення --- */}
             {profileSaveError ? (
               <Text style={styles.errorText}>{profileSaveError}</Text>
             ) : null}
@@ -1598,7 +1616,6 @@ const Anketa_Settings = () => {
               )}
             </TouchableOpacity>
 
-            {/* Кнопка видалення профілю */}
             <TouchableOpacity
               style={styles.deleteProfileButton(width)}
               onPress={handleDeleteProfile}
@@ -1612,11 +1629,12 @@ const Anketa_Settings = () => {
                 </Text>
               )}
             </TouchableOpacity>
-
           </View>
         )}
       </ScrollView>
 
+      {/* --- Модальні вікна (Країна, Мови, Спеціалізація, Вартість, Досвід, Зображення) --- */}
+      {/* Модальне вікно для вибору країни */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1627,7 +1645,7 @@ const Anketa_Settings = () => {
           <View style={styles.centeredView}>
             <View style={[styles.modalView(width), styles.modalBorder]}>
               <ScrollView style={styles.modalScrollView}>
-                {countries.map((item, index) => (
+                {countries.map((item) => (
                   <Pressable
                     key={item.code}
                     style={[
@@ -1663,6 +1681,7 @@ const Anketa_Settings = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Модальне вікно для вибору загальної мови додатка */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1673,7 +1692,7 @@ const Anketa_Settings = () => {
           <View style={styles.centeredView}>
             <View style={[styles.languageModalContent, styles.modalBorder]}>
               <ScrollView style={styles.modalScrollView}>
-                {generalAppLanguages.map((lang, index) => (
+                {generalAppLanguages.map((lang) => (
                   <Pressable
                     key={lang.code}
                     style={styles.languageOption}
@@ -1702,6 +1721,7 @@ const Anketa_Settings = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Модальне вікно для вибору мови консультації */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1712,12 +1732,11 @@ const Anketa_Settings = () => {
           <View style={styles.centeredView}>
             <View style={[styles.languageModalContent, styles.modalBorder]}>
               <ScrollView style={styles.modalScrollView}>
-                {/* Переконайтеся, що `consultationLanguages` визначено у вашому коді */}
                 {consultationLanguages.map((lang) => (
                   <Pressable
                     key={lang.code}
                     style={styles.languageOption}
-                    onPress={() => toggleConsultationLanguageSelect(lang.code,  lang.emoji)}
+                    onPress={() => toggleConsultationLanguageSelect(lang.code)}
                   >
                     <Text
                       style={[
@@ -1726,7 +1745,7 @@ const Anketa_Settings = () => {
                           styles.countryItemTextSelected,
                       ]}
                     >
-                     {lang.emoji} {t(lang.name)}
+                      {lang.emoji} {t(lang.name)}
                     </Text>
                   </Pressable>
                 ))}
@@ -1742,6 +1761,7 @@ const Anketa_Settings = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Модальне вікно для вибору спеціалізації */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1790,6 +1810,7 @@ const Anketa_Settings = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Модальне вікно для вибору вартості консультації */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1835,6 +1856,7 @@ const Anketa_Settings = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Модальне вікно для вибору років досвіду */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1877,7 +1899,8 @@ const Anketa_Settings = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
-     <Modal
+      {/* Модальне вікно для повноекранного перегляду зображення */}
+      <Modal
         animationType="fade"
         transparent={true}
         visible={isImageModalVisible}
@@ -1885,16 +1908,15 @@ const Anketa_Settings = () => {
       >
         <TouchableWithoutFeedback onPress={closeImageModal}>
           <View style={styles.fullScreenImageModalOverlay}>
-            {/* Обгортаємо зображення в окремий View, щоб TouchableWithoutFeedback завжди мав один дочірній елемент */}
             <TouchableWithoutFeedback>
-              {selectedImageUri ? ( // Якщо selectedImageUri є, рендеримо Image
+              {selectedImageUri ? (
                 <Image
                   source={{ uri: selectedImageUri }}
                   style={styles.fullScreenImage}
                   resizeMode="contain"
                 />
               ) : (
-                <View style={{ flex: 1 }} /> // Інакше рендеримо порожній View, щоб TouchableWithoutFeedback мав дочірній елемент
+                <View style={{ flex: 1 }} />
               )}
             </TouchableWithoutFeedback>
 
@@ -1911,6 +1933,7 @@ const Anketa_Settings = () => {
   );
 };
 
+// --- Таблиця стилів ---
 const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
@@ -1930,7 +1953,7 @@ const styles = StyleSheet.create({
     color: "#000000",
     fontFamily: "Mont-Regular",
   },
-  container: (width, height) => ({
+  container: (width) => ({
     backgroundColor: "#fff",
     alignItems: "center",
     paddingTop: 0,
@@ -2298,7 +2321,6 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Bold",
     marginLeft: 8,
   },
-
   modalContentYears: {
     backgroundColor: "#fff",
     borderRadius: 10,
@@ -2339,15 +2361,14 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 1,
   },
-  // Нові стилі для кнопки видалення профілю
   deleteProfileButton: (width) => ({
-    backgroundColor: "#FF3B30", // Червоний колір для кнопки видалення
+    backgroundColor: "#FF3B30",
     borderRadius: 555,
     paddingVertical: 15,
     width: width * 0.9,
     height: 52,
     alignItems: "center",
-    marginTop: 10, // Відступ від попередніх елементів
+    marginTop: 10,
     marginBottom: 20,
   }),
   deleteProfileButtonText: {
@@ -2355,6 +2376,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  // Стилі для відображення статусу лікаря
+  doctorStatusContainer: (isConfirmed) => ({
+    backgroundColor: isConfirmed ? "#4CAF50" : "rgba(241, 179, 7, 0.66)", // Зелений для підтверджено, бурштиновий для очікує
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 14,
+    marginLeft: 10, // Відрегулюйте за потреби для відступу
+  }),
+  doctorStatusText: {
+    fontSize: 14,
+    fontFamily: "Mont-Bold",
+    color: "white",
   },
 });
 
