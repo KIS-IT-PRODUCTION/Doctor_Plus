@@ -13,6 +13,10 @@ import {
   Linking,
   Dimensions,
   StatusBar,
+  Modal,
+  TouchableWithoutFeedback,
+  Switch,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +24,6 @@ import { supabase } from '../providers/supabaseClient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import Icon from '../assets/icon.svg';
-import Constants from 'expo-constants';
 
 // Одиниці масштабування для адаптивного інтерфейсу
 const { width, height } = Dimensions.get("window");
@@ -33,7 +36,7 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false, // ЦЕ ВАЖЛИВО: для сповіщень, що приходять в foreground, ми не хочемо автоматично збільшувати бейдж, бо ми контролюємо його вручну.
+    shouldSetBadge: false,
   }),
 });
 
@@ -43,6 +46,276 @@ const LIQPAY_INIT_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/funct
 // URL вашої Supabase Edge Function, яка обробляє callback від LiqPay
 const LIQPAY_CALLBACK_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/liqpay-callback';
 
+// ========================================================================
+// КОМПОНЕНТ: FeedbackModal
+// ========================================================================
+const FeedbackModal = ({ isVisible, onClose, onSubmit, initialBookingId }) => {
+  const { t } = useTranslation();
+  const [consultationOccurred, setConsultationOccurred] = useState(false);
+  const [consultationOnTime, setConsultationOnTime] = useState(false);
+  const [starRating, setStarRating] = useState(0); // Змінено: тепер це число, а не input
+  const [feedbackText, setFeedbackText] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Функція для візуалізації зірок (скопійовано з WriteReview.js, адаптовано)
+  const renderStars = () => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <TouchableOpacity key={i} onPress={() => setStarRating(i)} disabled={loading}>
+          <Text style={i <= starRating ? modalStyles.starFilled : modalStyles.starEmpty}>
+            ★
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    return <View style={modalStyles.starsContainer}>{stars}</View>;
+  };
+
+  // Скидання стану при відкритті модального вікна
+  useEffect(() => {
+    if (isVisible) {
+      setConsultationOccurred(false);
+      setConsultationOnTime(false);
+      setStarRating(0); // Скидаємо рейтинг
+      setFeedbackText('');
+      setLoading(false);
+    }
+  }, [isVisible]);
+
+  const handleSubmit = async () => {
+    if (loading) return;
+
+    // Перевірка обов'язкових полів: тепер starRating має бути більше 0
+    if (!consultationOccurred || !consultationOnTime || starRating === 0) {
+      Alert.alert(t('error'), t('feedback_modal.fill_all_required_fields'));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onSubmit(
+        initialBookingId,
+        consultationOccurred,
+        consultationOnTime,
+        starRating, // Використовуємо значення starRating безпосередньо
+        feedbackText
+      );
+      onClose();
+    } catch (error) {
+      console.error("Error submitting feedback from modal:", error);
+      Alert.alert(t('error'), `${t('feedback_modal.failed_to_submit_feedback')}: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={isVisible}
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={modalStyles.centeredView}>
+          <TouchableWithoutFeedback>
+            <View style={modalStyles.modalView}>
+              <Text style={modalStyles.modalTitle}>{t('feedback_modal.leave_feedback')}</Text>
+
+              <View style={modalStyles.questionContainer}>
+                <Text style={modalStyles.questionText}>{t('feedback_modal.consultation_occurred')}</Text>
+                <View style={modalStyles.switchContainer}>
+                  <Text style={!consultationOccurred ? modalStyles.switchLabelActive : modalStyles.switchLabelInactive}>{t('no')}</Text>
+                  <Switch
+                    trackColor={{ false: "#767577", true: "#0EB3EB" }}
+                    thumbColor={consultationOccurred ? "#f4f3f4" : "#f4f3f4"}
+                    ios_backgroundColor="#3e3e3e"
+                    onValueChange={setConsultationOccurred}
+                    value={consultationOccurred}
+                  />
+                  <Text style={consultationOccurred ? modalStyles.switchLabelActive : modalStyles.switchLabelInactive}>{t('yes')}</Text>
+                </View>
+              </View>
+
+              <View style={modalStyles.questionContainer}>
+                <Text style={modalStyles.questionText}>{t('feedback_modal.consultation_on_time')}</Text>
+                <View style={modalStyles.switchContainer}>
+                  <Text style={!consultationOnTime ? modalStyles.switchLabelActive : modalStyles.switchLabelInactive}>{t('no')}</Text>
+                  <Switch
+                    trackColor={{ false: "#767577", true: "#0EB3EB" }}
+                    thumbColor={consultationOnTime ? "#f4f3f4" : "#f4f3f4"}
+                    ios_backgroundColor="#3e3e3e"
+                    onValueChange={setConsultationOnTime}
+                    value={consultationOnTime}
+                  />
+                  <Text style={consultationOnTime ? modalStyles.switchLabelActive : modalStyles.switchLabelInactive}>{t('yes')}</Text>
+                </View>
+              </View>
+
+              {/* ПОЛЕ ДЛЯ ВВОДУ ЗІРОК - ТЕПЕР КАСТОМНИЙ КОМПОНЕНТ */}
+              <View style={modalStyles.questionContainer}>
+                <Text style={modalStyles.questionText}>{t('feedback_modal.rate_quality')} (1-5):</Text>
+                {renderStars()} {/* Використовуємо функцію renderStars */}
+              </View>
+
+              <View style={modalStyles.questionContainer}>
+                <Text style={modalStyles.questionText}>{t('feedback_modal.your_feedback')}</Text>
+                <TextInput
+                  style={modalStyles.textInput}
+                  multiline={true}
+                  placeholder={t('feedback_modal.optional_feedback_placeholder')}
+                  value={feedbackText}
+                  onChangeText={setFeedbackText}
+                  maxLength={500}
+                />
+                <Text style={modalStyles.charCount}>{feedbackText.length}/500</Text>
+              </View>
+
+              <View style={modalStyles.buttonContainer}>
+                <TouchableOpacity style={modalStyles.cancelButton} onPress={onClose}>
+                  <Text style={modalStyles.buttonText}>{t('cancel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={modalStyles.submitButton} onPress={handleSubmit} disabled={loading}>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={modalStyles.buttonText}>{t('submit')}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+};
+
+// Стилі для модального вікна
+const modalStyles = StyleSheet.create({
+  centeredView: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalView: {
+    width: width * 0.9,
+    backgroundColor: "white",
+    borderRadius: moderateScale(20),
+    padding: moderateScale(25),
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: verticalScale(2),
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: moderateScale(4),
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: moderateScale(22),
+    fontFamily: "Mont-SemiBold",
+    marginBottom: verticalScale(20),
+    color: "#333",
+    textAlign: 'center',
+  },
+  questionContainer: {
+    width: '100%',
+    marginBottom: verticalScale(15),
+  },
+  questionText: {
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-Medium",
+    marginBottom: verticalScale(8),
+    color: "#555",
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0f0f0',
+    borderRadius: moderateScale(10),
+    paddingVertical: verticalScale(5),
+    paddingHorizontal: moderateScale(15),
+  },
+  switchLabelActive: {
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-SemiBold",
+    color: '#0EB3EB',
+  },
+  switchLabelInactive: {
+    fontSize: moderateScale(16),
+    color: '#888',
+  },
+  textInput: {
+    width: '100%',
+    minHeight: verticalScale(50),
+    maxHeight: verticalScale(150),
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: moderateScale(10),
+    padding: moderateScale(10),
+    fontSize: moderateScale(15),
+    fontFamily: "Mont-Regular",
+    textAlignVertical: 'top',
+    marginTop: verticalScale(5),
+  },
+  charCount: {
+    alignSelf: 'flex-end',
+    fontSize: moderateScale(12),
+    color: '#888',
+    marginTop: verticalScale(5),
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: verticalScale(20),
+  },
+  submitButton: {
+    backgroundColor: '#0EB3EB',
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: moderateScale(30),
+    borderRadius: moderateScale(25),
+    minWidth: moderateScale(120),
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#ccc',
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: moderateScale(30),
+    borderRadius: moderateScale(25),
+    minWidth: moderateScale(120),
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-SemiBold",
+  },
+  // СТИЛІ ДЛЯ ЗІРОК
+  starsContainer: {
+    flexDirection: "row",
+    marginTop: verticalScale(10),
+    marginBottom: verticalScale(5),
+    alignSelf: 'flex-start',
+  },
+  starFilled: {
+    color: "#FFD700",
+    fontSize: moderateScale(30),
+    marginRight: moderateScale(5),
+  },
+  starEmpty: {
+    color: "#D3D3D3",
+    fontSize: moderateScale(30),
+    marginRight: moderateScale(5),
+  },
+});
+
+
 export default function PatientMessages() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -50,6 +323,11 @@ export default function PatientMessages() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentPatientId, setCurrentPatientId] = useState(null);
+
+  // Стан для модального вікна відгуків
+  const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
+  const [currentBookingIdForFeedback, setCurrentBookingIdForFeedback] = useState(null);
+
 
   // Функція для обробки натискання кнопки "Назад"
   const handleBackPress = () => {
@@ -59,7 +337,6 @@ export default function PatientMessages() {
   // НОВА ФУНКЦІЯ: Оновлення бейджа на іконці додатка
   const updateAppBadge = useCallback(async (count) => {
     try {
-      // *** ВИПРАВЛЕНО: Змінено setBadgeNumberAsync на setBadgeCountAsync ***
       await Notifications.setBadgeCountAsync(count);
       console.log(`Badge count updated to: ${count}`);
     } catch (error) {
@@ -104,7 +381,8 @@ export default function PatientMessages() {
     setLoading(true);
     console.log("PatientMessages: Отримання сповіщень для пацієнта з ID:", currentPatientId);
     try {
-      const { data, error } = await supabase
+      // Отримуємо сповіщення
+      const { data: notificationData, error: notificationError } = await supabase
         .from('patient_notifications')
         .select(`
           id,
@@ -118,28 +396,58 @@ export default function PatientMessages() {
         .eq('patient_id', currentPatientId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
+      if (notificationError) {
+        throw notificationError;
       }
 
-      const formattedMessages = data.map(msg => ({
-        id: msg.id,
-        title: msg.title,
-        body: msg.body,
-        created_at: msg.created_at,
-        is_read: msg.is_read,
-        type: msg.notification_type,
-        rawData: msg.data || {},
-        is_paid: msg.data?.is_paid || false,
-        booking_id: msg.data?.booking_id || null,
-        amount: msg.data?.amount || 0,
-        meet_link: msg.data?.meet_link || null,
-      }));
+      // Збираємо booking_ids з отриманих сповіщень
+      const bookingIds = notificationData
+        .filter(msg => msg.data && msg.data.booking_id)
+        .map(msg => msg.data.booking_id);
+
+      let bookingDetails = {};
+      if (bookingIds.length > 0) {
+        // Отримуємо деталі бронювань, щоб дізнатися status, has_feedback_patient та consultation_conducted
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from('patient_bookings')
+          // !!! ЗМІНЕНО ТУТ: Додано consultation_conducted
+          .select('id, status, has_feedback_patient, consultation_conducted')
+          .in('id', bookingIds);
+
+        if (bookingsError) {
+          console.error("PatientMessages: Помилка отримання деталей бронювань:", bookingsError.message);
+          // Не кидаємо помилку, дозволяємо працювати без цих деталей, але з попередженням
+        } else {
+          bookingsData.forEach(booking => {
+            bookingDetails[booking.id] = booking;
+          });
+        }
+      }
+
+      const formattedMessages = notificationData.map(msg => {
+        const bookingInfo = bookingDetails[msg.data?.booking_id] || {};
+        return {
+          id: msg.id,
+          title: msg.title,
+          body: msg.body,
+          created_at: msg.created_at,
+          is_read: msg.is_read,
+          type: msg.notification_type,
+          rawData: msg.data || {},
+          is_paid: msg.data?.is_paid || false,
+          booking_id: msg.data?.booking_id || null,
+          amount: msg.data?.amount || 0,
+          meet_link: msg.data?.meet_link || null,
+          booking_status: bookingInfo.status || null,
+          has_feedback_patient: bookingInfo.has_feedback_patient === true,
+          // !!! ЗМІНЕНО ТУТ: Додано consultation_conducted до об'єкта повідомлення
+          consultation_conducted: bookingInfo.consultation_conducted === true,
+        };
+      });
 
       setMessages(formattedMessages);
       console.log("PatientMessages: Отримано сповіщень:", formattedMessages.length);
 
-      // ПІДРАХУНОК ТА ОНОВЛЕННЯ БЕЙДЖА ПІСЛЯ ЗАВАНТАЖЕННЯ ПОВІДОМЛЕНЬ
       const unreadCount = formattedMessages.filter(msg => !msg.is_read).length;
       await updateAppBadge(unreadCount);
 
@@ -175,14 +483,12 @@ export default function PatientMessages() {
         console.warn("markSingleAsRead: ID повідомлення відсутній.");
         return;
     }
-    // Оновлюємо UI негайно
     setMessages(prevMessages => {
       const updatedMessages = prevMessages.map(msg =>
         msg.id === messageId ? { ...msg, is_read: true } : msg
       );
-      // Оновлюємо бейдж після зміни UI
       const unreadCount = updatedMessages.filter(msg => !msg.is_read).length;
-      updateAppBadge(unreadCount); // Викликаємо оновлення бейджа
+      updateAppBadge(unreadCount);
       return updatedMessages;
     });
 
@@ -199,20 +505,19 @@ export default function PatientMessages() {
     } catch (error) {
       console.error('PatientMessages: Помилка позначення одного повідомлення як прочитаного:', error.message);
       Alert.alert(t('error'), `${t('failed_to_mark_as_read')}: ${error.message}`);
-      // Відкат UI у випадку помилки
       setMessages(prevMessages => {
         const revertedMessages = prevMessages.map(msg =>
           msg.id === messageId ? { ...msg, is_read: false } : msg
         );
         const unreadCount = revertedMessages.filter(msg => !msg.is_read).length;
-        updateAppBadge(unreadCount); // Відкат бейджа
+        updateAppBadge(unreadCount);
         return revertedMessages;
       });
     }
   }, [t, updateAppBadge]);
 
 
-  // НОВА ФУНКЦІЯ: Обробка оплати через LiqPay
+  // Функція для обробки оплати через LiqPay
   const handleLiqPayPayment = useCallback(async (bookingId, amount, description, doctorName) => {
     if (!bookingId || !amount || !description || !currentPatientId) {
       Alert.alert(t('error'), t('liqpay_missing_params'));
@@ -286,7 +591,7 @@ export default function PatientMessages() {
     }
   }, [currentPatientId, t, LIQPAY_INIT_FUNCTION_URL, LIQPAY_CALLBACK_FUNCTION_URL]);
 
-  // Зміни тут: НОВА ФУНКЦІЯ: Обробка натискання кнопки "Приєднатися до зустрічі"
+  // Функція для обробки натискання кнопки "Приєднатися до зустрічі"
   const handleJoinMeet = useCallback(async (meetLink) => {
     if (!meetLink) {
       Alert.alert(t('error'), t('meet_link_missing'));
@@ -310,11 +615,54 @@ export default function PatientMessages() {
   const handleDeepLink = useCallback(({ url }) => {
     console.log("Додаток відкрито через deep link:", url);
     console.log("Викликаю fetchMessagesFromSupabase після deep link.");
-    // Додайте затримку перед оновленням, щоб дати БД синхронізуватися
     setTimeout(() => {
         fetchMessagesFromSupabase();
-    }, 1000); // Затримка 1 секунда, можна налаштувати
+    }, 1000);
   }, [fetchMessagesFromSupabase]);
+
+  // ФУНКЦІЯ: Надсилання відгуку до Supabase
+  const handleSubmitFeedback = useCallback(async (bookingId, consultationOccurred, consultationOnTime, starRating, feedbackText) => {
+    try {
+      if (!bookingId) {
+        throw new Error("Booking ID is required to submit feedback.");
+      }
+
+      const { error: updateBookingError } = await supabase
+        .from('patient_bookings')
+        .update({
+          consultation_occurred_patient: consultationOccurred,
+          consultation_on_time_patient: consultationOnTime,
+          consultation_rating_patient: starRating,
+          consultation_feedback_patient: feedbackText,
+          has_feedback_patient: true, // Встановлюємо на true після успішного відгуку
+        })
+        .eq('id', bookingId);
+
+      if (updateBookingError) {
+        throw updateBookingError;
+      }
+
+      console.log("Feedback submitted successfully for booking:", bookingId);
+      Alert.alert(t('success'), t('feedback_modal.feedback_submitted_successfully'));
+
+      // Оновлюємо стан повідомлень в UI, щоб кнопка "Залишити відгук" зникла
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.booking_id === bookingId ? { ...msg, has_feedback_patient: true } : msg // !!! Змінено тут: оновлюємо has_feedback_patient
+        )
+      );
+
+      const relatedMessage = messages.find(msg => msg.booking_id === bookingId);
+      if (relatedMessage && !relatedMessage.is_read) {
+        markSingleAsRead(relatedMessage.id);
+      }
+
+
+    } catch (error) {
+      console.error('Error submitting feedback to Supabase:', error.message);
+      throw error;
+    }
+  }, [t, messages, markSingleAsRead]);
 
   // useEffect для підписки на сповіщення та Deep Links
   useEffect(() => {
@@ -322,7 +670,6 @@ export default function PatientMessages() {
 
     const subscription = Notifications.addNotificationReceivedListener(notification => {
       console.log('PatientMessages: Сповіщення отримано на передньому плані:', notification);
-      // Оновлюємо список повідомлень та бейдж
       fetchMessagesFromSupabase();
     });
 
@@ -330,9 +677,6 @@ export default function PatientMessages() {
       console.log('PatientMessages: Отримано відповідь на сповіщення (користувач натиснув):', response);
       const { title, body, data } = response.notification.request.content;
 
-      // Оновити повідомлення після взаємодії зі сповіщенням
-      // Викликаємо fetchMessagesFromSupabase для отримання найновіших даних,
-      // оскільки це сповіщення могло змінити стан в БД.
       fetchMessagesFromSupabase();
 
       if (data && (data.type === 'booking_confirmed' || data.type === 'booking_rejected' || data.type === 'payment_success' || data.type === 'meet_link_update') && data.booking_id) {
@@ -342,10 +686,10 @@ export default function PatientMessages() {
             body || t('payment_success_notification_body'),
             [{ text: t('ok') }]
           );
-        } else if (data.type === 'meet_link_update') { // Обробка сповіщення про оновлення Meet-посилання
+        } else if (data.type === 'meet_link_update') {
             Alert.alert(
-                t('consultation_link_ready_title'), // Додайте цей ключ перекладу
-                `${t('consultation_link_ready_message', { doctorName: data.doctor_name, date: data.booking_date, time: data.booking_time_slot })}`, // Додайте цей ключ перекладу
+                t('consultation_link_ready_title'),
+                `${t('consultation_link_ready_message', { doctorName: data.doctor_name, date: data.booking_date, time: data.booking_time_slot })}`,
                 [
                     { text: t('cancel'), style: 'cancel' },
                     { text: t('join_meet_call'), onPress: () => handleJoinMeet(data.meet_link) }
@@ -378,9 +722,6 @@ export default function PatientMessages() {
                       ]
                     );
                   }
-                  // Зміни тут: Якщо оплачено і є посилання на Meet, запропонувати приєднатися
-                  // Цей блок тепер обробляє випадки, коли посилання надходить разом з підтвердженням
-                  // або пізніше через окреме сповіщення "meet_link_update".
                   if (data.status === 'confirmed' && data.is_paid && data.meet_link) {
                       Alert.alert(
                           t('consultation_ready_title'),
@@ -447,10 +788,30 @@ export default function PatientMessages() {
               const showPayButton = message.type === 'booking_confirmed' && !message.is_paid && message.booking_id && message.amount > 0;
               const isPaid = message.is_paid;
 
-              // Логіка для відображення кнопки "Приєднатися"
-              // Вона показується, якщо бронювання підтверджено АБО це оновлення посилання, І ОПЛАЧЕНО, І Є ПОСИЛАННЯ
               const showJoinMeetButton = (message.type === 'booking_confirmed' || message.type === 'meet_link_update') && isPaid && message.meet_link;
 
+              // ЛОГИ ДЛЯ ВІДЛАДКИ КНОПКИ ВІДГУКУ
+              console.log(`--- Message ID: ${message.id} ---`);
+              console.log(`  booking_id: ${message.booking_id}`);
+              console.log(`  booking_status: ${message.booking_status}`);
+              console.log(`  has_feedback_patient: ${message.has_feedback_patient}`);
+              console.log(`  consultation_conducted: ${message.consultation_conducted}`); // !!! НОВИЙ ЛОГ
+              console.log(`  Condition breakdown:
+                  - Has booking_id: ${!!message.booking_id}
+                  - Status is 'confirmed': ${message.booking_status === 'confirmed'}
+                  - Consultation conducted: ${message.consultation_conducted} // !!! НОВА УМОВА
+                  - Has NOT left feedback: ${!message.has_feedback_patient}
+              `);
+
+              // !!! ЗМІНЕНО ТУТ: Тепер кнопка відгуку з'являється, якщо статус 'confirmed' І consultation_conducted є true
+              const showFeedbackButton =
+                message.booking_id &&
+                message.booking_status === 'confirmed' &&
+                message.consultation_conducted === true && // !!! ДОДАНО ЦЮ УМОВУ
+                !message.has_feedback_patient;
+
+              console.log(`  FINAL showFeedbackButton result: ${showFeedbackButton}`);
+              // КІНЕЦЬ ЛОГІВ ДЛЯ ВІДЛАДКИ
 
               return (
                 <View key={message.id} style={styles.messageGroup}>
@@ -463,7 +824,6 @@ export default function PatientMessages() {
                     activeOpacity={0.8}
                     onPress={() => {
                         console.log("Card pressed:", message.id);
-                        // Автоматично позначати як прочитане при натисканні на картку
                         if (!message.is_read) {
                             markSingleAsRead(message.id);
                         }
@@ -481,7 +841,6 @@ export default function PatientMessages() {
                     <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
                     <Text style={styles.cardText}>{message.body || t('notification_body_default')}</Text>
 
-                    {/* ДОДАНО: Відображення посилання Meet, якщо воно є */}
                     {message.meet_link && (
                         <View style={styles.meetLinkContainer}>
                             <Ionicons name="videocam-outline" size={moderateScale(18)} color="#34A853" />
@@ -491,8 +850,6 @@ export default function PatientMessages() {
                         </View>
                     )}
 
-
-                    {/* БЛОК: Кнопка "Оплатити" / "Оплачено" / "Приєднатися" */}
                     {showPayButton ? (
                         <TouchableOpacity
                             style={styles.payButton}
@@ -515,6 +872,20 @@ export default function PatientMessages() {
                             <Ionicons name="videocam-outline" size={moderateScale(20)} color="#FFFFFF" style={styles.joinMeetIcon} />
                             <Text style={styles.joinMeetButtonText}>{t('join_meet_call')}</Text>
                         </TouchableOpacity>
+                    ) : showFeedbackButton ? (
+                        <TouchableOpacity
+                            style={styles.feedbackButton}
+                            onPress={() => {
+                                setCurrentBookingIdForFeedback(message.booking_id);
+                                setIsFeedbackModalVisible(true);
+                            }}
+                        >
+                            <Text style={styles.feedbackButtonText}>{t('leave_feedback_button')}</Text>
+                        </TouchableOpacity>
+                    ) : message.has_feedback_patient ? (
+                        <View style={styles.feedbackLeftButton}>
+                            <Text style={styles.feedbackLeftButtonText}>{t('feedback_left')}</Text>
+                        </View>
                     ) : isPaid ? (
                         <View style={styles.paidButton}>
                             <Text style={styles.paidButtonText}>{t('paid')}</Text>
@@ -522,9 +893,7 @@ export default function PatientMessages() {
                     ) : null}
 
                     <View style={styles.messageActionsRow}>
-                        {isPaid ? (
-                            <Text style={styles.readStatusText}>{t('paid')}</Text>
-                        ) : message.is_read ? (
+                        {message.is_read ? (
                             <Text style={styles.readStatusText}>{t('read')}</Text>
                         ) : null}
 
@@ -544,14 +913,21 @@ export default function PatientMessages() {
           )}
         </ScrollView>
       )}
+
+      <FeedbackModal
+        isVisible={isFeedbackModalVisible}
+        onClose={() => setIsFeedbackModalVisible(false)}
+        onSubmit={handleSubmitFeedback}
+        initialBookingId={currentBookingIdForFeedback}
+      />
     </SafeAreaView>
   );
 }
 
+// ОСНОВНІ СТИЛІ ДЛЯ PatientMessages
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
     backgroundColor: '#F5F7FA',
   },
@@ -735,8 +1111,40 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: moderateScale(8),
   },
-  joinMeetIcon: {
-    // Стилі для іконки, якщо потрібні додаткові налаштування
+  feedbackButton: {
+    marginTop: verticalScale(10),
+    backgroundColor: '#8A2BE2', // Фіолетовий колір для кнопки відгуку
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: moderateScale(20),
+    borderRadius: moderateScale(25),
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: verticalScale(1) },
+    shadowOpacity: 0.2,
+    shadowRadius: moderateScale(2),
+    elevation: 2,
+    marginBottom: verticalScale(10),
+  },
+  feedbackButtonText: {
+    color: '#fff',
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
+  },
+  feedbackLeftButton: {
+    marginTop: verticalScale(10),
+    backgroundColor: '#A0A0A0', // Сірий колір, якщо відгук вже залишено
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: moderateScale(20),
+    borderRadius: moderateScale(25),
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginBottom: verticalScale(10),
+  },
+  feedbackLeftButtonText: {
+    color: '#fff',
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
   },
   messageActionsRow: {
     flexDirection: 'row',

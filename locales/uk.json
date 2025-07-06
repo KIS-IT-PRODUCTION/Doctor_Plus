@@ -751,7 +751,13 @@
   "complete_consultation": "Завершити консультацію",
   "consultation_already_completed": "Консультацію завершено",
     "consultation_completed_indicator": "Консультацію завершено",
-
+"consultation_conducted_question": "Консультація відбулася?",
+  "consultation_conducted_required": "Будь ласка, вкажіть, чи відбулася консультація.",
+  "consultation_started_on_time_question": "Консультація почалася вчасно?",
+  "consultation_started_on_time_required": "Будь ласка, вкажіть, чи почалася консультація вчасно.",
+  "doctor_feedback_label": "Відгук (необов'язково):",
+  "doctor_feedback_placeholder": "Ваші коментарі щодо консультації...",
+  "submit_completion": "Підтвердити завершення",
    "complete_consultation_title": "Завершити консультацію?",
   "complete_consultation_message": "Ви впевнені, що бажаєте завершити цю консультацію? Це позначить її як завершену.",
   "no_messages_yet": "Повідомлень поки що немає.",
@@ -841,5 +847,25 @@
   "patient_role": "Пацієнт",
   "doctor_role": "Лікар",
   "i_agree_with": "Я погоджуюсь з ",
-  "privacy_policy": "Політикою конфіденційності"
+  "privacy_policy": "Політикою конфіденційності",
+  "feedback_modal": {
+    "leave_feedback": "Залишити відгук",
+    "consultation_occurred": "Чи відбулася консультація? (обов'язково)",
+    "consultation_on_time": "Консультація почалася вчасно? (обов'язково)",
+    "rate_quality": "Оцініть якість консультації. (обов'язково)",
+    "your_feedback": "Відгук (за бажанням)",
+    "optional_feedback_placeholder": "Введіть ваш відгук тут...",
+    "fill_all_required_fields": "Будь ласка, заповніть усі обов'язкові поля.",
+    "failed_to_submit_feedback": "Не вдалося відправити відгук",
+    "feedback_submitted_successfully": "Відгук успішно надіслано!"
+  },
+
+  "submit": "Відправити",
+  "leave_feedback_button": "Залишити відгук",
+  "feedback_left": "Відгук залишено",
+  "patient_messages_screen.no_messages": "Повідомлень поки немає.",
+  "patient_messages_screen.waiting_for_updates": "Тут з'являться важливі оновлення щодо ваших записів.",
+  "failed_to_authorize_payment": "Не вдалося авторизувати платіж.",
+  "payment_required_title": "Потрібна оплата",
+  "payment_required_message": "Ваше бронювання підтверджено. Будь ласка, оплатіть консультацію."
 }

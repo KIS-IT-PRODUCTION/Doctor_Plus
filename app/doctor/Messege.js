@@ -23,6 +23,9 @@ import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../../providers/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
+import { parseISO, format, isFuture, isPast } from 'date-fns'; // Імпорт date-fns
+import { uk, enUS } from 'date-fns/locale'; // Імпорт локалей для date-fns
+import ConsultationCompletionModal from '../../components/ConsultationCompletionModal'; // Переконайтеся, що шлях правильний
 
 const { width, height } = Dimensions.get("window");
 
@@ -33,7 +36,7 @@ const moderateScale = (size, factor = 0.5) =>
 
 export default function Message() {
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation(); // Додано i18n для вибору локалі date-fns
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,9 +44,12 @@ export default function Message() {
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
   const [loadingCompletion, setLoadingCompletion] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false); // Стан для модального вікна
+  const [selectedMessageForCompletion, setSelectedMessageForCompletion] = useState(null); // Повідомлення для модального вікна
 
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
+  const locale = i18n.language === 'uk' ? uk : enUS; // Визначення локалі для date-fns
 
   const handleBackPress = () => {
     navigation.goBack();
@@ -52,9 +58,9 @@ export default function Message() {
   const addNewMessage = useCallback((notificationContent) => {
     const { title, body, data } = notificationContent;
     const now = new Date();
-    const locale = t('locale') || 'uk-UA';
-    const messageDate = new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(now);
-    const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(now);
+    // Використовуємо date-fns для форматування
+    const messageDate = format(now, 'PPP', { locale });
+    const messageTime = format(now, 'p', { locale });
 
     setMessages(prevMessages => {
       const uniqueMessageId = data && data.db_id ? data.db_id : (Date.now().toString() + Math.random().toString(36).substring(2, 9));
@@ -81,13 +87,20 @@ export default function Message() {
           time: messageTime,
           is_read: (data && data.is_read) || false,
           type: messageType,
-          rawData: { ...data, status: messageStatus } || {},
+          rawData: {
+            ...data,
+            status: messageStatus,
+            // Додані поля для ConsultationCompletionModal
+            consultation_conducted: data.consultation_conducted,
+            consultation_started_on_time: data.consultation_started_on_time,
+            doctor_feedback: data.doctor_feedback,
+          } || {},
           meetLinkInput: data && data.meet_link ? data.meet_link : '',
         },
         ...prevMessages,
       ];
     });
-  }, [t]);
+  }, [t, locale]); // Додано locale в залежності
 
   const fetchMessagesFromSupabase = useCallback(async (doctorUserId, isRefreshing = false) => {
     if (!doctorUserId) {
@@ -114,23 +127,41 @@ export default function Message() {
 
       console.log("Fetched notifications:", data);
 
-      const locale = t('locale') || 'uk-UA';
-
       const formattedMessages = data.map(notif => {
         const rawData = notif.data || {};
         const messageStatus = (rawData.payment_status) ? String(rawData.payment_status).toLowerCase() : ((rawData.status) ? String(rawData.status).toLowerCase() : 'pending');
         const messageType = rawData.type || 'general';
+
+        let formattedDate = '';
+        let formattedTime = '';
+        try {
+          const createdAtDate = parseISO(notif.created_at); // Використовуємо parseISO
+          formattedDate = format(createdAtDate, 'PPP', { locale });
+          formattedTime = format(createdAtDate, 'p', { locale });
+        } catch (dateError) {
+          console.error("Error parsing created_at date with date-fns:", notif.created_at, dateError);
+          // Повернення до оригінального форматування, якщо date-fns не справляється
+          formattedDate = new Intl.DateTimeFormat(i18n.language, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at));
+          formattedTime = new Intl.DateTimeFormat(i18n.language, { hour: '2-digit', minute: '2-digit' }).format(new Date(notif.created_at));
+        }
 
         return {
           id: notif.id,
           db_id: notif.id,
           title: notif.title,
           body: notif.body,
-          date: new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at)),
-          time: new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(notif.created_at)),
+          date: formattedDate,
+          time: formattedTime,
           is_read: notif.is_read,
           type: messageType,
-          rawData: { ...rawData, status: messageStatus },
+          rawData: {
+            ...rawData,
+            status: messageStatus,
+            // Додані поля для ConsultationCompletionModal
+            consultation_conducted: rawData.consultation_conducted,
+            consultation_started_on_time: rawData.consultation_started_on_time,
+            doctor_feedback: rawData.doctor_feedback,
+          },
           meetLinkInput: rawData.meet_link ? rawData.meet_link : '',
         };
       });
@@ -147,7 +178,7 @@ export default function Message() {
       if (!isRefreshing) setLoading(false);
       else setRefreshing(false);
     }
-  }, [t]);
+  }, [t, i18n.language, locale]); // Додано locale та i18n.language в залежності
 
   const onRefresh = useCallback(() => {
     if (currentDoctorUserId) {
@@ -615,7 +646,7 @@ export default function Message() {
     );
   }, []);
 
-const handleSendMeetLink = useCallback(async (message) => {
+  const handleSendMeetLink = useCallback(async (message) => {
     const meetLink = message.meetLinkInput;
 
     if (!meetLink || meetLink.trim() === '') {
@@ -765,16 +796,22 @@ const handleSendMeetLink = useCallback(async (message) => {
                 console.error("Error re-fetching unread count after sending meet link:", countError?.message);
             }
         }
-
     } catch (error) {
         console.error("Error sending meet link:", error.message);
         Alert.alert(t('error'), `${t('failed_to_send_meet_link')}: ${error.message}`);
     }
-}, [t, currentDoctorUserId, doctorFullName]);
+  }, [t, currentDoctorUserId, doctorFullName]);
 
-  const handleCompleteConsultation = useCallback(async (message) => {
-    // console.log("Дані для завершення консультації (message.rawData):", message.rawData); // <-- Розкоментуйте для відладки!
+  const handleCompleteConsultation = useCallback((message) => {
+    // Відкриваємо модальне вікно і передаємо дані
+    setSelectedMessageForCompletion(message);
+    setIsModalVisible(true);
+  }, []);
 
+  const handleModalSubmit = useCallback(async ({ consultationConducted, consultationStartedOnTime, doctorFeedback }) => {
+    if (!selectedMessageForCompletion) return;
+
+    const message = selectedMessageForCompletion;
     const { patient_id: patientId, booking_id: bookingId, booking_date: bookingDate, booking_time_slot: bookingTimeSlot } = message.rawData;
     const doctorFinalName = doctorFullName || t('doctor');
 
@@ -803,11 +840,15 @@ const handleSendMeetLink = useCallback(async (message) => {
 
       const completeConsultationPayload = {
         type: 'consultation_completed',
-        patient_id: patientId,
         booking_id: bookingId,
+        patient_id: patientId,
         doctor_name: doctorFinalName,
         booking_date: bookingDate,
         booking_time_slot: bookingTimeSlot,
+        // НОВІ ДАНІ З МОДАЛЬНОГО ВІКНА:
+        consultation_conducted: consultationConducted,
+        consultation_started_on_time: consultationStartedOnTime,
+        doctor_feedback: doctorFeedback,
       };
 
       console.log("Calling send-meet-link-notification (consultation_completed) with data:", JSON.stringify(completeConsultationPayload, null, 2));
@@ -848,7 +889,10 @@ const handleSendMeetLink = useCallback(async (message) => {
               ...msg,
               rawData: {
                 ...msg.rawData,
-                status_meet: true,
+                status_meet: true, // Це може бути іншим полем, якщо ви відстежуєте статус завершення
+                consultation_conducted: consultationConducted,
+                consultation_started_on_time: consultationStartedOnTime,
+                doctor_feedback: doctorFeedback,
               },
               is_read: true
             }
@@ -876,8 +920,10 @@ const handleSendMeetLink = useCallback(async (message) => {
       Alert.alert(t('error'), `${t('failed_to_complete_consultation')}: ${error.message}`);
     } finally {
       setLoadingCompletion(false);
+      setIsModalVisible(false); // Закриття модального вікна
+      setSelectedMessageForCompletion(null); // Скидання вибраного повідомлення
     }
-  }, [t, currentDoctorUserId, doctorFullName]);
+  }, [t, currentDoctorUserId, doctorFullName, selectedMessageForCompletion]); // Додано selectedMessageForCompletion
 
   if (loading && !refreshing) {
     return (
@@ -930,6 +976,15 @@ const handleSendMeetLink = useCallback(async (message) => {
             const isPaymentSuccessful = (isPaymentReceived || isPaymentUpdate) && message.rawData.status === 'success' && message.rawData.is_paid === true;
             const isPaymentFailed = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined');
             const isPaymentPending = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
+
+            // Визначення, чи зустріч у минулому
+            const isPastConsultation = message.rawData.booking_date && message.rawData.booking_time_slot
+                ? isPast(parseISO(`${message.rawData.booking_date}T${message.rawData.booking_time_slot}`))
+                : false;
+
+            // Чи вже завершена консультація
+            const isConsultationCompleted = message.rawData.status_meet === true;
+
 
             let cardColors = ['#FFFFFF', '#FDFDFD'];
             let cardBorderStyle = styles.messageCardDefaultBorder;
@@ -1121,7 +1176,8 @@ const handleSendMeetLink = useCallback(async (message) => {
                           </TouchableOpacity>
                       )}
 
-                      {(message.rawData.is_paid && !message.rawData.status_meet) && (
+                      {/* Кнопка "Завершити консультацію" */}
+                      {isPastConsultation && !isConsultationCompleted && (
                         <TouchableOpacity
                           onPress={() => handleCompleteConsultation(message)}
                           style={styles.completeConsultationButton}
@@ -1133,7 +1189,7 @@ const handleSendMeetLink = useCallback(async (message) => {
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                           >
-                            {loadingCompletion ? (
+                            {loadingCompletion && selectedMessageForCompletion?.id === message.id ? (
                               <ActivityIndicator size="small" color="#FFFFFF" />
                             ) : (
                               <Text style={styles.completeConsultationButtonText}>
@@ -1144,12 +1200,37 @@ const handleSendMeetLink = useCallback(async (message) => {
                         </TouchableOpacity>
                       )}
 
-                      {message.rawData.status_meet && (
+                      {/* Індикатор "Консультація завершена" */}
+                      {isConsultationCompleted && (
                         <View style={styles.consultationCompletedIndicator}>
                           <Ionicons name="checkmark-circle" size={moderateScale(18)} color="#4CAF50" />
                           <Text style={styles.consultationCompletedText}>
                             {t('consultation_completed_indicator')}
                           </Text>
+                           {/* Опціонально: Показати відгук лікаря, якщо він є */}
+                            {message.rawData.doctor_feedback && (
+                                <Text style={styles.doctorFeedbackDisplay}>
+                                    <Text style={styles.doctorFeedbackLabel}>{t('your_feedback')}: </Text>
+                                    {message.rawData.doctor_feedback}
+                                </Text>
+                            )}
+                            {/* Опціонально: Показати статуси чекбоксів */}
+                            {typeof message.rawData.consultation_conducted === 'boolean' && (
+                              <Text style={styles.doctorFeedbackDisplay}>
+                                <Text style={styles.doctorFeedbackLabel}>
+                                  {t('consultation_conducted_question')}:
+                                </Text>
+                                {message.rawData.consultation_conducted ? t('yes') : t('no')}
+                              </Text>
+                            )}
+                            {typeof message.rawData.consultation_started_on_time === 'boolean' && (
+                              <Text style={styles.doctorFeedbackDisplay}>
+                                <Text style={styles.doctorFeedbackLabel}>
+                                  {t('consultation_started_on_time_question')}:
+                                </Text>
+                                {message.rawData.consultation_started_on_time ? t('yes') : t('no')}
+                              </Text>
+                            )}
                         </View>
                       )}
 
@@ -1171,6 +1252,17 @@ const handleSendMeetLink = useCallback(async (message) => {
           })
         )}
       </ScrollView>
+
+      {/* КОМПОНЕНТ МОДАЛЬНОГО ВІКНА ДЛЯ ЗАВЕРШЕННЯ КОНСУЛЬТАЦІЇ */}
+      <ConsultationCompletionModal
+        isVisible={isModalVisible}
+        onClose={() => {
+          setIsModalVisible(false);
+          setSelectedMessageForCompletion(null);
+        }}
+        onSubmit={handleModalSubmit}
+        isLoading={loadingCompletion}
+      />
     </SafeAreaView>
   );
 }
@@ -1424,9 +1516,8 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(15),
   },
   consultationCompletedIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: 'row', // Змінено на column для кращого відображення деталей
+    alignItems: 'flex-start', // Вирівнювання по лівому краю
     marginTop: verticalScale(15),
     paddingVertical: verticalScale(8),
     paddingHorizontal: moderateScale(15),
@@ -1440,6 +1531,19 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(15),
     color: '#2E7D32',
     marginLeft: moderateScale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doctorFeedbackDisplay: {
+    fontFamily: 'Mont-Regular',
+    fontSize: moderateScale(14),
+    color: '#555',
+    marginTop: verticalScale(5),
+    width: '100%',
+  },
+  doctorFeedbackLabel: {
+    fontFamily: 'Mont-SemiBold',
+    color: '#333',
   },
   loadingContainer: {
     flex: 1,
