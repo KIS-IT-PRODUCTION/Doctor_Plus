@@ -189,6 +189,9 @@
     "not_specified_full": "Not specified",
     "delete_profile": "Delete profile",
     "status_pending": "Waiting check",
+        "messages_screen.no_messages": "No messages yet.",
+    "messages_screen.waiting_for_bookings": "Notifications from the patient regarding your appointments will appear here.",
+
   "header_title": "Messages",
   "messages_screen": {
     "today": "Today",
@@ -642,7 +645,6 @@
   "liqpay_payment_init_failed": "Failed to initiate payment",
   "payment_success_notification_title": "Payment Successful",
   "payment_success_notification_body": "Your payment has been successfully processed!",
-
   "French": "French",
   "Spanish": "Spanish",
   "Japanese": "Japanese",
@@ -705,7 +707,7 @@
   "failed_to_save_meet_link": "Failed to save Meet link.",
   "failed_to_send_meet_link_notification": "Failed to send Meet link notification to patient.",
   "meet_link": "Meet Link",
-  "payment_status_paid": "Paid",
+  "payment_statuses.paid": "Paid",
   "payment_status_pending": "Pending",
   "payment_status_failure": "Failure",
   "payment_status_error": "Error",
@@ -784,5 +786,12 @@
     "pending": "Pending",
     "wait_secure": "Awaiting Confirmation",
     "3ds_verify": "Awaiting 3D Secure"
-  }
+  },
+   "online_doctor_consultations": "Online Doctor Consultations",
+  "health_treasure_slogan": "Health is the most valuable treasure, and we are here to help you preserve it.",
+  "choose_your_role": "Choose your role!",
+  "patient_role": "Patient",
+  "doctor_role": "Doctor",
+  "i_agree_with": "I agree with ",
+  "privacy_policy": "Privacy Policy"
 }

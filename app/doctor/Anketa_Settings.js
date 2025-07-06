@@ -60,9 +60,14 @@ const consultationCostOptions = generateConsultationCostOptions();
 const experienceYearsOptions = Array.from({ length: 51 }, (_, i) => i);
 
 const countries = [
- { name: "Ukraine", code: "UA", emoji: "🇺🇦", timezone: "UTC+2" },
+  { name: "Ukraine", code: "UA", emoji: "🇺🇦", timezone: "UTC+2" },
   { name: "United Kingdom", code: "GB", emoji: "🇬🇧", timezone: "UTC+0" },
-  { name: "United States", code: "US", emoji: "🇺🇸", timezone: "UTC-5" }, // Приклад: Східний час
+];
+
+const consultationLanguages = [
+  { name: "english", code: "en", emoji: "" }, // Використовуємо емодзі для Британії, як для англійської
+  { name: "ukrainian", code: "uk", emoji: "" },
+   { name: "United States", code: "US", emoji: "🇺🇸", timezone: "UTC-5" }, // Приклад: Східний час
   { name: "Canada", code: "CA", emoji: "🇨🇦", timezone: "UTC-6" }, // Приклад: Центральний час
   { name: "Germany", code: "DE", emoji: "🇩🇪", timezone: "UTC+1" },
   { name: "France", code: "FR", emoji: "🇫🇷", timezone: "UTC+1" },
@@ -254,11 +259,10 @@ const countries = [
   { name: "Sri Lanka", code: "LK", emoji: "🇱🇰", timezone: "UTC+5:30" },
   { name: "Jamaica", code: "JM", emoji: "🇯🇲", timezone: "UTC-5" },
 ];
-
-const consultationLanguages = [
- { name: "english", code: "en", emoji: "" }, // Використовуємо емодзі для Британії, як для англійської
-  { name: "ukrainian", code: "uk", emoji: "" },
-  { name: "german", code: "de", emoji: "" },
+const generalAppLanguages = [
+  { nameKey: "english", code: "en", emoji: "" },
+  { nameKey: "ukrainian", code: "uk", emoji: "" },
+   { name: "german", code: "de", emoji: "" },
   { name: "Philippines", code: "PH", emoji: "🇵🇭", timezone: "UTC+8" },
   { name: "Croatia", code: "HR", emoji: "🇭🇷", timezone: "UTC+1" },
   { name: "Central African Republic", code: "CF", emoji: "🇨🇫", timezone: "UTC+1" },
@@ -453,10 +457,6 @@ const consultationLanguages = [
   { name: "Federated States of Micronesia", code: "FM", emoji: "🇫🇲", timezone: "UTC+10" },
   { name: "Fiji", code: "FJ", emoji: "🇫🇯", timezone: "UTC+12" },
 ];
-const generalAppLanguages = [
-  { nameKey: "english", code: "en", emoji: "" },
-  { nameKey: "ukrainian", code: "uk", emoji: "" },
-];
 
 const Anketa_Settings = () => {
   const navigation = useNavigation();
@@ -571,6 +571,27 @@ const Anketa_Settings = () => {
           return;
         }
 
+        // --- ПОЧАТОК: ЗАВАНТАЖЕННЯ ЗАГАЛЬНОЇ МОВИ ДОДАТКУ ---
+        // Запит до profile_doctor для отримання мови
+        const { data: profileDoctorData, error: profileDoctorError } = await supabase
+          .from("profile_doctor")
+          .select("language")
+          .eq("user_id", user.id)
+          .single();
+
+        if (profileDoctorError && profileDoctorError.code !== "PGRST116") {
+          console.error("Error fetching doctor's language from profile_doctor:", profileDoctorError.message);
+        } else if (profileDoctorData && profileDoctorData.language) {
+          i18n.changeLanguage(profileDoctorData.language);
+          setDisplayedLanguageCode(profileDoctorData.language.toUpperCase());
+          console.log(`Loaded language from profile_doctor: ${profileDoctorData.language}`);
+        } else {
+          // Якщо мова не знайдена в profile_doctor, використовуємо i18n.language за замовчуванням
+          console.log("No language found in profile_doctor, using i18n default.");
+        }
+        // --- КІНЕЦЬ: ЗАВАНТАЖЕННЯ ЗАГАЛЬНОЇ МОВИ ДОДАТКУ ---
+
+
         const { data, error } = await supabase
           .from("anketa_doctor")
           .select("*")
@@ -588,12 +609,6 @@ const Anketa_Settings = () => {
           const userCountry = countries.find((c) => c.name === data.country);
           setCountry(userCountry || null);
           setConsultationCost(data.consultation_cost?.toString() || "");
-
-          // Встановлення загальної мови додатку з бази даних
-          if (data.language) {
-            i18n.changeLanguage(data.language);
-            setDisplayedLanguageCode(data.language.toUpperCase());
-          }
 
           let fetchedCommunicationLanguages = [];
           if (data.communication_languages) {
@@ -693,9 +708,9 @@ const Anketa_Settings = () => {
         Alert.alert(t("error_title"), t("error_not_authenticated_for_language"));
         return;
       }
-      // Оновлення колонки 'language' для поточного користувача
+      // Оновлення колонки 'language' для поточного користувача в таблиці profile_doctor
       const { error } = await supabase
-        .from("profile_doctor")
+        .from("profile_doctor") // <--- Змінено на profile_doctor
         .upsert(
           {
             user_id: user.id,
@@ -708,7 +723,7 @@ const Anketa_Settings = () => {
         console.error("Error saving general app language:", error.message);
         Alert.alert(t("error_title"), t("error_saving_language"));
       } else {
-        console.log("General app language saved successfully:", langCode);
+        console.log("General app language saved successfully to profile_doctor:", langCode);
       }
     } catch (err) {
       console.error("General error saving app language:", err);
@@ -1265,12 +1280,22 @@ const Anketa_Settings = () => {
               }
               console.log("Doctor profile data deleted.");
 
-              // Важливо: Видалення користувача з Supabase Auth на клієнтській стороні:
-              // Supabase не надає прямий клієнтський API для видалення *самого себе* з Auth таблиці без дозволів адміністратора.
-              // Метод `supabase.auth.admin.deleteUser(userId)` потребує Service Role Key, який НЕ ПОВИНЕН бути доступний на фронтенді.
-              // Найбезпечніший спосіб - це використати Edge Function або власний бекенд для цієї операції.
-              // Тут ми просто розлогінюємо користувача. Якщо обліковий запис має бути повністю видалений,
-              // це потрібно реалізувати на серверній стороні.
+              // Видаляємо запис профілю лікаря з таблиці `profile_doctor`
+              const { error: deleteProfileDoctorError } = await supabase
+                .from("profile_doctor") // <--- Додано видалення з profile_doctor
+                .delete()
+                .eq("user_id", userId);
+
+              if (deleteProfileDoctorError) {
+                console.warn(
+                  "Warning: Error deleting profile_doctor entry:",
+                  deleteProfileDoctorError.message
+                );
+                // Не блокуємо видалення, оскільки це не критично для основної анкети
+              }
+              console.log("Profile doctor data deletion attempted.");
+
+
               const { error: signOutError } = await supabase.auth.signOut();
               if (signOutError) {
                 console.warn("Warning: Error signing out after deletion:", signOutError.message);
@@ -1309,7 +1334,6 @@ const Anketa_Settings = () => {
       cleanupUris.forEach((uri) => URL.revokeObjectURL(uri));
     };
   }, [photoUri, diplomaUri, certificateUri]);
-
   return (
     <SafeAreaView
       style={{

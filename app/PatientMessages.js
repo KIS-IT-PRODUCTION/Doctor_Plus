@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Platform,
   Linking,
   Dimensions,
-  StatusBar, // Додаємо StatusBar для умовних стилів
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -33,7 +33,7 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: false, // ЦЕ ВАЖЛИВО: для сповіщень, що приходять в foreground, ми не хочемо автоматично збільшувати бейдж, бо ми контролюємо його вручну.
   }),
 });
 
@@ -55,6 +55,17 @@ export default function PatientMessages() {
   const handleBackPress = () => {
     navigation.goBack();
   };
+
+  // НОВА ФУНКЦІЯ: Оновлення бейджа на іконці додатка
+  const updateAppBadge = useCallback(async (count) => {
+    try {
+      // *** ВИПРАВЛЕНО: Змінено setBadgeNumberAsync на setBadgeCountAsync ***
+      await Notifications.setBadgeCountAsync(count);
+      console.log(`Badge count updated to: ${count}`);
+    } catch (error) {
+      console.error("Failed to set badge count:", error);
+    }
+  }, []);
 
   useEffect(() => {
     const getUserId = async () => {
@@ -117,16 +128,20 @@ export default function PatientMessages() {
         body: msg.body,
         created_at: msg.created_at,
         is_read: msg.is_read,
-        type: msg.notification_type, // Використовуємо notification_type
+        type: msg.notification_type,
         rawData: msg.data || {},
         is_paid: msg.data?.is_paid || false,
         booking_id: msg.data?.booking_id || null,
         amount: msg.data?.amount || 0,
-        meet_link: msg.data?.meet_link || null, // Отримуємо meet_link з rawData
+        meet_link: msg.data?.meet_link || null,
       }));
 
       setMessages(formattedMessages);
       console.log("PatientMessages: Отримано сповіщень:", formattedMessages.length);
+
+      // ПІДРАХУНОК ТА ОНОВЛЕННЯ БЕЙДЖА ПІСЛЯ ЗАВАНТАЖЕННЯ ПОВІДОМЛЕНЬ
+      const unreadCount = formattedMessages.filter(msg => !msg.is_read).length;
+      await updateAppBadge(unreadCount);
 
     } catch (error) {
       console.error('PatientMessages: Помилка отримання повідомлень пацієнта:', error.message);
@@ -135,7 +150,7 @@ export default function PatientMessages() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [currentPatientId, t]);
+  }, [currentPatientId, t, updateAppBadge]);
 
   // Використовуємо useFocusEffect для оновлення при фокусуванні на екрані
   useFocusEffect(
@@ -154,18 +169,23 @@ export default function PatientMessages() {
     fetchMessagesFromSupabase();
   }, [fetchMessagesFromSupabase]);
 
-  // Функція для позначення ОДНОГО повідомлення як прочитаного (може бути викликана кнопкою)
+  // Функція для позначення ОДНОГО повідомлення як прочитаного
   const markSingleAsRead = useCallback(async (messageId) => {
     if (!messageId) {
         console.warn("markSingleAsRead: ID повідомлення відсутній.");
         return;
     }
     // Оновлюємо UI негайно
-    setMessages(prevMessages =>
-      prevMessages.map(msg =>
+    setMessages(prevMessages => {
+      const updatedMessages = prevMessages.map(msg =>
         msg.id === messageId ? { ...msg, is_read: true } : msg
-      )
-    );
+      );
+      // Оновлюємо бейдж після зміни UI
+      const unreadCount = updatedMessages.filter(msg => !msg.is_read).length;
+      updateAppBadge(unreadCount); // Викликаємо оновлення бейджа
+      return updatedMessages;
+    });
+
     try {
       const { error } = await supabase
         .from('patient_notifications')
@@ -180,13 +200,16 @@ export default function PatientMessages() {
       console.error('PatientMessages: Помилка позначення одного повідомлення як прочитаного:', error.message);
       Alert.alert(t('error'), `${t('failed_to_mark_as_read')}: ${error.message}`);
       // Відкат UI у випадку помилки
-      setMessages(prevMessages =>
-        prevMessages.map(msg =>
+      setMessages(prevMessages => {
+        const revertedMessages = prevMessages.map(msg =>
           msg.id === messageId ? { ...msg, is_read: false } : msg
-        )
-      );
+        );
+        const unreadCount = revertedMessages.filter(msg => !msg.is_read).length;
+        updateAppBadge(unreadCount); // Відкат бейджа
+        return revertedMessages;
+      });
     }
-  }, [t]);
+  }, [t, updateAppBadge]);
 
 
   // НОВА ФУНКЦІЯ: Обробка оплати через LiqPay
@@ -299,7 +322,8 @@ export default function PatientMessages() {
 
     const subscription = Notifications.addNotificationReceivedListener(notification => {
       console.log('PatientMessages: Сповіщення отримано на передньому плані:', notification);
-      fetchMessagesFromSupabase(); // Оновлення списку після отримання нового сповіщення
+      // Оновлюємо список повідомлень та бейдж
+      fetchMessagesFromSupabase();
     });
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
@@ -383,7 +407,7 @@ export default function PatientMessages() {
       Notifications.removeNotificationSubscription(responseSubscription);
       linkingSubscription.remove();
     };
-  }, [currentPatientId, fetchMessagesFromSupabase, navigation, t, handleLiqPayPayment, handleDeepLink, handleJoinMeet]); // Додано handleJoinMeet в залежності
+  }, [currentPatientId, fetchMessagesFromSupabase, navigation, t, handleLiqPayPayment, handleDeepLink, handleJoinMeet]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -451,7 +475,7 @@ export default function PatientMessages() {
                         message.type === 'booking_confirmed' && styles.messageCardConfirmed,
                         message.type === 'booking_rejected' && styles.messageCardRejected,
                         isPaid && styles.messageCardPaid,
-                        message.type === 'meet_link_update' && styles.messageCardMeetLinkUpdate, // Новий стиль для оновлень Meet Link
+                        message.type === 'meet_link_update' && styles.messageCardMeetLinkUpdate,
                     ]}
                   >
                     <Text style={styles.cardTitle}>{message.title || t('notification_title_default')}</Text>
@@ -483,15 +507,15 @@ export default function PatientMessages() {
                         >
                             <Text style={styles.payButtonText}>{t('pay_now')} {message.amount} {t('uah')}</Text>
                         </TouchableOpacity>
-                    ) : showJoinMeetButton ? ( // Зміни тут: Кнопка "Приєднатися"
+                    ) : showJoinMeetButton ? (
                         <TouchableOpacity
-                            style={styles.joinMeetButton} // Новий стиль
+                            style={styles.joinMeetButton}
                             onPress={() => handleJoinMeet(message.meet_link)}
                         >
                             <Ionicons name="videocam-outline" size={moderateScale(20)} color="#FFFFFF" style={styles.joinMeetIcon} />
                             <Text style={styles.joinMeetButtonText}>{t('join_meet_call')}</Text>
                         </TouchableOpacity>
-                    ) : isPaid ? ( // Якщо оплачено, але немає Meet посилання (ще не надіслано)
+                    ) : isPaid ? (
                         <View style={styles.paidButton}>
                             <Text style={styles.paidButtonText}>{t('paid')}</Text>
                         </View>
@@ -547,7 +571,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontFamily: "Mont-SemiBold", // Якщо шрифт Mont-SemiBold доступний
+    fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(20),
     color: "#333",
   },
@@ -567,7 +591,6 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(10),
     fontSize: moderateScale(16),
     color: '#555',
-    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   messageList: {
     paddingVertical: verticalScale(20),
@@ -587,13 +610,11 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: moderateScale(14),
     fontWeight: '600',
-    // fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
     color: '#666',
   },
   timestampText: {
     fontSize: moderateScale(14),
     color: '#888',
-    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   messageCard: {
     backgroundColor: '#FFFFFF',
@@ -623,14 +644,12 @@ const styles = StyleSheet.create({
     borderLeftColor: '#2E7D32',
     opacity: 1,
   },
-  // НОВИЙ СТИЛЬ: для повідомлення про оновлення Meet Link
   messageCardMeetLinkUpdate: {
-    borderLeftColor: '#9C27B0', // Фіолетовий колір, як у лікаря
+    borderLeftColor: '#9C27B0',
   },
   cardTitle: {
     fontSize: moderateScale(18),
     fontWeight: 'bold',
-    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
     color: '#333',
     marginBottom: verticalScale(8),
   },
@@ -639,27 +658,24 @@ const styles = StyleSheet.create({
     color: '#555',
     lineHeight: verticalScale(22),
     marginBottom: verticalScale(10),
-    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
-  // НОВІ СТИЛІ: для контейнера Meet-посилання
   meetLinkContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: verticalScale(5),
     marginBottom: verticalScale(10),
     padding: moderateScale(10),
-    backgroundColor: '#F0FFF0', // Світло-зелений фон
+    backgroundColor: '#F0FFF0',
     borderRadius: moderateScale(10),
     borderWidth: 1,
-    borderColor: '#A8DDA8', // Зелена рамка
+    borderColor: '#A8DDA8',
   },
   meetLinkText: {
     fontSize: moderateScale(14),
-    color: '#34A853', // Темно-зелений колір тексту
+    color: '#34A853',
     marginLeft: moderateScale(8),
-    textDecorationLine: 'underline', // Підкреслення
-    flexShrink: 1, // Дозволяє тексту скорочуватися
-    // fontFamily: 'Mont-Regular',
+    textDecorationLine: 'underline',
+    flexShrink: 1,
   },
   payButton: {
     marginTop: verticalScale(10),
@@ -680,7 +696,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
   },
   paidButton: {
     marginTop: verticalScale(10),
@@ -696,11 +711,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
   },
   joinMeetButton: {
     marginTop: verticalScale(10),
-    backgroundColor: '#34A853', // Колір Google Meet
+    backgroundColor: '#34A853',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -719,7 +733,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: moderateScale(16),
     fontWeight: 'bold',
-    // fontFamily: 'Mont-Bold', // Якщо шрифт Mont-Bold доступний
     marginLeft: moderateScale(8),
   },
   joinMeetIcon: {
@@ -734,7 +747,6 @@ const styles = StyleSheet.create({
   readStatusText: {
     fontSize: moderateScale(14),
     color: '#888',
-    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
   markAsReadButton: {
     backgroundColor: 'transparent',
@@ -748,7 +760,6 @@ const styles = StyleSheet.create({
   markAsReadButtonText: {
     color: '#0EB3EB',
     fontSize: moderateScale(13),
-    // fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
   },
   emptyMessagesContainer: {
     flex: 1,
@@ -761,13 +772,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#777',
     marginBottom: verticalScale(10),
-    // fontFamily: 'Mont-SemiBold', // Якщо шрифт Mont-SemiBold доступний
   },
   emptyMessagesSubText: {
     fontSize: moderateScale(14),
     color: '#999',
     textAlign: 'center',
     paddingHorizontal: moderateScale(30),
-    // fontFamily: 'Mont-Regular', // Якщо шрифт Mont-Regular доступний
   },
 });

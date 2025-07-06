@@ -13,7 +13,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   ActivityIndicator,
-  RefreshControl, 
+  RefreshControl,
   KeyboardAvoidingView,
   StatusBar,
 } from "react-native";
@@ -50,7 +50,7 @@ const allDoctorSpecializations = [
   { key: "surgeon", nameKey: "categories.surgeon" },
   { key: "cardiologist", nameKey: "categories.cardiologist" },
   { key: "dentist", nameKey: "categories.dentist" },
-  { key: "dermatologist", nameKey: "categories.dermatologist" },
+  { key: "dermatologist", nameName: "categories.dermatologist" },
   { key: "ophthalmologist", nameKey: "categories.ophthalmologist" },
   { key: "neurologist", nameKey: "categories.neurologist" },
   { key: "endocrinologist", nameKey: "categories.endocrinologist" },
@@ -106,13 +106,11 @@ const Patsient_Home = () => {
     }
 
     try {
-      // Виправлено назву таблиці з 'messages' на 'patient_notifications'
-      // Видалено 'head: false', оскільки для count: 'exact' це не потрібно
       const { count, error } = await supabase
-        .from('patient_notifications') // <--- ВИПРАВЛЕНО ТУТ!
-        .select('*', { count: 'exact' }) // Запитуємо точну кількість
-        .eq('patient_id', session.user.id) // Повідомлення для поточного пацієнта
-        .eq('is_read', false); // Тільки непрочитані
+        .from('patient_notifications')
+        .select('*', { count: 'exact' })
+        .eq('patient_id', session.user.id)
+        .eq('is_read', false);
 
       if (error) {
         console.error("Error fetching unread messages count:", error.message);
@@ -125,7 +123,7 @@ const Patsient_Home = () => {
       console.error("Unexpected error fetching unread messages count:", err);
       setUnreadMessagesCount(0);
     }
-  }, [session?.user]); // Залежить від зміни сесії користувача
+  }, [session?.user]);
 
 
   // Функція для реєстрації та збереження push-токену
@@ -215,7 +213,7 @@ const Patsient_Home = () => {
     console.log("DEBUG: Token to be saved:", token, "for userId:", userId);
 
     if (token && userId) {
-      console.log(`DEBUG: Saving token '<span class="math-inline">\{token\}' for user\_id '</span>{userId}' to 'profiles' table.`);
+      console.log(`DEBUG: Saving token '${token}' for user_id '${userId}' to 'profiles' table.`);
       const { data: updateData, error } = await supabase
         .from('profiles')
         .update({ notification_token: token })
@@ -245,7 +243,7 @@ const Patsient_Home = () => {
       return () => {
         // Опціонально, якщо потрібно щось очистити при втраті фокусу
       };
-    }, [fetchUnreadMessagesCount, session?.user]) // Додаємо fetchUnreadMessagesCount та session?.user в залежності
+    }, [fetchUnreadMessagesCount, session?.user])
   );
 
   useEffect(() => {
@@ -341,11 +339,11 @@ const Patsient_Home = () => {
     } finally {
       setLoadingSpecializations(false);
     }
-  }, [t]); // Додаємо t в залежності, оскільки воно використовується всередині
+  }, [t]);
 
   useEffect(() => {
     fetchAvailableSpecializations();
-  }, [fetchAvailableSpecializations]); // Залежить від fetchAvailableSpecializations
+  }, [fetchAvailableSpecializations]);
 
   const handleSaveInfo = async () => {
     if (!personalInfoText.trim()) {
@@ -426,9 +424,36 @@ const Patsient_Home = () => {
     setLanguageModalVisible(false);
   };
 
-  const handleLanguageSelect = (langCode) => {
+  // ОНОВЛЕНА ФУНКЦІЯ handleLanguageSelect
+  const handleLanguageSelect = async (langCode) => {
+    // 1. Змінюємо мову інтерфейсу за допомогою i18n
     i18n.changeLanguage(langCode);
+    setDisplayedLanguageCode(langCode.toUpperCase()); // Оновлюємо відображення мови
     closeLanguageModal();
+
+    // 2. Зберігаємо вибрану мову в Supabase, якщо користувач авторизований
+    if (session?.user) {
+      try {
+        const { error } = await supabase
+          .from('profiles') // Назва вашої таблиці з профілями
+          .update({ language: langCode }) // Оновлюємо колонку 'language'
+          .eq('user_id', session.user.id); // Для поточного користувача
+
+        if (error) {
+          console.error("Error updating user language in Supabase:", error.message);
+          Alert.alert(t("error_title"), t("failed_to_save_language", { error: error.message }));
+        } else {
+          console.log(`User ${session.user.id} language updated to: ${langCode}`);
+          // Опціонально: можна додати невелике сповіщення про успіх
+          // Alert.alert(t("success_title"), t("language_saved_successfully"));
+        }
+      } catch (err) {
+        console.error("Unexpected error updating user language:", err);
+        Alert.alert(t("error_title"), t("unknown_error_saving_language"));
+      }
+    } else {
+      console.warn("No active session, skipping language save to Supabase.");
+    }
   };
 
   const openSpecializationModal = () => {
@@ -459,7 +484,9 @@ const Patsient_Home = () => {
     setRefreshing(false);
   }, [fetchUnreadMessagesCount, fetchAvailableSpecializations]);
 
-
+  // ... (решта вашого коду компонента)
+  // Я залишив тільки ту частину, яку ви надали, щоб уникнути дублювання
+  // Ваша секція 'return' і стилі залишаються незмінними.
   return (
     <View style={styles.fullScreenContainer}>
       <SafeAreaView style={styles.safeAreaContent}>

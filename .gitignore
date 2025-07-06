@@ -1,4 +1,5 @@
 node_modules
 # Expo Prebuild / CNG
 android/
+ios/
 .expo/devices.json

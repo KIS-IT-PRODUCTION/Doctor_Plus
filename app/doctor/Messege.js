@@ -17,7 +17,7 @@ import {
   StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Icon from "../../assets/icon.svg"; // Переконайтеся, що шлях до SVG коректний
+import Icon from "../../assets/icon.svg";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
@@ -26,7 +26,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get("window");
 
-// Функції масштабування для адаптивного дизайну
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) =>
@@ -41,6 +40,7 @@ export default function Message() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
+  const [loadingCompletion, setLoadingCompletion] = useState(false);
 
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
@@ -57,11 +57,10 @@ export default function Message() {
     const messageTime = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(now);
 
     setMessages(prevMessages => {
-      // Визначаємо універсальний ID для повідомлення, пріоритет віддаємо db_id (з бази даних)
       const uniqueMessageId = data && data.db_id ? data.db_id : (Date.now().toString() + Math.random().toString(36).substring(2, 9));
 
       const isDuplicate = prevMessages.some(msg =>
-        msg.id === uniqueMessageId // Порівнюємо за єдиним ID
+        msg.id === uniqueMessageId
       );
 
       if (isDuplicate) {
@@ -74,8 +73,8 @@ export default function Message() {
 
       return [
         {
-          id: uniqueMessageId, // Використовуємо універсальний ID тут
-          db_id: data && data.db_id ? data.db_id : null, // Зберігаємо оригінальний db_id, якщо є
+          id: uniqueMessageId,
+          db_id: data && data.db_id ? data.db_id : null,
           title: title,
           body: body,
           date: messageDate,
@@ -99,7 +98,7 @@ export default function Message() {
     }
 
     if (!isRefreshing) setLoading(true);
-    else setRefreshing(false); // Залишаємо loading true, поки refresh не завершиться
+    else setRefreshing(false);
 
     console.log("Fetching notifications for doctor (user ID):", doctorUserId);
     try {
@@ -123,8 +122,8 @@ export default function Message() {
         const messageType = rawData.type || 'general';
 
         return {
-          id: notif.id, // ID повідомлення з бази даних
-          db_id: notif.id, // Дублюємо для послідовності, або можна використовувати тільки 'id'
+          id: notif.id,
+          db_id: notif.id,
           title: notif.title,
           body: notif.body,
           date: new Intl.DateTimeFormat(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at)),
@@ -132,11 +131,14 @@ export default function Message() {
           is_read: notif.is_read,
           type: messageType,
           rawData: { ...rawData, status: messageStatus },
-          meetLinkInput: rawData.meet_link ? rawData.meet_link : '', // Завантажуємо meet_link з rawData
+          meetLinkInput: rawData.meet_link ? rawData.meet_link : '',
         };
       });
 
       setMessages(formattedMessages);
+
+      await Notifications.setBadgeCountAsync(0);
+      console.log('App badge count reset to 0 after fetching messages.');
 
     } catch (error) {
       console.error("Error fetching messages from Supabase:", error.message);
@@ -154,7 +156,6 @@ export default function Message() {
       setRefreshing(false);
     }
   }, [currentDoctorUserId, fetchMessagesFromSupabase]);
-
 
   useEffect(() => {
     const getDoctorData = async () => {
@@ -198,7 +199,18 @@ export default function Message() {
       if (currentDoctorUserId) {
         fetchMessagesFromSupabase(currentDoctorUserId);
       }
-      return () => {};
+      const resetBadgeOnFocus = async () => {
+        try {
+            await Notifications.setBadgeCountAsync(0);
+            console.log('App badge count reset to 0 on screen focus.');
+        } catch (error) {
+            console.error('Failed to reset badge count on focus:', error);
+        }
+      };
+      resetBadgeOnFocus();
+
+      return () => {
+      };
     }, [currentDoctorUserId, fetchMessagesFromSupabase])
   );
 
@@ -221,6 +233,10 @@ export default function Message() {
         }
       };
       addNewMessage(notificationContentWithDbId);
+      const newBadgeCount = (notification.request.content.badge !== undefined && notification.request.content.badge !== null)
+        ? notification.request.content.badge
+        : messages.filter(msg => !msg.is_read).length + 1;
+      Notifications.setBadgeCountAsync(newBadgeCount).catch(e => console.error("Error setting badge on received:", e));
     });
 
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
@@ -235,6 +251,9 @@ export default function Message() {
         }
       };
       addNewMessage(notificationContentWithDbId);
+
+      Notifications.setBadgeCountAsync(0).catch(e => console.error("Error setting badge on response:", e));
+
 
       if (data && data.type === 'new_booking' && data.booking_id) {
         console.log("Navigating to BookingDetails for booking_id:", data.booking_id);
@@ -272,10 +291,9 @@ export default function Message() {
         Notifications.removeNotificationSubscription(notificationResponseListener.current);
       }
     };
-  }, [t, addNewMessage, navigation]);
+  }, [t, addNewMessage, navigation, messages.length]);
 
   const markAsReadAndStatus = useCallback(async (messageId, newStatus = null, isPaymentNotification = false) => {
-    // Optimistic UI update
     setMessages(prevMessages =>
       prevMessages.map(msg => {
         if (msg.id === messageId) {
@@ -337,16 +355,28 @@ export default function Message() {
         Alert.alert(t('error'), t('failed_to_update_notification_status'));
       } else {
         console.log(`Notification ${messageId} marked as read (${updateObject.is_read}) and status updated to ${newStatus || 'N/A'} in DB.`);
+        if (updateObject.is_read && currentDoctorUserId) {
+            const { count: unreadCountAfterRead, error: countError } = await supabase
+              .from('doctor_notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('doctor_id', currentDoctorUserId)
+              .eq('is_read', false);
+
+            if (!countError && unreadCountAfterRead !== null) {
+                await Notifications.setBadgeCountAsync(unreadCountAfterRead);
+                console.log(`Badge count updated to ${unreadCountAfterRead} after marking message as read.`);
+            } else {
+                console.error("Error re-fetching unread count after marking message as read:", countError?.message);
+            }
+        }
       }
     } catch (error) {
       console.error("Network error marking notification as read or updating status:", error.message);
       Alert.alert(t('error'), t('failed_to_update_notification_status'));
     }
-  }, [t]);
+  }, [t, currentDoctorUserId]);
 
-  // Універсальна функція для позначення будь-якого повідомлення як прочитаного
   const markMessageAsRead = useCallback(async (messageId) => {
-    // Оптимістичне оновлення UI
     setMessages(prevMessages =>
       prevMessages.map(msg =>
         msg.id === messageId ? { ...msg, is_read: true } : msg
@@ -361,7 +391,6 @@ export default function Message() {
 
       if (error) {
         console.error("Error marking message as read in DB:", error.message);
-        // Якщо помилка, відкочуємо оптимістичне оновлення
         setMessages(prevMessages =>
           prevMessages.map(msg =>
             msg.id === messageId ? { ...msg, is_read: false } : msg
@@ -370,10 +399,23 @@ export default function Message() {
         Alert.alert(t('error'), t('failed_to_update_notification_status'));
       } else {
         console.log(`Message ${messageId} marked as read in DB.`);
+        if (currentDoctorUserId) {
+            const { count: unreadCountAfterRead, error: countError } = await supabase
+              .from('doctor_notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('doctor_id', currentDoctorUserId)
+              .eq('is_read', false);
+
+            if (!countError && unreadCountAfterRead !== null) {
+                await Notifications.setBadgeCountAsync(unreadCountAfterRead);
+                console.log(`Badge count updated to ${unreadCountAfterRead} after marking a single message as read.`);
+            } else {
+                console.error("Error re-fetching unread count after marking single message as read:", countError?.message);
+            }
+        }
       }
     } catch (error) {
       console.error("Network error marking message as read:", error.message);
-      // Якщо помилка, відкочуємо оптимістичне оновлення
       setMessages(prevMessages =>
         prevMessages.map(msg =>
           msg.id === messageId ? { ...msg, is_read: false } : msg
@@ -381,7 +423,7 @@ export default function Message() {
       )
       Alert.alert(t('error'), t('failed_to_update_notification_status'));
     }
-  }, [t]);
+  }, [t, currentDoctorUserId]);
 
   const updateBookingStatusAndNotify = useCallback(async (message, newStatus) => {
       if (!message || !message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId) {
@@ -585,14 +627,13 @@ const handleSendMeetLink = useCallback(async (message) => {
         return;
     }
 
-    // Додав перевірку на message.db_id, оскільки вона потрібна для оновлення doctor_notifications
     if (!message.rawData || !message.rawData.booking_id || !message.rawData.patient_id || !currentDoctorUserId || !message.db_id) {
         console.error("Missing essential data for sending meet link:", {
             rawData: message.rawData,
             booking_id: message.rawData?.booking_id,
             patient_id: message.rawData?.patient_id,
             currentDoctorUserId: currentDoctorUserId,
-            message_db_id: message.db_id // Для відладки
+            message_db_id: message.db_id
         });
         Alert.alert(t('error'), t('invalid_booking_data_for_meet_link'));
         return;
@@ -603,10 +644,9 @@ const handleSendMeetLink = useCallback(async (message) => {
     const bookingDate = message.rawData.booking_date || message.rawData.date;
     const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
     const doctorFinalName = doctorFullName || t('doctor');
-    const notificationDbId = message.db_id; // ID повідомлення в doctor_notifications
+    const notificationDbId = message.db_id; // Використовуємо message.db_id для оновлення сповіщення в doctor_notifications
 
     try {
-        // 1. Оновлюємо посилання в базі даних patient_bookings
         const { error: updateBookingError } = await supabase
             .from('patient_bookings')
             .update({ meet_link: meetLink })
@@ -618,8 +658,6 @@ const handleSendMeetLink = useCallback(async (message) => {
         }
         console.log(`Meet link for booking ${bookingId} updated in patient_bookings.`);
 
-        // --- НОВИЙ КРОК: ОНОВЛЕННЯ doctor_notifications ---
-        // 2. Отримуємо поточні дані повідомлення з doctor_notifications
         const { data: currentNotificationData, error: fetchNotifError } = await supabase
             .from('doctor_notifications')
             .select('data')
@@ -628,31 +666,26 @@ const handleSendMeetLink = useCallback(async (message) => {
 
         if (fetchNotifError) {
             console.warn("Warning: Error fetching current notification data from doctor_notifications, proceeding without updating notification's rawData:", fetchNotifError.message);
-            // Ми продовжимо без оновлення doctor_notifications, якщо не вдалося завантажити
-            // або викинемо помилку, якщо вважаємо це критичним
         }
 
         let updatedRawDataForNotification = currentNotificationData?.data || {};
-        updatedRawDataForNotification.meet_link = meetLink; // Додаємо/оновлюємо meet_link
+        updatedRawDataForNotification.meet_link = meetLink;
 
         const { error: updateNotifError } = await supabase
             .from('doctor_notifications')
             .update({
-                data: updatedRawDataForNotification, // Зберігаємо оновлені дані
-                is_read: true // Можна відразу позначити як прочитане, якщо лікар взаємодіяв
+                data: updatedRawDataForNotification,
+                is_read: true
             })
             .eq('id', notificationDbId);
 
         if (updateNotifError) {
             console.error("Error updating meet_link in doctor_notifications:", updateNotifError.message);
-            // Надайте користувачеві повідомлення про помилку збереження в історії
             Alert.alert(t('error'), t('failed_to_save_meet_link_in_notification_history'));
         } else {
             console.log(`Meet link for notification ${notificationDbId} updated in doctor_notifications.`);
         }
-        // --- КІНЕЦЬ НОВОГО КРОКУ ---
 
-        // 3. Викликаємо Edge Function для надсилання сповіщення пацієнту
         const sendMeetLinkUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/send-meet-link-notification';
         const { data: { session } } = await supabase.auth.getSession();
         const accessToken = session?.access_token;
@@ -663,6 +696,7 @@ const handleSendMeetLink = useCallback(async (message) => {
         }
 
         const meetLinkPayload = {
+            type: 'meet_link_update',
             patient_id: patientId,
             booking_id: bookingId,
             meet_link: meetLink,
@@ -702,28 +736,148 @@ const handleSendMeetLink = useCallback(async (message) => {
         console.log('Meet link notification sent successfully. Response:', await response.json());
         Alert.alert(t('success'), t('meet_link_sent_successfully'));
 
-        // 4. ОНОВЛЮЄМО ЛОКАЛЬНИЙ СТАН `messages` ДЛЯ ВІДОБРАЖЕННЯ ПОСИЛАННЯ
         setMessages(prevMessages =>
             prevMessages.map(msg =>
                 msg.id === message.id
                     ? {
                         ...msg,
-                        meetLinkInput: meetLink, // Зберігаємо введене посилання в meetLinkInput
+                        meetLinkInput: meetLink,
                         rawData: {
                             ...msg.rawData,
-                            meet_link: meetLink // Зберігаємо посилання також в rawData.meet_link
+                            meet_link: meetLink
                         },
-                        is_read: true // Позначаємо повідомлення як прочитане
+                        is_read: true
                     }
                     : msg
             )
         );
+        if (currentDoctorUserId) {
+            const { count: unreadCountAfterSend, error: countError } = await supabase
+              .from('doctor_notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('doctor_id', currentDoctorUserId)
+              .eq('is_read', false);
+
+            if (!countError && unreadCountAfterSend !== null) {
+                await Notifications.setBadgeCountAsync(unreadCountAfterSend);
+                console.log(`Badge count updated to ${unreadCountAfterSend} after sending meet link.`);
+            } else {
+                console.error("Error re-fetching unread count after sending meet link:", countError?.message);
+            }
+        }
 
     } catch (error) {
         console.error("Error sending meet link:", error.message);
         Alert.alert(t('error'), `${t('failed_to_send_meet_link')}: ${error.message}`);
     }
 }, [t, currentDoctorUserId, doctorFullName]);
+
+  const handleCompleteConsultation = useCallback(async (message) => {
+    // console.log("Дані для завершення консультації (message.rawData):", message.rawData); // <-- Розкоментуйте для відладки!
+
+    const { patient_id: patientId, booking_id: bookingId, booking_date: bookingDate, booking_time_slot: bookingTimeSlot } = message.rawData;
+    const doctorFinalName = doctorFullName || t('doctor');
+
+    if (!bookingId || !patientId || !doctorFinalName || !bookingDate || !bookingTimeSlot) {
+      console.error("Відсутні дані для завершення консультації:", {
+        bookingId,
+        patientId,
+        doctorFinalName,
+        bookingDate,
+        bookingTimeSlot
+      });
+      Alert.alert(t('error'), t('missing_consultation_details'));
+      return;
+    }
+
+    setLoadingCompletion(true);
+    try {
+      const completeConsultationUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/send-meet-link-notification';
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        Alert.alert(t('error'), t('user_not_authenticated_please_login_again'));
+        return;
+      }
+
+      const completeConsultationPayload = {
+        type: 'consultation_completed',
+        patient_id: patientId,
+        booking_id: bookingId,
+        doctor_name: doctorFinalName,
+        booking_date: bookingDate,
+        booking_time_slot: bookingTimeSlot,
+      };
+
+      console.log("Calling send-meet-link-notification (consultation_completed) with data:", JSON.stringify(completeConsultationPayload, null, 2));
+
+      const response = await fetch(completeConsultationUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(completeConsultationPayload),
+      });
+
+      if (!response.ok) {
+        let errorText = `HTTP Error completing consultation: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.error) {
+            errorText = errorData.error;
+          } else {
+            errorText = JSON.stringify(errorData);
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse error response from complete consultation Edge Function (possibly not JSON):", parseError);
+        }
+        console.error('Error calling complete consultation Edge Function:', errorText);
+        Alert.alert(t('error'), `${t('failed_to_complete_consultation')}: ${errorText}`);
+        return;
+      }
+
+      console.log('Consultation completion notification sent successfully. Response:', await response.json());
+      Alert.alert(t('success'), t('consultation_completed_successfully'));
+
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === message.id
+            ? {
+              ...msg,
+              rawData: {
+                ...msg.rawData,
+                status_meet: true,
+              },
+              is_read: true
+            }
+            : msg
+        )
+      );
+
+      if (currentDoctorUserId) {
+        const { count: unreadCountAfterComplete, error: countError } = await supabase
+          .from('doctor_notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('doctor_id', currentDoctorUserId)
+          .eq('is_read', false);
+
+        if (!countError && unreadCountAfterComplete !== null) {
+          await Notifications.setBadgeCountAsync(unreadCountAfterComplete);
+          console.log(`Badge count updated to ${unreadCountAfterComplete} after completing consultation.`);
+        } else {
+          console.error("Error re-fetching unread count after completing consultation:", countError?.message);
+        }
+      }
+
+    } catch (error) {
+      console.error("Error completing consultation:", error.message);
+      Alert.alert(t('error'), `${t('failed_to_complete_consultation')}: ${error.message}`);
+    } finally {
+      setLoadingCompletion(false);
+    }
+  }, [t, currentDoctorUserId, doctorFullName]);
 
   if (loading && !refreshing) {
     return (
@@ -745,7 +899,6 @@ const handleSendMeetLink = useCallback(async (message) => {
           {t("messages_screen.header_title")}
         </Text>
         <View>
-          {/* Переконайтеся, що Icon коректно імпортується та відображається */}
           <Icon width={moderateScale(50)} height={moderateScale(50)} />
         </View>
       </View>
@@ -779,37 +932,37 @@ const handleSendMeetLink = useCallback(async (message) => {
             const isPaymentPending = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
 
             let cardColors = ['#FFFFFF', '#FDFDFD'];
-            let cardBorderStyle = styles.messageCardDefaultBorder; // За замовчуванням
+            let cardBorderStyle = styles.messageCardDefaultBorder;
             let showActions = false;
-            let showStatusText = false; // Використовуватимемо для відображення статусу в тексті
+            let showStatusText = false;
 
             if (isPendingBooking) {
-                cardColors = ['#E0F7FA', '#B2EBF2']; // Блакитні для очікування
+                cardColors = ['#E0F7FA', '#B2EBF2'];
                 cardBorderStyle = styles.messageCardPendingBorder;
                 showActions = true;
             } else if (isConfirmedBooking) {
-                cardColors = ['#E8F5E9', '#C8E6C9']; // Зелені для підтверджених
+                cardColors = ['#E8F5E9', '#C8E6C9'];
                 cardBorderStyle = styles.messageCardConfirmedBorder;
                 showStatusText = true;
             } else if (isRejectedBooking) {
-                cardColors = ['#FFEBEE', '#FFCDD2']; // Червоні для відхилених
+                cardColors = ['#FFEBEE', '#FFCDD2'];
                 cardBorderStyle = styles.messageCardRejectedBorder;
                 showStatusText = true;
             } else if (isPaymentSuccessful) {
-                cardColors = ['#E8F5E9', '#C8E6C9']; // Зелені для успішної оплати
+                cardColors = ['#E8F5E9', '#C8E6C9'];
                 cardBorderStyle = styles.messageCardConfirmedBorder;
             } else if (isPaymentFailed) {
-                cardColors = ['#FFEBEE', '#FFCDD2']; // Червоні для невдалої оплати
+                cardColors = ['#FFEBEE', '#FFCDD2'];
                 cardBorderStyle = styles.messageCardRejectedBorder;
             } else if (isPaymentPending) {
-                cardColors = ['#FFFDE7', '#FFF9C4']; // Жовті для очікування оплати
+                cardColors = ['#FFFDE7', '#FFF9C4'];
                 cardBorderStyle = styles.messageCardWarningBorder;
-            } else { // Будь-яке інше повідомлення (загальне)
+            } else {
                 if (!message.is_read) {
-                    cardColors = ['#FFFFFF', '#F0F8FF']; // Легкий блакитний для непрочитаних
+                    cardColors = ['#FFFFFF', '#F0F8FF'];
                     cardBorderStyle = styles.messageCardUnreadBorder;
                 } else {
-                    cardColors = ['#FFFFFF', '#FDFDFD']; // Дефолтний градієнт
+                    cardColors = ['#FFFFFF', '#FDFDFD'];
                     cardBorderStyle = styles.messageCardDefaultBorder;
                 }
             }
@@ -923,7 +1076,6 @@ const handleSendMeetLink = useCallback(async (message) => {
                               {t('time')}: {message.rawData.booking_time_slot || message.time}
                           </Text>
 
-                      {/* Умова показу поля введення meet_link: якщо оплачено або посилання вже існує */}
                       {(message.rawData.is_paid || message.rawData.meet_link) && (
                         <View style={styles.meetLinkInputContainer}>
                           <TextInput
@@ -953,7 +1105,6 @@ const handleSendMeetLink = useCallback(async (message) => {
                         </View>
                       )}
 
-                      {/* Кнопка "Приєднатися до зустрічі" відображається, якщо meet_link існує */}
                       {message.rawData.meet_link && (
                           <TouchableOpacity
                               onPress={() => Linking.openURL(message.rawData.meet_link)}
@@ -969,16 +1120,49 @@ const handleSendMeetLink = useCallback(async (message) => {
                               </LinearGradient>
                           </TouchableOpacity>
                       )}
+
+                      {(message.rawData.is_paid && !message.rawData.status_meet) && (
+                        <TouchableOpacity
+                          onPress={() => handleCompleteConsultation(message)}
+                          style={styles.completeConsultationButton}
+                          disabled={loadingCompletion}
+                        >
+                          <LinearGradient
+                            colors={['#FFC107', '#FFA000']}
+                            style={styles.completeConsultationButtonGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                          >
+                            {loadingCompletion ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.completeConsultationButtonText}>
+                                {t('complete_consultation')}
+                              </Text>
+                            )}
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      )}
+
+                      {message.rawData.status_meet && (
+                        <View style={styles.consultationCompletedIndicator}>
+                          <Ionicons name="checkmark-circle" size={moderateScale(18)} color="#4CAF50" />
+                          <Text style={styles.consultationCompletedText}>
+                            {t('consultation_completed_indicator')}
+                          </Text>
+                        </View>
+                      )}
+
                     </View>
                   )}
 
                   {!message.is_read && (
                     <TouchableOpacity
                       onPress={() => markMessageAsRead(message.db_id || message.id)}
-                      style={styles.markAsReadButtonCompact} // Використовуємо новий стиль
+                      style={styles.markAsReadButtonCompact}
                     >
-                        <Ionicons name="checkmark-circle-outline" size={moderateScale(16)} color="#0EB3EB" /> 
-                        <Text style={styles.markAsReadButtonTextCompact}>{t('messages_screen.mark_as_read')}</Text> 
+                        <Ionicons name="checkmark-circle-outline" size={moderateScale(16)} color="#0EB3EB" />
+                        <Text style={styles.markAsReadButtonTextCompact}>{t('messages_screen.mark_as_read')}</Text>
                     </TouchableOpacity>
                   )}
                 </LinearGradient>
@@ -1055,7 +1239,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   unreadMessageCard: {
-    // Стиль для фону, якщо повідомлення непрочитане (градієнт вже встановлює колір)
   },
   messageCardDefaultBorder: {
     borderColor: '#e0e0e0',
@@ -1220,6 +1403,43 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: "Mont-SemiBold",
     fontSize: moderateScale(15),
+  },
+  completeConsultationButton: {
+    marginTop: verticalScale(15),
+    borderRadius: moderateScale(10),
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+    marginHorizontal: moderateScale(0),
+  },
+  completeConsultationButtonGradient: {
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: moderateScale(15),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: moderateScale(10),
+  },
+  completeConsultationButtonText: {
+    color: '#fff',
+    fontFamily: "Mont-SemiBold",
+    fontSize: moderateScale(15),
+  },
+  consultationCompletedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: verticalScale(15),
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: moderateScale(15),
+    backgroundColor: '#E8F5E9',
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  consultationCompletedText: {
+    fontFamily: "Mont-SemiBold",
+    fontSize: moderateScale(15),
+    color: '#2E7D32',
+    marginLeft: moderateScale(8),
   },
   loadingContainer: {
     flex: 1,

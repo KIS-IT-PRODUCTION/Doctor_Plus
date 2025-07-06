@@ -189,7 +189,9 @@
   "not_specified_full": "Не вказано",
     "delete_profile": "Видалити профіль",
     "status_pending": "Очікує підтвердження",
-    
+    "messages_screen.no_messages": "Повідомлень поки немає",
+    "messages_screen.waiting_for_bookings": "Тут з'являться сповіщення від пацієнтів щодо ваших прийомів",
+
 "header_title": "Повідомлення",
   "messages_screen": {
     "patient": "Пацієнт",
@@ -731,7 +733,7 @@
   "failed_to_save_meet_link": "Не вдалося зберегти посилання на Meet.",
   "failed_to_send_meet_link_notification": "Не вдалося надіслати сповіщення пацієнту про посилання на Meet.",
   "meet_link": "Посилання на Meet",
-  "payment_status_paid": "Оплачено",
+  "payment_statuses.paid": "Оплачено",
   "payment_status_pending": "Очікує",
   "payment_status_failure": "Помилка",
   "payment_status_error": "Помилка",
@@ -746,7 +748,12 @@
   "join_meet_call": "Приєднатися до зустрічі",
   "consultation_ready_title": "Консультація готова!",
   "consultation_ready_message": "Посилання на зустріч готове. Приєднуйтесь до консультації.",
+  "complete_consultation": "Завершити консультацію",
+  "consultation_already_completed": "Консультацію завершено",
+    "consultation_completed_indicator": "Консультацію завершено",
 
+   "complete_consultation_title": "Завершити консультацію?",
+  "complete_consultation_message": "Ви впевнені, що бажаєте завершити цю консультацію? Це позначить її як завершену.",
   "no_messages_yet": "Повідомлень поки що немає.",
   "stay_tuned_for_updates": "Слідкуйте за оновленнями та новими бронюваннями!",
   "payment_notification_title_default": "Оновлення платежу",
@@ -797,7 +804,9 @@
 
   "confirm": "Прийняти",
   "reject_booking_title": "Відхилити бронювання?",
-
+  "consultation_completed_successfully": "Консультацію успішно завершено!",
+  "failed_to_complete_consultation": "Не вдалося завершити консультацію",
+  "missing_consultation_details": "Відсутні дані для завершення консультації",
   "booking_status_confirmed": "Бронювання підтверджено",
   "booking_status_rejected": "Бронювання відхилено",
   "booking_status_pending": "Очікує на підтвердження",
@@ -825,6 +834,12 @@
     "reviewTextPlaceholder": "Напишіть ваш відгук тут...",
     "yourRatingLabel": "Ваша оцінка:",
     "submitButton": "Надіслати відгук"
-  
-}
+},    
+"online_doctor_consultations": "Онлайн Консультації Лікарів",
+  "health_treasure_slogan": "Здоров'я - найцінніший скарб, і ми тут, щоб допомогти вам його зберегти.",
+  "choose_your_role": "Оберіть свою роль!",
+  "patient_role": "Пацієнт",
+  "doctor_role": "Лікар",
+  "i_agree_with": "Я погоджуюсь з ",
+  "privacy_policy": "Політикою конфіденційності"
 }

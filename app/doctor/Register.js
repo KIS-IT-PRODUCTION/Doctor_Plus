@@ -408,7 +408,7 @@ const Register = () => {
               <Text style={styles.languageTextRegister}>
                 {displayedLanguageCode}
               </Text>
-              <Ionicons name="chevron-down-outline" size={16} color="white" />
+              <Ionicons name="globe-outline" size={16} color="white" />
             </View>
           </TouchableOpacity>
         </View>

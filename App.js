@@ -15,7 +15,7 @@ import * as Linking from "expo-linking";
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import "./i18n";
 
-// Імпорти екранів
+// Імпорти екранів (переконайтеся, що всі шляхи правильні)
 import ChooseSpecial from "./app/ChooseSpecial";
 import LoginScreen from "./app/LoginScreen";
 import Patsient_Home from "./app/Patsient_Home";
@@ -49,58 +49,81 @@ SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 
+const SplashPlaceholderScreen = () => (
+  <View style={styles.centeredContainer}>
+    <ActivityIndicator size="large" color="#0EB3EB" />
+    <Text style={{ marginTop: 10, fontFamily: "Mont-Regular" }}>Завантаження даних...</Text>
+  </View>
+);
+
+
 function RootNavigator() {
   const { session, loading, userRole } = useAuth();
   const navigationRef = useRef();
   const [isNavigationReady, setNavigationReady] = useState(false);
+  const [hasNavigatedInitially, setHasNavigatedInitially] = useState(false);
 
+  // Цей useEffect тепер відповідає виключно за виконання reset навігації
+  // коли всі умови виконані.
   useEffect(() => {
-    if (!isNavigationReady || !navigationRef.current) {
-      console.log("RootNavigator Effect: Навігатор не готовий або посилання недоступне, пропускаємо навігацію.");
-      return;
-    }
+    // Чекаємо, поки NavigationContainer готовий, AuthProvider завершить завантаження,
+    // і поки ми не виконали початкову навігацію, АБО коли сесія/роль змінюється.
+    if (isNavigationReady && !loading && navigationRef.current && navigationRef.current.isReady()) {
+      let targetRouteName;
+      let targetParams = {};
 
-    if (session && session.user) {
-      if (userRole === "doctor") {
-        console.log("RootNavigator Effect: Сесія активна, роль - лікар. Перехід до Profile_doctor.");
-        navigationRef.current.reset({
-          index: 0,
-          routes: [{ name: "Profile_doctor", params: { doctorId: session.user.id } }],
-        });
-      } else if (userRole === "patient") {
-        console.log("RootNavigator Effect: Сесія активна, роль - пацієнт. Перехід до Patsient_Home.");
-        navigationRef.current.reset({
-          index: 0,
-          routes: [{ name: "Patsient_Home" }],
-        });
+      if (session && session.user) {
+        if (userRole === "doctor") {
+          targetRouteName = "Profile_doctor";
+          targetParams = { doctorId: session.user.id };
+        } else if (userRole === "patient") {
+          targetRouteName = "Patsient_Home";
+        } else {
+          targetRouteName = "HomeScreen"; // Запасний варіант, якщо роль не визначена
+        }
       } else {
-        console.log("RootNavigator Effect: Сесія активна, але роль не визначена. Перехід до HomeScreen.");
+        targetRouteName = "HomeScreen"; // Неавтентифікований користувач
+      }
+
+      const currentRoute = navigationRef.current.getCurrentRoute()?.name;
+      console.log(`RootNavigator Effect: Current: ${currentRoute}, Target: ${targetRouteName}, Session: ${session ? 'Active' : 'None'}, Loading: ${loading}, Role: ${userRole}, Has Navigated Initially: ${hasNavigatedInitially}`);
+
+      // Виконуємо reset тільки якщо:
+      // 1. Ми ще не навігували спочатку (для першого запуску)
+      // АБО
+      // 2. Цільовий маршрут відрізняється від поточного (для входу/виходу)
+      // І ми не перебуваємо на "безпечних" неавтентифікованих екранах, коли сесія null
+      if (
+        !hasNavigatedInitially ||
+        (currentRoute !== targetRouteName &&
+         !(session === null && (currentRoute === "LoginScreen" || currentRoute === "RegisterScreen" || currentRoute === "Login" || currentRoute === "Register")))
+      ) {
+        console.log(`RootNavigator Effect: Performing reset to ${targetRouteName}.`);
         navigationRef.current.reset({
           index: 0,
-          routes: [{ name: "HomeScreen" }],
+          routes: [{ name: targetRouteName, params: targetParams }],
         });
+        setHasNavigatedInitially(true); // Позначаємо, що початкова навігація виконана
+        SplashScreen.hideAsync(); // Приховуємо сплеш
+      } else {
+        // Якщо ми вже на потрібному екрані або на безпечному неавтентифікованому екрані,
+        // просто приховуємо сплеш, якщо він ще не прихований.
+        console.log(`RootNavigator Effect: Already on/near target route (${currentRoute}). Hiding SplashScreen if not already hidden.`);
+        SplashScreen.hideAsync();
       }
-    } else {
-      console.log("RootNavigator Effect: Сесії немає. Перехід до HomeScreen.");
-      navigationRef.current.reset({
-        index: 0,
-        routes: [{ name: "HomeScreen" }],
-      });
+    } else if (!loading && !isNavigationReady && !hasNavigatedInitially) {
+        console.log("RootNavigator Effect: Waiting for NavigationContainer to be ready.");
+    } else if (loading) {
+        console.log("RootNavigator Effect: AuthProvider is still loading.");
     }
-  }, [session, userRole, isNavigationReady]);
+  }, [session, loading, userRole, isNavigationReady, hasNavigatedInitially]);
 
-  if (loading) {
-    console.log("RootNavigator: AuthProvider завантажується (первинна ініціалізація)...");
-    return (
-      <View style={styles.centeredContainer}>
-        <ActivityIndicator size="large" color="#0EB3EB" />
-        <Text style={{ marginTop: 10, fontFamily: "Mont-Regular" }}>Завантаження даних користувача...</Text>
-      </View>
-    );
-  }
 
-  console.log(`RootNavigator (RENDER): Сесія: ${session ? 'Присутня' : 'Відсутня'}, Роль: ${userRole}, Навігатор готовий: ${isNavigationReady}, AuthProvider Loading: ${loading}`);
-
+  // Ми завжди рендеримо NavigationContainer, як тільки appIsReady і AuthProvider не завантажується
+  // (тобто, коли RootNavigator взагалі рендериться).
+  // Це дозволяє navigationRef і isNavigationReady правильно ініціалізуватися.
+  // Блокуємо рендеринг лише на рівні App.js, поки шрифти не завантажаться.
+  // SplashPlaceholderScreen служить візуальним індикатором, поки відбувається reset.
   return (
     <NavigationContainer
       ref={navigationRef}
@@ -109,16 +132,19 @@ function RootNavigator() {
         console.log("RootNavigator: NavigationContainer готовий!");
       }}
     >
-      <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade", animationDuration: 0 }}>
-        {/* Неавтентифіковані екрани */}
-        <Stack.Screen name="Login" component={Login} />
+      <Stack.Navigator
+        screenOptions={{ headerShown: false, animation: "fade", animationDuration: 0 }}
+        initialRouteName="SplashPlaceholder" // Завжди починаємо з заглушки
+      >
+        <Stack.Screen name="SplashPlaceholder" component={SplashPlaceholderScreen} />
+        {/* Всі інші екрани - їх тут завжди рендеримо, не умовно */}
         <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="LoginScreen" component={LoginScreen} />
         <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
+        <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="Register" component={Register} />
         <Stack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
 
-        {/* Автентифіковані екрани (пацієнти) */}
         <Stack.Screen name="Patsient_Home" component={Patsient_Home} />
         <Stack.Screen name="Search" component={Search} />
         <Stack.Screen name="Faq" component={Faq} />
@@ -130,7 +156,6 @@ function RootNavigator() {
         <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
         <Stack.Screen name="PatientMessages" component={PatientMessages} />
 
-        {/* Автентифіковані екрани (лікарі) */}
         <Stack.Screen name="Anketa_Settings" component={Anketa_Settings} />
         <Stack.Screen name="Profile_doctor" component={Profile_doctor} />
         <Stack.Screen name="Messege" component={Messege} />
@@ -142,6 +167,7 @@ function RootNavigator() {
     </NavigationContainer>
   );
 }
+
 
 
 export default function App() {
@@ -169,24 +195,20 @@ export default function App() {
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      await SplashScreen.hideAsync();
-      console.log("App.js: SplashScreen приховано.");
+      // Тут не ховаємо сплеш-екран, це робить RootNavigator
     }
   }, [appIsReady]);
 
   if (!appIsReady) {
-    console.log("App.js: Додаток ще не готовий, показуємо null.");
+    console.log("App.js: Додаток ще не готовий, показуємо null (продовжується показ сплеш-екрану).");
     return null;
   }
 
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <AuthProvider>
-        {/*
-          Умовне рендеринг DoctorProfileProvider
-          Він буде працювати тільки тоді, коли userRole визначено як 'doctor'
-        */}
         <ConditionalDoctorProfileProvider>
+          {/* RootNavigator тепер завжди рендериться, якщо appIsReady */}
           <RootNavigator />
         </ConditionalDoctorProfileProvider>
       </AuthProvider>
@@ -194,16 +216,13 @@ export default function App() {
   );
 }
 
-// Новий компонент для умовного рендерингу DoctorProfileProvider
 function ConditionalDoctorProfileProvider({ children }) {
   const { userRole, loading } = useAuth();
 
-  // Показуємо дітей без провайдера, якщо роль пацієнт або ще завантажується
   if (loading || userRole === 'patient' || userRole === null) {
     return <>{children}</>;
   }
 
-  // Якщо роль - лікар, тоді обгортаємо дітей у DoctorProfileProvider
   if (userRole === 'doctor') {
     return (
       <DoctorProfileProvider>
@@ -212,7 +231,6 @@ function ConditionalDoctorProfileProvider({ children }) {
     );
   }
 
-  // Дефолтний випадок, якщо роль невідома або інша, також показуємо дітей без провайдера
   return <>{children}</>;
 }
 

@@ -8,30 +8,30 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		14869C813ACA6AF92AC6F044 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4E2695F564152614A84D34C6 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		6DB2284AF9894B96A5F580E1 /* sms_meow.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = E48065101F9543CDB82AB0CC /* sms_meow.mp3 */; };
-		708D56833A6E9EB9860E1742 /* libPods-DoctorPlus.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7153A614FA8FC67B6E07B348 /* libPods-DoctorPlus.a */; };
+		6A4CD05F8B2FEF6DA305AAB4 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85F76BEA3EC846251B988CFA /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		E5CD264745401371AE5A9EF4 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F65AA596FFB8312632704575 /* ExpoModulesProvider.swift */; };
+		C72D38326FBE2BEBEAC38978 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A8A8DFF390CF754FB564F61E /* PrivacyInfo.xcprivacy */; };
+		DDD21DDB818878B58F3465FE /* libPods-DoctorPlus.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2901A207AB5BC0A89400FDA9 /* libPods-DoctorPlus.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		F4E027521C4748D0A59009ED /* sms_meow.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 2D17AA4194044AA6AA632D09 /* sms_meow.mp3 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* DoctorPlus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DoctorPlus.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = DoctorPlus/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = DoctorPlus/Info.plist; sourceTree = "<group>"; };
-		4E2695F564152614A84D34C6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = DoctorPlus/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		7153A614FA8FC67B6E07B348 /* libPods-DoctorPlus.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-DoctorPlus.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		73F5A1BFCA2CA19D94E3A950 /* Pods-DoctorPlus.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.debug.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.debug.xcconfig"; sourceTree = "<group>"; };
+		2901A207AB5BC0A89400FDA9 /* libPods-DoctorPlus.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-DoctorPlus.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D17AA4194044AA6AA632D09 /* sms_meow.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = sms_meow.mp3; path = DoctorPlus/sms_meow.mp3; sourceTree = "<group>"; };
+		7EC04C27861A34950311A597 /* Pods-DoctorPlus.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.debug.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.debug.xcconfig"; sourceTree = "<group>"; };
+		85F76BEA3EC846251B988CFA /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-DoctorPlus/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		A8A8DFF390CF754FB564F61E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = DoctorPlus/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = DoctorPlus/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		CBBF621F298DF704328C4B83 /* Pods-DoctorPlus.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.release.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.release.xcconfig"; sourceTree = "<group>"; };
-		E48065101F9543CDB82AB0CC /* sms_meow.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = sms_meow.mp3; path = DoctorPlus/sms_meow.mp3; sourceTree = "<group>"; };
+		CC85BC6FEB701FD0B1B324D8 /* Pods-DoctorPlus.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.release.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = DoctorPlus/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* DoctorPlus-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "DoctorPlus-Bridging-Header.h"; path = "DoctorPlus/DoctorPlus-Bridging-Header.h"; sourceTree = "<group>"; };
-		F65AA596FFB8312632704575 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-DoctorPlus/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -39,7 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				708D56833A6E9EB9860E1742 /* libPods-DoctorPlus.a in Frameworks */,
+				DDD21DDB818878B58F3465FE /* libPods-DoctorPlus.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,8 +55,8 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				E48065101F9543CDB82AB0CC /* sms_meow.mp3 */,
-				4E2695F564152614A84D34C6 /* PrivacyInfo.xcprivacy */,
+				2D17AA4194044AA6AA632D09 /* sms_meow.mp3 */,
+				A8A8DFF390CF754FB564F61E /* PrivacyInfo.xcprivacy */,
 			);
 			name = DoctorPlus;
 			sourceTree = "<group>";
@@ -65,18 +65,9 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				7153A614FA8FC67B6E07B348 /* libPods-DoctorPlus.a */,
+				2901A207AB5BC0A89400FDA9 /* libPods-DoctorPlus.a */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		31C267D703B70874D51320CB /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				73F5A1BFCA2CA19D94E3A950 /* Pods-DoctorPlus.debug.xcconfig */,
-				CBBF621F298DF704328C4B83 /* Pods-DoctorPlus.release.xcconfig */,
-			);
-			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -93,8 +84,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				31C267D703B70874D51320CB /* Pods */,
-				D0669E6FDAD4C0FA7A5EDBC8 /* ExpoModulesProviders */,
+				E52B933E2119799D33796264 /* Pods */,
+				864B8AFB8B973E000F39E4D2 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -109,12 +100,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AB0B343C1616B28434D2A7F5 /* DoctorPlus */ = {
+		864B8AFB8B973E000F39E4D2 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				F65AA596FFB8312632704575 /* ExpoModulesProvider.swift */,
+				DBF6A3852C19C021158D620A /* DoctorPlus */,
 			);
-			name = DoctorPlus;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -126,12 +117,21 @@
 			path = DoctorPlus/Supporting;
 			sourceTree = "<group>";
 		};
-		D0669E6FDAD4C0FA7A5EDBC8 /* ExpoModulesProviders */ = {
+		DBF6A3852C19C021158D620A /* DoctorPlus */ = {
 			isa = PBXGroup;
 			children = (
-				AB0B343C1616B28434D2A7F5 /* DoctorPlus */,
+				85F76BEA3EC846251B988CFA /* ExpoModulesProvider.swift */,
 			);
-			name = ExpoModulesProviders;
+			name = DoctorPlus;
+			sourceTree = "<group>";
+		};
+		E52B933E2119799D33796264 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				7EC04C27861A34950311A597 /* Pods-DoctorPlus.debug.xcconfig */,
+				CC85BC6FEB701FD0B1B324D8 /* Pods-DoctorPlus.release.xcconfig */,
+			);
+			path = Pods;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -142,13 +142,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "DoctorPlus" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				51AF107F00E7AB3C9B71A623 /* [Expo] Configure project */,
+				A83DCCDA264B9343836BF7DD /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				5AD1456B259A8241CEC1D538 /* [CP] Embed Pods Frameworks */,
+				F9476563D76D8208BB5C8C06 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -198,8 +198,8 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				6DB2284AF9894B96A5F580E1 /* sms_meow.mp3 in Resources */,
-				14869C813ACA6AF92AC6F044 /* PrivacyInfo.xcprivacy in Resources */,
+				F4E027521C4748D0A59009ED /* sms_meow.mp3 in Resources */,
+				C72D38326FBE2BEBEAC38978 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -241,43 +241,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		51AF107F00E7AB3C9B71A623 /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-DoctorPlus/expo-configure-project.sh\"\n";
-		};
-		5AD1456B259A8241CEC1D538 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
@@ -366,6 +329,43 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		A83DCCDA264B9343836BF7DD /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-DoctorPlus/expo-configure-project.sh\"\n";
+		};
+		F9476563D76D8208BB5C8C06 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -374,7 +374,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				E5CD264745401371AE5A9EF4 /* ExpoModulesProvider.swift in Sources */,
+				6A4CD05F8B2FEF6DA305AAB4 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -383,7 +383,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 73F5A1BFCA2CA19D94E3A950 /* Pods-DoctorPlus.debug.xcconfig */;
+			baseConfigurationReference = 7EC04C27861A34950311A597 /* Pods-DoctorPlus.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -396,7 +396,6 @@
 					"FB_SONARKIT_ENABLED=1",
 				);
 				INFOPLIST_FILE = DoctorPlus/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Doctor Plus";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -411,21 +410,17 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kis-production.DOCTOR";
 				PRODUCT_NAME = DoctorPlus;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "DoctorPlus/DoctorPlus-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CBBF621F298DF704328C4B83 /* Pods-DoctorPlus.release.xcconfig */;
+			baseConfigurationReference = CC85BC6FEB701FD0B1B324D8 /* Pods-DoctorPlus.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -433,7 +428,6 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 53RRR8478R;
 				INFOPLIST_FILE = DoctorPlus/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Doctor Plus";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -448,13 +442,9 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kis-production.DOCTOR";
 				PRODUCT_NAME = DoctorPlus;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "DoctorPlus/DoctorPlus-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
@@ -514,10 +504,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -572,10 +559,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;

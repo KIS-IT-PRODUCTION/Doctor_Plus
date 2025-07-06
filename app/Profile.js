@@ -7,12 +7,12 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
-  Modal,
-  Pressable,
-  TouchableWithoutFeedback,
-  Dimensions,
+  Modal, // Modal залишається, якщо використовується деінде, але в цьому фрагменті не потрібен
+  // Pressable, // Не використовується в цьому файлі
+  // TouchableWithoutFeedback, // Видалено
+  Dimensions, // Не використовується в цьому файлі
   Alert,
-  SafeAreaView, // Added SafeAreaView for consistent padding
+  SafeAreaView,
   Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -20,8 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 import Icon from "../assets/icon.svg";
+
 // Reusable component for displaying values in a styled box
-// Updated ValueBox to apply styling for displayValueContainer
 const ValueBox = ({ children, isTextValue = true }) => {
   const isEmpty =
     !children ||
@@ -107,17 +107,15 @@ const Profile = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
-  // State for image modal
-  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState(null);
+  // Видалено: State for image modal
+  // const [isImageModalVisible, setIsImageModalVisible] = useState(false);
+  // const [selectedImageUri, setSelectedImageUri] = useState(null);
 
   const formatYearsText = useCallback(
     (years) => {
       if (years === null || years === undefined || isNaN(years) || years < 0) {
         return t("not_specified");
       }
-      // Assuming t("years_experience") handles pluralization correctly
-      // based on count. If not, you'd need a more complex logic as in Anketa_Settings.
       const lastDigit = years % 10;
       const lastTwoDigits = years % 100;
 
@@ -192,7 +190,6 @@ const Profile = ({ route }) => {
 
   const handleChooseConsultationTime = () => {
     if (doctorId) {
-      // Fix: Use the 'doctorId' constant that is already extracted from route.params
       navigation.navigate('ConsultationTimePatient', { doctorId: doctorId });
     } else {
       Alert.alert(t("error"), t("doctor_id_missing_for_consultation"));
@@ -232,7 +229,6 @@ const Profile = ({ route }) => {
     (specializationData) => {
       const parsedSpecs = getParsedArray(specializationData);
       if (parsedSpecs.length > 0) {
-        // Assume specializations array contains { value: "key", nameKey: "translation_key" }
         const mappedSpecs = specializations
           .filter((spec) => parsedSpecs.includes(spec.value))
           .map((spec) => t(spec.nameKey));
@@ -243,15 +239,16 @@ const Profile = ({ route }) => {
     [getParsedArray, t]
   );
 
-  const openImageModal = (uri) => {
-    setSelectedImageUri(uri);
-    setIsImageModalVisible(true);
-  };
+  // Видалено: Функції openImageModal та closeImageModal
+  // const openImageModal = (uri) => {
+  //   setSelectedImageUri(uri);
+  //   setIsImageModalVisible(true);
+  // };
 
-  const closeImageModal = () => {
-    setSelectedImageUri(null);
-    setIsImageModalVisible(false);
-  };
+  // const closeImageModal = () => {
+  //   setSelectedImageUri(null);
+  //   setIsImageModalVisible(false);
+  // };
 
   if (loading) {
     return (
@@ -308,7 +305,7 @@ const Profile = ({ route }) => {
     achievements,
     certificate_photo_url,
     diploma_url,
-    country, // Added country
+    country,
   } = doctor;
 
   return (
@@ -363,7 +360,6 @@ const Profile = ({ route }) => {
             {full_name || t("not_specified")}
           </Text>
 
-          {/* New layout for information fields */}
           <Text style={styles.inputLabel}>{t("country")}</Text>
           <ValueBox>{country || t("not_specified")}</ValueBox>
 
@@ -383,12 +379,6 @@ const Profile = ({ route }) => {
           <ValueBox>
             {consultation_cost ? `$${consultation_cost}` : t("not_specified")}
           </ValueBox>
-
-          {/* Removed Rating for now as it's not in Anketa_Settings, can add later */}
-          {/*
-          <Text style={styles.inputLabel}>{t("rating")}</Text>
-          <ValueBox>🌟🌟</ValueBox>
-          */}
         </View>
 
         <TouchableOpacity
@@ -427,10 +417,9 @@ const Profile = ({ route }) => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
           {certificate_photo_url && !certificateError ? (
-            <TouchableOpacity
-              style={styles.imageWrapper}
-              onPress={() => openImageModal(certificate_photo_url)}
-            >
+            // >>>>>>> ПОЧАТОК ЗМІН <<<<<<<
+            // Змінено на View замість TouchableOpacity
+            <View style={styles.imageWrapper}>
               {loadingCertificate && (
                 <ActivityIndicator
                   size="small"
@@ -451,7 +440,8 @@ const Profile = ({ route }) => {
                   );
                 }}
               />
-            </TouchableOpacity>
+            </View>
+            // >>>>>>> КІНЕЦЬ ЗМІН <<<<<<<
           ) : (
             <View style={styles.emptyImage}>
               <Ionicons name="image-outline" size={60} color="#A7D9EE" />
@@ -465,10 +455,9 @@ const Profile = ({ route }) => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
           {diploma_url && !diplomaError ? (
-            <TouchableOpacity
-              style={styles.imageWrapper}
-              onPress={() => openImageModal(diploma_url)}
-            >
+            // >>>>>>> ПОЧАТОК ЗМІН <<<<<<<
+            // Змінено на View замість TouchableOpacity
+            <View style={styles.imageWrapper}>
               {loadingDiploma && (
                 <ActivityIndicator
                   size="small"
@@ -486,7 +475,8 @@ const Profile = ({ route }) => {
                   console.error("Error loading diploma image:", diploma_url);
                 }}
               />
-            </TouchableOpacity>
+            </View>
+            // >>>>>>> КІНЕЦЬ ЗМІН <<<<<<<
           ) : (
             <View style={styles.emptyImage}>
               <Ionicons name="image-outline" size={60} color="#A7D9EE" />
@@ -496,33 +486,9 @@ const Profile = ({ route }) => {
         </View>
       </ScrollView>
 
-      {/* Image Modal for fullscreen view */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={isImageModalVisible}
-        onRequestClose={closeImageModal}
-      >
-        <TouchableWithoutFeedback onPress={closeImageModal}>
-          <View style={styles.fullScreenImageModalOverlay}>
-            <TouchableWithoutFeedback>
-              {selectedImageUri && (
-                <Image
-                  source={{ uri: selectedImageUri }}
-                  style={styles.fullScreenImage}
-                  resizeMode="contain"
-                />
-              )}
-            </TouchableWithoutFeedback>
-            <TouchableOpacity
-              style={styles.closeImageModalButton}
-              onPress={closeImageModal}
-            >
-              <Ionicons name="close-circle" size={40} color="white" />
-            </TouchableOpacity>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      {/* >>>>>>> ПОЧАТОК ЗМІН <<<<<<< */}
+      {/* Повністю видалено Modal для fullscreen image view */}
+      {/* >>>>>>> КІНЕЦЬ ЗМІН <<<<<<< */}
     </SafeAreaView>
   );
 };
@@ -816,8 +782,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
-    borderWidth: 1, // Added border for consistency
-    borderColor: "#0EB3EB", // Border color from doctor profile
+    borderWidth: 1,
+    borderColor: "#0EB3EB",
   },
   certificateImage: {
     width: "100%",
@@ -864,24 +830,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 1,
     backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 60, // Half of 120 width/height
+    borderRadius: 60,
   },
-  fullScreenImageModalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fullScreenImage: {
-    width: "95%",
-    height: "95%",
-  },
-  closeImageModalButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 50 : 20,
-    right: 20,
-    zIndex: 1,
-  },
+  // Видалено стилі для fullscreenImageModalOverlay, fullScreenImage, closeImageModalButton
+  // fullScreenImageModalOverlay: {
+  //   ...StyleSheet.absoluteFillObject,
+  //   backgroundColor: "rgba(0, 0, 0, 0.9)",
+  //   justifyContent: "center",
+  //   alignItems: "center",
+  // },
+  // fullScreenImage: {
+  //   width: "95%",
+  //   height: "95%",
+  // },
+  // closeImageModalButton: {
+  //   position: "absolute",
+  //   top: Platform.OS === "ios" ? 50 : 20,
+  //   right: 20,
+  //   zIndex: 1,
+  // },
 });
 
 export default Profile;

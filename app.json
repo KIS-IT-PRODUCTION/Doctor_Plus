@@ -3,7 +3,7 @@
     "name": "Doctor Plus",
     "slug": "DOCTOR",
     "scheme": "doctor",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -12,9 +12,9 @@
       "image": "./assets/icon2.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff",
-      "tabletImage": "./assets/icon.png",
+      "tabletImage": "./assets/icon2.png",
       "tabletBackgroundColor": "#ffffff",
-      "darkModeImage": "./assets/icon.png",
+      "darkModeImage": "./assets/icon2.png",
       "darkModeBackgroundColor": "#ffffff"
     },
     "extra": {
@@ -41,6 +41,7 @@
         "darkModeImage": "./assets/icon2.png",
         "darkModeBackgroundColor": "#ffffff"
       }
+     
     },
     "android": {
       "adaptiveIcon": {
@@ -79,6 +80,10 @@
     "web": {
       "favicon": "./assets/icon.png"
     },
+    "notification": {
+      "icon": "./assets/icon.png", 
+      "iosDisplayInForeground": true 
+    },
     "plugins": [
       "expo-localization",
       "expo-secure-store",
@@ -89,7 +94,12 @@
           "icon": "./assets/icon.png",
           "sounds": [
             "./assets/sms_meow.mp3"
-          ]
+          ],
+          "ios": {
+            "allowBadge": true,
+            "allowSound": true, 
+            "allowAlert": true 
+          }
         }
       ],
       [
