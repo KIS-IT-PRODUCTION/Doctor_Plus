@@ -7,55 +7,46 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
-  Modal, // <-- Імпортуємо Modal
-  TouchableWithoutFeedback, // <-- Імпортуємо TouchableWithoutFeedback
-  Dimensions, // <-- Імпортуємо Dimensions для адаптивності стилів
+  Modal,
+  TouchableWithoutFeedback,
+  Dimensions,
+  PixelRatio,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { useTranslation } from "react-i18next"; // <-- Імпортуємо useTranslation
-import { Ionicons } from "@expo/vector-icons"; // <-- Імпортуємо Ionicons для іконки глобуса
+import { useTranslation } from "react-i18next";
+import { Ionicons } from "@expo/vector-icons";
 
 import Icon from "../assets/icon.svg";
 import Box from "../assets/Main/check_box.svg";
 import Box2 from "../assets/Main/check_box_outline_blank.svg";
 
+// Отримуємо розміри екрану для адаптивності
+const { width, height } = Dimensions.get("window");
+
+// Допоміжні функції для адаптивних розмірів
+const getResponsiveFontSize = (baseSize) => {
+  const scale = width / 400; // База 400px для мобільного пристрою (приблизно iPhone X/Xs)
+  const newSize = baseSize * scale;
+  return Math.round(PixelRatio.roundToNearestPixel(newSize));
+};
+
+const getResponsiveWidth = (percent) => {
+  return width * (percent / 100);
+};
+
+const getResponsiveHeight = (percent) => {
+  return height * (percent / 100);
+};
+
 const HomeScreen = () => {
   const navigation = useNavigation();
-  const { t, i18n } = useTranslation(); // <-- Отримуємо t та i18n
+  const { t, i18n } = useTranslation();
 
   const [privacyPolicyAgreed, setPrivacyPolicyAgreed] = useState(false);
-  const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false); // <-- Стан для модалки мови
-  const [displayedLanguageCode, setDisplayedLanguageCode] = useState( // <-- Стан для відображення коду мови
+  const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
+  const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
   );
-
-  // Отримуємо розміри екрану для адаптивності
-  const [dimensions, setDimensions] = useState({
-    width: Dimensions.get("window").width,
-    height: Dimensions.get("window").height,
-  });
-
-  // Оновлюємо розміри при зміні орієнтації/розмірів екрану
-  useEffect(() => {
-    const updateDimensions = () => {
-      setDimensions({
-        width: Dimensions.get("window").width,
-        height: Dimensions.get("window").height,
-      });
-    };
-
-    if (Platform.OS === "web") {
-      window.addEventListener("resize", updateDimensions);
-      return () => window.removeEventListener("resize", updateDimensions);
-    } else {
-      const subscription = Dimensions.addEventListener("change", updateDimensions);
-      return () => {
-        if (subscription) {
-          subscription.remove();
-        }
-      };
-    }
-  }, []);
 
   // Оновлюємо displayedLanguageCode при зміні мови i18n
   useEffect(() => {
@@ -69,7 +60,7 @@ const HomeScreen = () => {
 
   const handleDoctorSelect = () => {
     console.log("Doctor selected");
-    navigation.navigate("Register"); // Припускаємо, що це ваш Doctor Register Screen
+    navigation.navigate("Register");
   };
 
   const handlePrivacyPolicyToggle = () => {
@@ -81,7 +72,7 @@ const HomeScreen = () => {
     // Тут можна відкрити WebView або новий екран з текстом політики конфіденційності
   };
 
-  // Функції для керування модальним вікном вибору мови (скопійовано з RegisterScreen.js)
+  // Функції для керування модальним вікном вибору мови
   const openLanguageModal = () => {
     setIsLanguageModalVisible(true);
   };
@@ -95,54 +86,52 @@ const HomeScreen = () => {
     closeLanguageModal();
   };
 
-  // Мови для відображення у модальному вікні (скопійовано з RegisterScreen.js)
+  // Мови для відображення у модальному вікні
   const languagesForModal = [
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
     { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
   ];
 
-  const { width, height } = dimensions;
-  const isLargeScreen = width > 768; // Визначення для адаптивного дизайну
+  const isLargeScreen = width > 768; // Визначення для адаптивного дизайну (наприклад, для планшетів)
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Кнопка вибору мови - стиль adapted з languageContainerRegister */}
-      <View style={styles.languageContainer}>
-        <TouchableOpacity
-          style={styles.languageButton}
-          onPress={openLanguageModal}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={styles.languageText}>
-              {displayedLanguageCode}
-            </Text>
-            <Ionicons name="globe-outline" size={16} color="white" />
-          </View>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.logoContainer}>
-        <Icon width={190} height={190} />
+        <Icon width={getResponsiveWidth(45)} height={getResponsiveWidth(45)} />
       </View>
       <Text style={styles.title}>{t("online_doctor_consultations")}</Text>
       <Text style={styles.subtitle}>
         {t("health_treasure_slogan")}
       </Text>
+
+      {/* Кнопка вибору мови - тепер у видному місці в основному потоці */}
+      <TouchableOpacity
+        style={styles.languageButtonMain}
+        onPress={openLanguageModal}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Ionicons name="globe-outline" size={getResponsiveFontSize(20)} color="white" />
+          <Text style={styles.languageTextMain}>
+            {displayedLanguageCode}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
       <Text style={styles.chooseText}>{t("choose_your_role")}</Text>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={handlePatientSelect}>
+      <View style={[styles.buttonContainer, isLargeScreen && styles.buttonContainerLargeScreen]}>
+        <TouchableOpacity style={[styles.button, isLargeScreen && styles.buttonLargeScreen]} onPress={handlePatientSelect}>
           <Text style={styles.buttonText}>{t("patient_role")}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleDoctorSelect}>
+        <TouchableOpacity style={[styles.button, isLargeScreen && styles.buttonLargeScreen]} onPress={handleDoctorSelect}>
           <Text style={styles.buttonText}>{t("doctor_role")}</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.privacyPolicyContainer}>
         <TouchableOpacity onPress={handlePrivacyPolicyToggle}>
           {privacyPolicyAgreed ? (
-            <Box width={24} height={24} />
+            <Box width={getResponsiveFontSize(24)} height={getResponsiveFontSize(24)} />
           ) : (
-            <Box2 width={24} height={24} />
+            <Box2 width={getResponsiveFontSize(24)} height={getResponsiveFontSize(24)} />
           )}
         </TouchableOpacity>
         <TouchableOpacity onPress={handlePrivacyPolicyPress}>
@@ -153,7 +142,7 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Модальне вікно для вибору мови - скопійовано з RegisterScreen.js */}
+      {/* Модальне вікно для вибору мови */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -196,95 +185,115 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     backgroundColor: "white",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 10 : 10,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + getResponsiveHeight(2) : getResponsiveHeight(2),
   },
   logoContainer: {
-    marginBottom: 20,
+    marginBottom: getResponsiveHeight(2),
   },
-  // Стилі для кнопки вибору мови (адаптовані з RegisterScreen.js)
-  languageContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 15,
-  },
-  languageButton: {
+  // Нові стилі для основної кнопки вибору мови
+  languageButtonMain: {
     backgroundColor: "#0EB3EB",
-    borderRadius: 10,
-    width: 71, // Фіксована ширина
-    paddingVertical: 5,
-    flexDirection: "row",
+    borderRadius: 555, // Кругла кнопка
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: 'row', // Щоб іконка та текст були поруч
+    paddingVertical: getResponsiveHeight(1.5),
+    paddingHorizontal: getResponsiveWidth(5),
+    marginBottom: getResponsiveHeight(3), // Відступ від наступного елемента
+    width: getResponsiveWidth(60), // Адаптивна ширина
+    maxWidth: 250, // Максимальна ширина для великих екранів
+    shadowColor: "#000", // Додаємо тінь для 3D ефекту
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8, // Для Android
   },
-  languageText: {
-    fontSize: 14,
+  languageTextMain: {
+    fontSize: getResponsiveFontSize(18), // Більший розмір шрифту
     fontFamily: "Mont-Bold",
     color: "white",
-    marginHorizontal: 5,
+    marginLeft: getResponsiveWidth(2), // Відступ між іконкою та текстом
   },
   title: {
-    fontSize: 24,
+    fontSize: getResponsiveFontSize(24),
     color: "#333",
     textAlign: "center",
     fontFamily: "Mont-SemiBold",
-    marginBottom: 9,
+    marginBottom: getResponsiveHeight(1.2),
+    paddingHorizontal: getResponsiveWidth(5),
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: getResponsiveFontSize(15),
     color: "#777",
     textAlign: "center",
     fontFamily: "Mont-Regular",
-    marginBottom: 72,
-    paddingHorizontal: 20,
-    lineHeight: 22,
-    marginTop: 9,
+    marginBottom: getResponsiveHeight(2), // Зменшуємо відступ, якщо кнопка мови буде нижче
+    paddingHorizontal: getResponsiveWidth(5),
+    lineHeight: getResponsiveFontSize(22),
+    marginTop: getResponsiveHeight(1.2),
   },
   chooseText: {
-    fontSize: 32,
+    fontSize: getResponsiveFontSize(32),
     fontFamily: "Mont-SemiBold",
     color: "#555",
-    marginBottom: 9,
+    marginBottom: getResponsiveHeight(1.2),
   },
   buttonContainer: {
-    width: "100%",
+    width: getResponsiveWidth(100),
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: getResponsiveHeight(2),
+  },
+  buttonContainerLargeScreen: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: getResponsiveWidth(5), // Простір між кнопками для великих екранів
+    flexWrap: 'wrap', // Дозволяє кнопкам переноситися на новий рядок, якщо не вистачає місця
   },
   button: {
     backgroundColor: "#0EB3EB",
     borderRadius: 555,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 9,
-    width: 258,
-    height: 58,
+    marginBottom: getResponsiveHeight(1.2),
+    width: getResponsiveWidth(65), // Адаптивна ширина
+    maxWidth: 258, // Максимальна ширина
+    height: getResponsiveHeight(7), // Адаптивна висота
+    maxHeight: 58, // Максимальна висота
+  },
+  buttonLargeScreen: {
+    width: getResponsiveWidth(35),
+    maxWidth: 200,
+    marginBottom: 0, // Без нижнього відступу, якщо в рядок
   },
   buttonText: {
     color: "white",
     fontFamily: "Mont-SemiBold",
-    fontSize: 20,
+    fontSize: getResponsiveFontSize(20),
     textAlign: "center",
   },
   privacyPolicyContainer: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: getResponsiveHeight(2),
   },
   checkbox: {
-    marginRight: 10,
+    marginRight: getResponsiveWidth(2.5),
   },
   privacyPolicyText: {
-    fontSize: 10,
+    fontSize: getResponsiveFontSize(10),
     color: "#337AB7",
     fontFamily: "Mont-SemiBold",
   },
   privacyPolicyText2: {
-    fontSize: 10,
+    fontSize: getResponsiveFontSize(10),
     color: "black",
     textDecorationLine: "underline",
     fontFamily: "Mont-Medium",
   },
-  // Стилі для модального вікна вибору мови (скопійовані з RegisterScreen.js)
+  // Стилі для модального вікна вибору мови
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -294,11 +303,11 @@ const styles = StyleSheet.create({
   languageModalContent: {
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 20,
+    padding: getResponsiveWidth(5),
     borderColor: "#0EB3EB",
     borderWidth: 1,
     alignItems: "center",
-    width: Dimensions.get("window").width * 0.8,
+    width: getResponsiveWidth(80),
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -309,19 +318,19 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: getResponsiveFontSize(20),
     fontWeight: "bold",
-    marginBottom: 15,
+    marginBottom: getResponsiveHeight(2),
   },
   languageOption: {
-    paddingVertical: 15,
+    paddingVertical: getResponsiveHeight(2),
     width: "100%",
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
   languageOptionText: {
-    fontSize: 18,
+    fontSize: getResponsiveFontSize(18),
     fontFamily: "Mont-Regular",
     color: "#333",
   },

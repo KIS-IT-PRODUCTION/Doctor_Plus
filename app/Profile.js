@@ -7,13 +7,11 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
-  Modal, // Modal залишається, якщо використовується деінде, але в цьому фрагменті не потрібен
-  // Pressable, // Не використовується в цьому файлі
-  // TouchableWithoutFeedback, // Видалено
-  Dimensions, // Не використовується в цьому файлі
   Alert,
   SafeAreaView,
   Platform,
+  Dimensions,
+  Modal, // Додано Modal
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,8 +19,116 @@ import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 import Icon from "../assets/icon.svg";
 
-// Reusable component for displaying values in a styled box
+// ВАЖЛИВО: Встановіть цю бібліотеку: npm install react-native-image-zoom-viewer
+import ImageViewer from "react-native-image-zoom-viewer";
+
+// ---
+// ### Утиліти та дані для прапорів та перекладу
+// ---
+
+const { width, height } = Dimensions.get("window"); // Оновлено: додано height
+
+const scale = (size) => (width / 375) * size;
+const verticalScale = (size) => (height / 812) * size; // Використовуємо height для вертикального масштабування
+const moderateScale = (size, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
+
+const COUNTRY_FLAGS_MAP = {
+  "EN": "🇬🇧",
+  "UK": "🇺🇦",
+  "DE": "🇩🇪",
+  "PL": "🇵🇱",
+  "FR": "🇫🇷",
+  "ES": "🇪🇸",
+  "IT": "🇮🇹",
+  "PT": "🇵🇹",
+  "RU": "🇷🇺",
+  "JP": "🇯🇵",
+  "CN": "🇨🇳",
+  "AR": "🇦🇪",
+  "HI": "🇮🇳",
+  "KO": "🇰🇷",
+  "TR": "🇹🇷",
+  "NL": "🇳🇱",
+  "SE": "🇸🇪",
+  "NO": "🇳🇴",
+  "DK": "🇩🇰",
+  "FI": "🇫🇮",
+  "GR": "🇬🇷",
+  "HE": "🇮🇱",
+  "HU": "🇭🇺",
+  "CZ": "🇨🇿",
+  "SK": "🇸🇰",
+  "RO": "🇷🇴",
+  "BG": "🇧🇬",
+  "HR": "🇭🇷",
+  "SR": "🇷🇸",
+  "LT": "🇱🇹",
+  "LV": "🇱🇻",
+  "EE": "🇪🇪",
+  "AL": "🇦🇱",
+  "AZ": "🇦🇿",
+  "KA": "🇬🇪",
+  "AM": "🇦🇲",
+  "TH": "🇹🇭",
+  "VN": "🇻🇳",
+  "ID": "🇮🇩",
+  "MS": "🇲🇾",
+  "PH": "🇵🇭",
+  "DA": "🇩🇰",
+  "IS": "🇮🇸",
+  "GA": "🇮🇪",
+  "AF": "🇿🇦",
+  "ZU": "🇿🇦",
+  "XH": "🇿🇦",
+  "SW": "🇰🇪",
+  "AM": "🇪🇹",
+  "SO": "🇸🇴",
+  "HA": "🇳🇬",
+  "YO": "🇳🇬",
+  "IG": "🇳🇬",
+  "WO": "🇸🇳",
+  "RW": "🇷🇼",
+  "SN": "🇸🇳",
+  "UZ": "🇺🇿",
+  "KK": "🇰🇿",
+  "TG": "🇹🇯",
+  "BN": "🇧🇩",
+  "GU": "🇮🇳",
+  "KN": "🇮🇳",
+  "ML": "🇮🇳",
+  "MR": "🇮🇳",
+  "PA": "🇮🇳",
+  "TA": "🇮🇳",
+  "TE": "🇮🇳",
+  "UR": "🇵🇰",
+  "NE": "🇳🇵",
+  "SI": "🇱🇰",
+  "KM": "🇰🇭",
+  "LO": "🇱🇦",
+  "DZ": "🇧🇹",
+  "MN": "🇲🇳",
+  "MY": "🇲🇲",
+  "UG": "🇺🇬",
+  "RW": "🇷🇼",
+  "RN": "🇧🇮",
+  "NY": "🇲🇼",
+  "MG": "🇲🇬",
+  "GD": "🇬🇩",
+  "HT": "🇭🇹",
+  "FJ": "🇫🇯",
+  "SM": "🇼🇸",
+  "TO": "🇹🇴",
+  "TL": "🇵🇭",
+};
+
+// ---
+// ### Компонент ValueBox
+// ---
+
 const ValueBox = ({ children, isTextValue = true }) => {
+  const { t } = useTranslation();
+
   const isEmpty =
     !children ||
     (typeof children === "string" && children.trim() === "") ||
@@ -32,7 +138,7 @@ const ValueBox = ({ children, isTextValue = true }) => {
     return (
       <View style={styles.displayValueContainer}>
         <Text style={[styles.valueText, styles.noValueText]}>
-          Not specified
+          {t("not_specified")}
         </Text>
       </View>
     );
@@ -48,52 +154,57 @@ const ValueBox = ({ children, isTextValue = true }) => {
   );
 };
 
-// Функція для відображення прапорів мов
+// ---
+// ### Оновлений компонент LanguageFlags
+// ---
+
 const LanguageFlags = ({ languages }) => {
+  const { t } = useTranslation();
+
   const getFlag = (code) => {
-    switch (String(code).toUpperCase()) {
-      case "UK":
-        return "🇺🇦";
-      case "DE":
-        return "🇩🇪";
-      case "PL":
-        return "🇵🇱";
-      case "EN":
-        return "🇬🇧";
-      case "FR":
-        return "🇫🇷";
-      case "ES":
-        return "🇪🇸";
-      default:
-        return "❓";
-    }
+    return COUNTRY_FLAGS_MAP[String(code).toUpperCase()] || "❓";
   };
 
   if (!languages || languages.length === 0) {
-    return null;
+    return (
+      <Text style={[styles.valueText, styles.noValueText]}>
+        {t("not_specified")}
+      </Text>
+    );
+  }
+
+  const flagsToDisplay = languages.filter(
+    (langCode) => COUNTRY_FLAGS_MAP[String(langCode).toUpperCase()]
+  );
+
+  if (flagsToDisplay.length === 0) {
+    return (
+      <Text style={[styles.valueText, styles.noValueText]}>
+        {t("not_specified")}
+      </Text>
+    );
   }
 
   return (
     <View style={styles.flagsContainer}>
-      {languages.map(
-        (lang, index) =>
-          typeof lang === "string" && (
-            <Text key={index} style={styles.flagText}>
-              {getFlag(lang)}
-            </Text>
-          )
-      )}
+      {flagsToDisplay.map((langCode, index) => (
+        <Text key={index} style={styles.flagText}>
+          {getFlag(langCode)}
+        </Text>
+      ))}
     </View>
   );
 };
+
+// ---
+// ### Основний компонент Profile
+// ---
 
 const Profile = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
 
-  const doctorId = route.params?.doctorId
-    ? String(route.params.doctorId)
-    : null;
+  const doctorId = route.params?.doctorId ? String(route.params.doctorId) : null;
 
   const [doctor, setDoctor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -107,9 +218,9 @@ const Profile = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
-  // Видалено: State for image modal
-  // const [isImageModalVisible, setIsImageModalVisible] = useState(false);
-  // const [selectedImageUri, setSelectedImageUri] = useState(null);
+  // Новий стан для модального вікна перегляду зображень
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [currentImageUrls, setCurrentImageUrls] = useState([]);
 
   const formatYearsText = useCallback(
     (years) => {
@@ -190,7 +301,7 @@ const Profile = ({ route }) => {
 
   const handleChooseConsultationTime = () => {
     if (doctorId) {
-      navigation.navigate('ConsultationTimePatient', { doctorId: doctorId });
+      navigation.navigate("ConsultationTimePatient", { doctorId: doctorId });
     } else {
       Alert.alert(t("error"), t("doctor_id_missing_for_consultation"));
     }
@@ -214,15 +325,14 @@ const Profile = ({ route }) => {
     }
   }, []);
 
-  const getLanguages = useCallback(
+  const processCommunicationLanguages = useCallback(
     (languagesData) => {
       const parsedLanguages = getParsedArray(languagesData);
-      return consultationLanguages
-        .filter((lang) => parsedLanguages.includes(lang.code))
-        .map((lang) => t(lang.nameKey))
-        .join(", ");
+      return parsedLanguages.map((lang) =>
+        String(lang.code || lang).toUpperCase()
+      );
     },
-    [getParsedArray, t]
+    [getParsedArray]
   );
 
   const getSpecializations = useCallback(
@@ -239,16 +349,11 @@ const Profile = ({ route }) => {
     [getParsedArray, t]
   );
 
-  // Видалено: Функції openImageModal та closeImageModal
-  // const openImageModal = (uri) => {
-  //   setSelectedImageUri(uri);
-  //   setIsImageModalVisible(true);
-  // };
-
-  // const closeImageModal = () => {
-  //   setSelectedImageUri(null);
-  //   setIsImageModalVisible(false);
-  // };
+  // Функція для відкриття модального вікна з зображенням
+  const openImageViewer = (imageUrl) => {
+    setCurrentImageUrls([{ url: imageUrl }]);
+    setIsImageViewerVisible(true);
+  };
 
   if (loading) {
     return (
@@ -312,13 +417,13 @@ const Profile = ({ route }) => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={24} color="black" />
+          <Ionicons name="arrow-back" size={moderateScale(24)} color="black" />
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>{t("profile")}</Text>
-       <View style={styles.logoContainer}>
-                      <Icon width={50} height={50} />
-                    </View>
+        <View style={styles.logoContainer}>
+          <Icon width={moderateScale(50)} height={moderateScale(50)} />
+        </View>
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
@@ -348,7 +453,7 @@ const Profile = ({ route }) => {
               <View style={styles.emptyAvatar}>
                 <Ionicons
                   name="person-circle-outline"
-                  size={80}
+                  size={moderateScale(80)}
                   color="#3498DB"
                 />
                 <Text style={styles.emptyAvatarText}>{t("no_photo")}</Text>
@@ -364,7 +469,11 @@ const Profile = ({ route }) => {
           <ValueBox>{country || t("not_specified")}</ValueBox>
 
           <Text style={styles.inputLabel}>{t("communication_language")}</Text>
-          <ValueBox>{getLanguages(communication_languages)}</ValueBox>
+          <ValueBox isTextValue={false}>
+            <LanguageFlags
+              languages={processCommunicationLanguages(communication_languages)}
+            />
+          </ValueBox>
 
           <Text style={styles.inputLabel}>{t("specialization")}</Text>
           <ValueBox>{getSpecializations(specialization)}</ValueBox>
@@ -417,9 +526,10 @@ const Profile = ({ route }) => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
           {certificate_photo_url && !certificateError ? (
-            // >>>>>>> ПОЧАТОК ЗМІН <<<<<<<
-            // Змінено на View замість TouchableOpacity
-            <View style={styles.imageWrapper}>
+            <TouchableOpacity // Обгортаємо в TouchableOpacity
+              style={styles.imageWrapper}
+              onPress={() => openImageViewer(certificate_photo_url)}
+            >
               {loadingCertificate && (
                 <ActivityIndicator
                   size="small"
@@ -440,11 +550,14 @@ const Profile = ({ route }) => {
                   );
                 }}
               />
-            </View>
-            // >>>>>>> КІНЕЦЬ ЗМІН <<<<<<<
+            </TouchableOpacity>
           ) : (
             <View style={styles.emptyImage}>
-              <Ionicons name="image-outline" size={60} color="#A7D9EE" />
+              <Ionicons
+                name="image-outline"
+                size={moderateScale(60)}
+                color="#A7D9EE"
+              />
               <Text style={styles.emptyImageText}>
                 {t("no_certificate_photo")}
               </Text>
@@ -455,9 +568,10 @@ const Profile = ({ route }) => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
           {diploma_url && !diplomaError ? (
-            // >>>>>>> ПОЧАТОК ЗМІН <<<<<<<
-            // Змінено на View замість TouchableOpacity
-            <View style={styles.imageWrapper}>
+            <TouchableOpacity // Обгортаємо в TouchableOpacity
+              style={styles.imageWrapper}
+              onPress={() => openImageViewer(diploma_url)}
+            >
               {loadingDiploma && (
                 <ActivityIndicator
                   size="small"
@@ -475,48 +589,116 @@ const Profile = ({ route }) => {
                   console.error("Error loading diploma image:", diploma_url);
                 }}
               />
-            </View>
-            // >>>>>>> КІНЕЦЬ ЗМІН <<<<<<<
+            </TouchableOpacity>
           ) : (
             <View style={styles.emptyImage}>
-              <Ionicons name="image-outline" size={60} color="#A7D9EE" />
+              <Ionicons
+                name="image-outline"
+                size={moderateScale(60)}
+                color="#A7D9EE"
+              />
               <Text style={styles.emptyImageText}>{t("no_diploma_photo")}</Text>
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* >>>>>>> ПОЧАТОК ЗМІН <<<<<<< */}
-      {/* Повністю видалено Modal для fullscreen image view */}
-      {/* >>>>>>> КІНЕЦЬ ЗМІН <<<<<<< */}
+      {/* Модальне вікно для перегляду зображень */}
+      <Modal visible={isImageViewerVisible} transparent={true}>
+        <ImageViewer
+          imageUrls={currentImageUrls}
+          enableSwipeDown={true} // Дозволяє закривати свайпом вниз
+          onSwipeDown={() => setIsImageViewerVisible(false)} // Обробник свайпу
+          renderHeader={() => ( // Кастомний заголовок для кнопки закриття
+            <View style={styles.imageViewerHeader}>
+              <TouchableOpacity
+                style={styles.imageViewerCloseButton}
+                onPress={() => setIsImageViewerVisible(false)}
+              >
+                <Ionicons name="close-circle" size={moderateScale(30)} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };
 
-const consultationLanguages = [
-  { nameKey: "english", code: "en", emoji: "" },
-  { nameKey: "ukrainian", code: "uk", emoji: "" },
-  { nameKey: "polish", code: "pl", emoji: "🇵🇱" },
-  { nameKey: "german", code: "de", emoji: "🇩🇪" },
-];
+// ---
+// ### Статичні дані для спеціалізацій (для цього файлу)
+// Цей список має бути повним, як у Search.js
+// ---
 
 const specializations = [
-  { nameKey: "general_practitioner", value: "general_practitioner" },
-  { nameKey: "pediatrician", value: "pediatrician" },
-  { nameKey: "cardiologist", value: "cardiologist" },
-  { nameKey: "dermatologist", value: "dermatologist" },
-  { nameKey: "neurologist", value: "neurologist" },
-  { nameKey: "surgeon", value: "surgeon" },
-  { nameKey: "psychiatrist", value: "psychiatrist" },
-  { nameKey: "dentist", value: "dentist" },
-  { nameKey: "ophthalmologist", value: "ophthalmologist" },
-  { nameKey: "ent_specialist", value: "ent_specialist" },
-  { nameKey: "gastroenterologist", value: "gastroenterologist" },
-  { nameKey: "endocrinologist", value: "endocrinologist" },
-  { nameKey: "oncologist", value: "oncologist" },
-  { nameKey: "allergist", value: "allergist" },
-  { nameKey: "physiotherapist", value: "physiotherapist" },
+  { value: "general_practitioner", nameKey: "general_practitioner" },
+  { value: "pediatrician", nameKey: "pediatrician" },
+  { value: "cardiologist", nameKey: "cardiologist" },
+  { value: "dermatologist", nameKey: "dermatologist" },
+  { value: "neurologist", nameKey: "neurologist" },
+  { value: "surgeon", nameKey: "surgeon" },
+  { value: "psychiatrist", nameKey: "psychiatrist" },
+  { value: "dentist", nameKey: "dentist" },
+  { value: "ophthalmologist", nameKey: "ophthalmologist" },
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
+  { value: "gastroenterologist", nameKey: "gastroenterologist" },
+  { value: "endocrinologist", nameKey: "endocrinologist" },
+  { value: "oncologist", nameKey: "oncologist" },
+  { value: "allergist", nameKey: "allergist" },
+  { value: "physiotherapist", nameKey: "physiotherapist" },
+  { value: "traumatologist", nameKey: "traumatologist" },
+  { value: "gynecologist", nameKey: "gynecologist" },
+  { value: "urologist", nameKey: "urologist" },
+  { value: "pulmonologist", nameKey: "pulmonologist" },
+  { value: "nephrologist", nameKey: "nephrologist" },
+  { value: "rheumatologist", nameKey: "rheumatologist" },
+  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" },
+  { value: "psychologist", nameKey: "psychologist" },
+  { value: "nutritionist", nameKey: "nutritionist" },
+  { value: "radiologist", nameKey: "radiologist" },
+  { value: "anesthesiologist", nameKey: "anesthesiologist" },
+  { value: "oncologist_radiation", nameKey: "oncologist_radiation" },
+  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" },
+  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" },
+  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" },
+  { value: "immunologist", nameKey: "immunologist" },
+  { value: "genetics_specialist", nameKey: "genetics_specialist" },
+  { value: "geriatrician", nameKey: "geriatrician" },
+  { value: "toxicologist", nameKey: "toxicologist" },
+  { value: "forensic_expert", nameKey: "forensic_expert" },
+  { value: "epidemiologist", nameKey: "epidemiologist" },
+  { value: "pathologist", nameKey: "pathologist" },
+  { value: "rehabilitologist", nameKey: "rehabilitologist" },
+  { value: "manual_therapist", nameKey: "manual_therapist" },
+  { value: "chiropractor", nameKey: "chiropractor" },
+  { value: "reflexologist", nameKey: "reflexologist" },
+  { value: "massage_therapist", nameKey: "massage_therapist" },
+  { value: "dietitian", nameKey: "dietitian" },
+  { value: "sexologist", nameKey: "sexologist" },
+  { value: "phlebologist", nameKey: "phlebologist" },
+  { value: "mammologist", nameKey: "mammologist" },
+  { value: "proctologist", nameKey: "proctologist" },
+  { value: "andrologist", nameKey: "andrologist" },
+  { value: "reproductive_specialist", nameKey: "reproductive_specialist" },
+  { value: "transfusiologist", nameKey: "transfusiologist" },
+  { value: "balneologist", nameKey: "balneologist" },
+  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" },
+  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" },
+  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" },
+  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" },
+  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" },
+  { value: "neonatologist", nameKey: "neonatologist" },
+  { value: "speech_therapist", nameKey: "speech_therapist" },
+  { value: "ergotherapist", nameKey: "ergotherapist" },
+  { value: "osteopath", nameKey: "osteopath" },
+  { value: "homeopath", nameKey: "homeopath" },
+  { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
+
+
+// ---
+// ### Стилі
+// ---
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -533,8 +715,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: moderateScale(10),
+    fontSize: moderateScale(16),
     color: "#000000",
     fontFamily: "Mont-Regular",
   },
@@ -542,45 +724,45 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: moderateScale(20),
     backgroundColor: "#ffebee",
   },
   errorText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     color: "#000000",
     textAlign: "center",
-    marginBottom: 15,
+    marginBottom: moderateScale(15),
     fontFamily: "Mont-Regular",
   },
   retryButton: {
     backgroundColor: "#0EB3EB",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(20),
+    borderRadius: moderateScale(25),
   },
   retryButtonText: {
     color: "#FFF",
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
   noDoctorText: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     textAlign: "center",
     color: "#000000",
-    marginTop: 50,
+    marginTop: moderateScale(50),
     fontFamily: "Mont-Regular",
   },
   backToHomeButton: {
     backgroundColor: "#0EB3EB",
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    marginTop: 20,
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(25),
+    borderRadius: moderateScale(25),
+    marginTop: moderateScale(20),
   },
   backToHomeButtonText: {
     color: "#FFF",
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
@@ -589,67 +771,67 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === "android" ? 30 : 0, // Adjust for Android status bar
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? moderateScale(30) : 0,
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(20),
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
   backButton: {
     backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: 25,
-    width: 48,
-    height: 48,
+    borderRadius: moderateScale(25),
+    width: moderateScale(48),
+    height: moderateScale(48),
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "bold",
     color: "#000000",
     flex: 1,
     textAlign: "center",
-    marginHorizontal: 10,
+    marginHorizontal: moderateScale(10),
     fontFamily: "Mont-Bold",
   },
   scrollViewContent: {
-    paddingHorizontal: 15,
-    paddingBottom: 20,
+    paddingHorizontal: moderateScale(15),
+    paddingBottom: moderateScale(20),
   },
   doctorMainInfo: {
-    backgroundColor: "#E3F2FD", // Light blue background
-    borderRadius: 15,
-    padding: 20,
-    marginTop: 20,
+    backgroundColor: "#E3F2FD",
+    borderRadius: moderateScale(15),
+    padding: moderateScale(20),
+    marginTop: moderateScale(20),
     alignItems: "center",
-    elevation: 3, // Android shadow
-    shadowColor: "#000", // iOS shadow
+    elevation: 3,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     position: "relative",
   },
   avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 15,
+    width: moderateScale(120),
+    height: moderateScale(120),
+    borderRadius: moderateScale(60),
+    marginBottom: moderateScale(15),
     position: "relative",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden", // Ensures content stays within bounds
-    borderWidth: 1, // Added border for consistency
-    borderColor: "#0EB3EB", // Border color from doctor profile
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#0EB3EB",
   },
   avatar: {
     width: "100%",
     height: "100%",
-    borderRadius: 60, // Use 60 for 120x120 to make it perfectly round
+    borderRadius: moderateScale(60),
   },
   emptyAvatar: {
     width: "100%",
     height: "100%",
-    borderRadius: 60,
+    borderRadius: moderateScale(60),
     borderWidth: 1,
     borderColor: "#ccc",
     backgroundColor: "#f0f0f0",
@@ -657,49 +839,48 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyAvatarText: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: "#666",
-    marginTop: 5,
+    marginTop: moderateScale(5),
     fontFamily: "Mont-Regular",
   },
   doctorDetails: {
     width: "100%",
   },
   doctorName: {
-    fontSize: 22,
+    fontSize: moderateScale(22),
     fontWeight: "bold",
     color: "#000000",
     textAlign: "center",
-    marginBottom: 20, // Increased margin for better separation
+    marginBottom: moderateScale(20),
     fontFamily: "Mont-Bold",
   },
-  // New styles for consistent display
   inputLabel: {
-    fontSize: 14,
-    alignSelf: "flex-start", // Align to left like doctor's profile
+    fontSize: moderateScale(14),
+    alignSelf: "flex-start",
     color: "#2A2A2A",
     fontFamily: "Mont-Medium",
-    paddingHorizontal: 15, // Adjusted padding
-    marginTop: 10,
-    marginBottom: 5,
-    width: "100%", // Take full width
+    paddingHorizontal: moderateScale(15),
+    marginTop: moderateScale(10),
+    marginBottom: moderateScale(5),
+    width: "100%",
   },
   displayValueContainer: {
-    backgroundColor: "rgba(14, 179, 235, 0.2)", // Background from doctor's profile inputs
-    borderRadius: 20, // Rounded corners
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    width: "100%", // Take full width
-    minHeight: 52, // Min height like doctor's inputs
+    backgroundColor: "rgba(14, 179, 235, 0.2)",
+    borderRadius: moderateScale(20),
+    paddingVertical: moderateScale(15),
+    paddingHorizontal: moderateScale(20),
+    width: "100%",
+    minHeight: moderateScale(52),
     justifyContent: "center",
-    alignItems: "flex-start", // Align text to start
-    marginBottom: 14, // Spacing
+    alignItems: "flex-start",
+    marginBottom: moderateScale(14),
   },
   valueText: {
     color: "black",
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontFamily: "Mont-Medium",
-    flexWrap: "wrap", // Allow text to wrap
+    flexWrap: "wrap",
   },
   noValueText: {
     color: "#777",
@@ -713,16 +894,16 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   flagText: {
-    fontSize: 18,
-    marginRight: 5,
+    fontSize: moderateScale(18),
+    marginRight: moderateScale(5),
   },
   actionButton: {
     backgroundColor: "#0EB3EB",
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingVertical: moderateScale(15),
+    borderRadius: moderateScale(25),
     alignItems: "center",
-    marginTop: 20,
-    marginHorizontal: 15,
+    marginTop: moderateScale(20),
+    marginHorizontal: moderateScale(15),
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -731,25 +912,25 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: "#FFF",
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
   sectionTitleLink: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "bold",
     color: "#000000",
     textAlign: "center",
-    marginTop: 25,
-    marginBottom: 15,
+    marginTop: moderateScale(25),
+    marginBottom: moderateScale(15),
     textDecorationLine: "underline",
     fontFamily: "Mont-Bold",
   },
   sectionContainer: {
     backgroundColor: "#E3F2FD",
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
+    borderRadius: moderateScale(15),
+    padding: moderateScale(15),
+    marginBottom: moderateScale(15),
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -758,26 +939,26 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   sectionHeader: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: "bold",
     color: "#000000",
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
     borderBottomWidth: 1,
     borderBottomColor: "#CFD8DC",
-    paddingBottom: 5,
+    paddingBottom: moderateScale(5),
     fontFamily: "Mont-Bold",
   },
   sectionContent: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#000000",
-    lineHeight: 20,
+    lineHeight: moderateScale(20),
     fontFamily: "Mont-Regular",
   },
   imageWrapper: {
     width: "100%",
-    height: 200,
-    borderRadius: 10,
-    marginTop: 10,
+    aspectRatio: 16 / 9, // Задаємо співвідношення сторін 16:9
+    borderRadius: moderateScale(10),
+    marginTop: moderateScale(10),
     position: "relative",
     justifyContent: "center",
     alignItems: "center",
@@ -788,14 +969,14 @@ const styles = StyleSheet.create({
   certificateImage: {
     width: "100%",
     height: "100%",
-    resizeMode: "contain",
-    borderRadius: 10,
+    resizeMode: "contain", // Зображення вміщується в контейнер, зберігаючи пропорції
+    borderRadius: moderateScale(10),
   },
   emptyImage: {
     width: "100%",
-    height: 200,
-    borderRadius: 10,
-    marginTop: 10,
+    height: moderateScale(200), // Залишимо мінімальну висоту для порожнього стану
+    borderRadius: moderateScale(10),
+    marginTop: moderateScale(10),
     backgroundColor: "#f0f0f0",
     borderWidth: 1,
     borderColor: "#ccc",
@@ -803,9 +984,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyImageText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#666",
-    marginTop: 5,
+    marginTop: moderateScale(5),
     fontFamily: "Mont-Regular",
   },
   imageLoadingIndicator: {
@@ -818,7 +999,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 1,
     backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
   },
   avatarLoadingIndicator: {
     position: "absolute",
@@ -830,25 +1011,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 1,
     backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 60,
+    borderRadius: moderateScale(60),
   },
-  // Видалено стилі для fullscreenImageModalOverlay, fullScreenImage, closeImageModalButton
-  // fullScreenImageModalOverlay: {
-  //   ...StyleSheet.absoluteFillObject,
-  //   backgroundColor: "rgba(0, 0, 0, 0.9)",
-  //   justifyContent: "center",
-  //   alignItems: "center",
-  // },
-  // fullScreenImage: {
-  //   width: "95%",
-  //   height: "95%",
-  // },
-  // closeImageModalButton: {
-  //   position: "absolute",
-  //   top: Platform.OS === "ios" ? 50 : 20,
-  //   right: 20,
-  //   zIndex: 1,
-  // },
+  logoContainer: {
+    // Стилі для контейнера вашого логотипу, якщо потрібно
+  },
+  // Стилі для модального вікна перегляду зображень
+  imageViewerHeader: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? moderateScale(50) : moderateScale(20),
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    alignItems: 'flex-end',
+    paddingHorizontal: moderateScale(20),
+  },
+  imageViewerCloseButton: {
+    padding: moderateScale(10),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: moderateScale(20),
+  },
 });
 
 export default Profile;

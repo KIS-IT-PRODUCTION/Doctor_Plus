@@ -6,14 +6,23 @@ import {
   View,
   ActivityIndicator,
   StyleSheet,
+  Platform, // Імпортуємо Platform
 } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
-import * as Linking from "expo-linking";
+// import * as Linking from "expo-linking"; // Linking не використовується безпосередньо тут, можна видалити якщо не використовується ніде в App.js
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import "./i18n";
+import * as Notifications from 'expo-notifications'; // Імпортуємо Notifications
+
+// ВАЖЛИВО: Для коректної роботи Intl API (який використовується для часових зон),
+// якщо ви орієнтуєтеся на старіші Android або деякі JS-двигуни, можливо, знадобиться
+// розкоментувати наступні рядки. Для більшості сучасних Expo SDK це може бути не потрібно.
+// import 'intl';
+// import 'intl/locale-data/jsonp/en'; // Додайте локалі, які ви використовуєте, наприклад, 'uk'
+// import 'intl/locale-data/jsonp/uk'; // Приклад для української локалі
 
 // Імпорти екранів (переконайтеся, що всі шляхи правильні)
 import ChooseSpecial from "./app/ChooseSpecial";
@@ -39,7 +48,7 @@ import ConsultationTime from "./app/doctor/ConsultationTime";
 import ConsultationTimePatient from "./app/ConsultationTimePatient";
 import PatientMessages from "./app/PatientMessages";
 import ResetPasswordScreen from "./app/doctor/ResetPasswordScreen";
-import TabBar_doctor from "./components/TopBar_doctor";
+import FeedbackModal from "./components/FeedbackModal"
 
 import { DoctorProfileProvider } from "./components/DoctorProfileContext";
 import { enableScreens } from 'react-native-screens';
@@ -155,6 +164,7 @@ function RootNavigator() {
         <Stack.Screen name="Profile" component={Profile} />
         <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
         <Stack.Screen name="PatientMessages" component={PatientMessages} />
+        <Stack.Screen name="FeedbackModal" component={FeedbackModal} />
 
         <Stack.Screen name="Anketa_Settings" component={Anketa_Settings} />
         <Stack.Screen name="Profile_doctor" component={Profile_doctor} />
@@ -176,6 +186,7 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
+        // Завантаження шрифтів
         await Font.loadAsync({
           "Mont-Regular": require("./assets/Font/static/Montserrat-Regular.ttf"),
           "Mont-Medium": require("./assets/Font/static/Montserrat-Medium.ttf"),
@@ -183,6 +194,19 @@ export default function App() {
           "Mont-SemiBold": require("./assets/Font/static/Montserrat-SemiBold.ttf"),
         });
         console.log("App.js: Шрифти завантажені.");
+
+        // Ініціалізація каналів сповіщень для Android
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'Загальні сповіщення',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+            sound: 'default', // Використовувати системний звук за замовчуванням
+          });
+          console.log("App.js: Android канал сповіщень 'default' налаштовано.");
+        }
+
       } catch (e) {
         console.warn("App.js: Помилка завантаження шрифтів або ініціалізації:", e);
       } finally {

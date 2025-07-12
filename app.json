@@ -41,11 +41,10 @@
         "darkModeImage": "./assets/icon2.png",
         "darkModeBackgroundColor": "#ffffff"
       }
-     
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/icon2.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -74,15 +73,16 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
-        "android.permission.ACCESS_MEDIA_LOCATION"
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.VIBRATE"
       ]
     },
     "web": {
       "favicon": "./assets/icon.png"
     },
     "notification": {
-      "icon": "./assets/icon.png", 
-      "iosDisplayInForeground": true 
+      "icon": "./assets/icon2.png",
+      "iosDisplayInForeground": true
     },
     "plugins": [
       "expo-localization",
@@ -91,14 +91,10 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "sounds": [
-            "./assets/sms_meow.mp3"
-          ],
           "ios": {
             "allowBadge": true,
-            "allowSound": true, 
-            "allowAlert": true 
+            "allowSound": true,
+            "allowAlert": true
           }
         }
       ],

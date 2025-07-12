@@ -48,11 +48,74 @@ if (
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
-    shouldPlaySound: false,
+    shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
-
+const specializations = [
+  { value: "general_practitioner", nameKey: "general_practitioner" },
+  { value: "pediatrician", nameKey: "pediatrician" },
+  { value: "cardiologist", nameKey: "cardiologist" },
+  { value: "dermatologist", nameKey: "dermatologist" },
+  { value: "neurologist", nameKey: "neurologist" },
+  { value: "surgeon", nameKey: "surgeon" },
+  { value: "psychiatrist", nameKey: "psychiatrist" },
+  { value: "dentist", nameKey: "dentist" },
+  { value: "ophthalmologist", nameKey: "ophthalmologist" },
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "gastroenterologist", nameKey: "gastroenterologist" },
+  { value: "endocrinologist", nameKey: "endocrinologist" },
+  { value: "oncologist", nameKey: "oncologist" },
+  { value: "allergist", nameKey: "allergist" },
+  { value: "physiotherapist", nameKey: "physiotherapist" },
+  { value: "traumatologist", nameKey: "traumatologist" }, // Додано
+  { value: "gynecologist", nameKey: "gynecologist" },       // Додано
+  { value: "urologist", nameKey: "urologist" },             // Додано
+  { value: "pulmonologist", nameKey: "pulmonologist" },     // Додано
+  { value: "nephrologist", nameKey: "nephrologist" },       // Додано
+  { value: "rheumatologist", nameKey: "rheumatologist" },   // Додано
+  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" }, // Додано
+  { value: "psychologist", nameKey: "psychologist" },       // Додано
+  { value: "nutritionist", nameKey: "nutritionist" },       // Додано
+  { value: "radiologist", nameKey: "radiologist" },         // Додано
+  { value: "anesthesiologist", nameKey: "anesthesiologist" }, // Додано
+  { value: "oncologist_radiation", nameKey: "oncologist_radiation" }, // Додано
+  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" }, // Додано
+  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" }, // Додано
+  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" }, // Додано
+  { value: "immunologist", nameKey: "immunologist" }, // Додано
+  { value: "genetics_specialist", nameKey: "genetics_specialist" }, // Додано
+  { value: "geriatrician", nameKey: "geriatrician" }, // Додано
+  { value: "toxicologist", nameKey: "toxicologist" }, // Додано
+  { value: "forensic_expert", nameKey: "forensic_expert" }, // Додано
+  { value: "epidemiologist", nameKey: "epidemiologist" }, // Додано
+  { value: "pathologist", nameKey: "pathologist" }, // Додано
+  { value: "rehabilitologist", nameKey: "rehabilitologist" }, // Додано
+  { value: "manual_therapist", nameKey: "manual_therapist" }, // Додано
+  { value: "chiropractor", nameKey: "chiropractor" }, // Додано
+  { value: "reflexologist", nameKey: "reflexologist" }, // Додано
+  { value: "massage_therapist", nameKey: "massage_therapist" }, // Додано
+  { value: "dietitian", nameKey: "dietitian" }, // Додано
+  { value: "sexologist", nameKey: "sexologist" }, // Додано
+  { value: "phlebologist", nameKey: "phlebologist" }, // Додано
+  { value: "mammologist", nameKey: "mammologist" }, // Додано
+  { value: "proctologist", nameKey: "proctologist" }, // Додано
+  { value: "andrologist", nameKey: "andrologist" }, // Додано
+  { value: "reproductive_specialist", nameKey: "reproductive_specialist" }, // Додано
+  { value: "transfusiologist", nameKey: "transfusiologist" }, // Додано
+  { value: "balneologist", nameKey: "balneologist" }, // Додано
+  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" }, // Додано
+  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" }, // Додано
+  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" }, // Додано
+  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" }, // Додано
+  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" }, // Додано
+  { value: "neonatologist", nameKey: "neonatologist" }, // Додано
+  { value: "speech_therapist", nameKey: "speech_therapist" }, // Додано
+  { value: "ergotherapist", nameKey: "ergotherapist" }, // Додано
+  { value: "osteopath", nameKey: "osteopath" }, // Додано
+  { value: "homeopath", nameKey: "homeopath" }, // Додано
+  { value: "acupuncturist", nameKey: "acupuncturist" }, // Додано
+];
 async function registerForPushNotificationsAsync(userId) {
   let token;
 
@@ -485,6 +548,7 @@ const Profile_doctor = ({ route }) => {
       profile.experience_years !== null &&
       profile.experience_years !== undefined &&
       profile.work_location &&
+      profile.achievements &&
       profile.about_me &&
       (profile.communication_languages && profile.communication_languages.length > 0) &&
       (profile.specialization && profile.specialization.length > 0) &&
@@ -719,7 +783,12 @@ const Profile_doctor = ({ route }) => {
       const parsedSpecs = getParsedArray(specializationData);
       if (parsedSpecs.length > 0) {
         if (typeof parsedSpecs[0] === "string") {
-          return parsedSpecs.map((specValue) => t(`categories.${specValue}`)).join(", ");
+          return parsedSpecs
+            .map((specValue) => {
+              const specObj = specializations.find((s) => s.value === specValue);
+              return specObj ? t(specObj.nameKey) : specValue;
+            })
+            .join(", ");
         } else if (typeof parsedSpecs[0] === "object" && parsedSpecs[0].nameKey) {
           return parsedSpecs.map((specObj) => t(`categories.${specObj.nameKey}`)).join(", ");
         }
@@ -978,6 +1047,7 @@ const Profile_doctor = ({ route }) => {
                 {currentDoctor.about_me || t("not_specified_full")}
               </Text>
             </View>
+
 
             {currentDoctor.achievements && currentDoctor.achievements.length > 0 && (
               <View style={styles.sectionContainer}>

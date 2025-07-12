@@ -19,7 +19,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
-import Icon from "../assets/icon.svg"; // Залишаємо закоментованим, якщо не використовується напряму тут
+import Icon from "../assets/icon.svg"; // Знято коментування для використання логотипу
 
 // Отримання розмірів екрану
 const { width, height } = Dimensions.get("window");
@@ -52,39 +52,75 @@ const getParsedArray = (value) => {
 
 // Data for specializations
 const specializationsList = [
-  { value: "general_practitioner", nameKey: "categories.general_practitioner" },
-  { value: "pediatrician", nameKey: "categories.pediatrician" },
-  { value: "cardiologist", nameKey: "categories.cardiologist" },
-  { value: "dermatologist", nameKey: "categories.dermatologist" },
-  { value: "neurologist", nameKey: "categories.neurologist" },
-  { value: "surgeon", nameKey: "categories.surgeon" },
-  { value: "psychiatrist", nameKey: "categories.psychiatrist" },
-  { value: "dentist", nameKey: "categories.dentist" },
-  { value: "ophthalmologist", nameKey: "categories.ophthalmologist" },
-  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
-  { value: "gastroenterologist", nameKey: "categories.gastroenterologist" },
-  { value: "endocrinologist", nameKey: "categories.endocrinologist" },
-  { value: "oncologist", nameKey: "categories.oncologist" },
-  { value: "allergist", nameKey: "categories.allergist" },
-  { value: "physiotherapist", nameKey: "categories.physiotherapist" },
-  { value: "traumatologist", nameKey: "categories.traumatologist" },
-  { value: "gynecologist", nameKey: "categories.gynecologist" },
-  { value: "urologist", nameKey: "categories.urologist" },
-  { value: "pulmonologist", nameKey: "categories.pulmonologist" },
-  { value: "nephrologist", nameKey: "categories.nephrologist" },
-  { value: "rheumatologist", nameKey: "categories.rheumatologist" },
-  { value: "infectiousDiseasesSpecialist", nameKey: "categories.infectiousDiseasesSpecialist" },
-  { value: "psychologist", nameKey: "categories.psychologist" },
-  { value: "nutritionist", nameKey: "categories.nutritionist" },
-  { value: "radiologist", nameKey: "categories.radiologist" },
-  { value: "anesthesiologist", nameKey: "categories.anesthesiologist" },
+  { value: "general_practitioner", nameKey: "general_practitioner" },
+  { value: "pediatrician", nameKey: "pediatrician" },
+  { value: "cardiologist", nameKey: "cardiologist" },
+  { value: "dermatologist", nameKey: "dermatologist" },
+  { value: "neurologist", nameKey: "neurologist" },
+  { value: "surgeon", nameKey: "surgeon" },
+  { value: "psychiatrist", nameKey: "psychiatrist" },
+  { value: "dentist", nameKey: "dentist" },
+  { value: "ophthalmologist", nameKey: "ophthalmologist" },
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "gastroenterologist", nameKey: "gastroenterologist" },
+  { value: "endocrinologist", nameKey: "endocrinologist" },
+  { value: "oncologist", nameKey: "oncologist" },
+  { value: "allergist", nameKey: "allergist" },
+  { value: "physiotherapist", nameKey: "physiotherapist" },
+  { value: "traumatologist", nameKey: "traumatologist" },
+  { value: "gynecologist", nameKey: "gynecologist" },
+  { value: "urologist", nameKey: "urologist" },
+  { value: "pulmonologist", nameKey: "pulmonologist" },
+  { value: "nephrologist", nameKey: "nephrologist" },
+  { value: "rheumatologist", nameKey: "rheumatologist" },
+  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" },
+  { value: "psychologist", nameKey: "psychologist" },
+  { value: "nutritionist", nameKey: "nutritionist" },
+  { value: "radiologist", nameKey: "radiologist" },
+  { value: "anesthesiologist", nameKey: "anesthesiologist" },
+  { value: "oncologist_radiation", nameKey: "oncologist_radiation" },
+  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" },
+  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" },
+  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" },
+  { value: "immunologist", nameKey: "immunologist" },
+  { value: "genetics_specialist", nameKey: "genetics_specialist" },
+  { value: "geriatrician", nameKey: "geriatrician" },
+  { value: "toxicologist", nameKey: "toxicologist" },
+  { value: "forensic_expert", nameKey: "forensic_expert" },
+  { value: "epidemiologist", nameKey: "epidemiologist" },
+  { value: "pathologist", nameKey: "pathologist" },
+  { value: "rehabilitologist", nameKey: "rehabilitologist" },
+  { value: "manual_therapist", nameKey: "manual_therapist" },
+  { value: "chiropractor", nameKey: "chiropractor" },
+  { value: "reflexologist", nameKey: "reflexologist" },
+  { value: "massage_therapist", nameKey: "massage_therapist" },
+  { value: "dietitian", nameKey: "dietitian" },
+  { value: "sexologist", nameKey: "sexologist" },
+  { value: "phlebologist", nameKey: "phlebologist" },
+  { value: "mammologist", nameKey: "mammologist" },
+  { value: "proctologist", nameKey: "proctologist" },
+  { value: "andrologist", nameKey: "andrologist" },
+  { value: "reproductive_specialist", nameKey: "reproductive_specialist" },
+  { value: "transfusiologist", nameKey: "transfusiologist" },
+  { value: "balneologist", nameKey: "balneologist" },
+  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" },
+  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" },
+  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" },
+  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" },
+  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" },
+  { value: "neonatologist", nameKey: "neonatologist" },
+  { value: "speech_therapist", nameKey: "speech_therapist" },
+  { value: "ergotherapist", nameKey: "ergotherapist" },
+  { value: "osteopath", nameKey: "osteopath" },
+  { value: "homeopath", nameKey: "homeopath" },
+  { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
 
 
 const COUNTRY_FLAGS_MAP = {
    "EN": "🇬🇧",
   "UK": "🇺🇦",
-  "DE": "🇩🇪", // Germany/German
+ "DE": "🇩🇪", // Germany/German
   "PH": "🇵🇭", // Philippines
   "HR": "🇭🇷", // Croatia
   "CF": "🇨🇫", // Central African Republic
@@ -382,7 +418,6 @@ const DoctorCard = ({ doctor }) => {
   };
 
   // Отримуємо doctor_points з об'єкта doctor, який має вкладений profile_doctor
-  // Завдяки нормалізації в fetchDoctors, profile_doctor завжди є масивом
   const doctorPoints = doctor.profile_doctor?.[0]?.doctor_points;
   const starRating = calculateStarsFromPoints(doctorPoints);
 
@@ -412,7 +447,6 @@ const DoctorCard = ({ doctor }) => {
             )}
           </InfoBox>
           <InfoBox label={t("communication_language")}>
-            {/* Передаємо languages, як у Profile_doctor */}
             <LanguageFlags languages={getParsedArray(doctor.communication_languages)} />
           </InfoBox>
         </View>
@@ -427,15 +461,8 @@ const DoctorCard = ({ doctor }) => {
           label={t("work_experience")}
           value={formatYearsText(doctor.experience_years)}
         />
-        {/* New InfoBox for `doctor_check` - assuming it exists and you want to display it */}
-        {doctor.doctor_check && (
-          <InfoBox label={t("status")} value={t("available_for_consultations")} />
-        )}
-        {/* InfoBox for doctor_check being true */}
-        {doctor.doctor_check && (
-          <InfoBox label={t("verification_status")} value={t("verified_doctor")} />
-        )}
         <InfoBox label={t("time_in_app")} value={doctor.time_in_app || t("not_specified")} />
+        {/* Кількість консультацій тепер береться з doctor.consultations_count */}
         <InfoBox
           label={t("consultations_count")}
           value={doctor.consultations_count?.toString() || "0"}
@@ -475,10 +502,10 @@ const ChooseSpecial = () => {
 
   // --- Додано: Ефект для скидання сортування при зміні спеціалізації ---
   useEffect(() => {
-    if (initialSpecialization) {
-      setCurrentSortOption("rating_desc"); // Скидаємо до сортування за рейтингом (спадання)
+    if (initialSpecialization || searchQuery) {
+      setCurrentSortOption("rating_desc");
     }
-  }, [initialSpecialization]); // Запускається при зміні initialSpecialization
+  }, [initialSpecialization, searchQuery]);
 
 
   const fetchDoctors = useCallback(async () => {
@@ -488,22 +515,18 @@ const ChooseSpecial = () => {
       let data = [];
       let fetchError = null;
 
-      // Base query for all doctors, always filtering by doctor_check = true
       let query = supabase
         .from("anketa_doctor")
-        .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, doctor_check") // Include doctor_check and doctor_check
-        .eq("doctor_check", true); // Filter by doctor_check = true
+        .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, doctor_check")
+        .eq("doctor_check", true);
 
       if (initialSpecialization) {
-        // Add specialization filter if present
         const { data: categoryData, error: categoryError } = await query
           .filter("specialization", "cs", `["${initialSpecialization}"]`);
 
         data = categoryData;
         fetchError = categoryError;
       } else if (searchQuery) {
-        // Special handling for RPC function which returns a flat structure
-        // We'll filter doctor_check = true after fetching, if RPC doesn't support it directly
         const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
             p_search_query: searchQuery,
         });
@@ -515,11 +538,9 @@ const ChooseSpecial = () => {
             setLoading(false);
             return;
         }
-        // Filter doctor_check on the client side for RPC results if not filtered by RPC
         data = rpcData.filter(doctor => doctor.doctor_check === true);
-        fetchError = rpcError; // Although filtered, keep track of RPC errors
+        fetchError = rpcError;
       } else {
-          // If no specialization or search query, fetch all doctors with doctor_check = true
           const { data: allDoctorsData, error: allDoctorsError } = await query;
           data = allDoctorsData;
           fetchError = allDoctorsError;
@@ -530,7 +551,7 @@ const ChooseSpecial = () => {
         setError(`${t("error_fetching_doctors")}: ${fetchError.message}`);
         setDoctors([]);
       } else {
-        const processedDoctors = data.map((doctor) => {
+        const processedDoctorsPromises = data.map(async (doctor) => {
           let normalizedProfileDoctor = null;
           if (doctor.profile_doctor) {
             if (Array.isArray(doctor.profile_doctor)) {
@@ -565,13 +586,29 @@ const ChooseSpecial = () => {
             }
           }
 
+          // Fetch consultations count for each doctor
+          const { count: consultationsCount, error: countError } = await supabase
+            .from('patient_bookings')
+            .select('id', { count: 'exact' })
+            .eq('doctor_id', doctor.user_id)
+            .eq('consultation_conducted', true); // Фільтруємо лише проведені консультації
+
+          if (countError) {
+            console.error(`Error fetching consultations count for doctor ${doctor.user_id}:`, countError);
+            // Optionally, handle this error, e.g., set count to 0 or leave it undefined
+          }
+
           return {
             ...doctor,
             profile_doctor: normalizedProfileDoctor,
             communication_languages: parsedCommunicationLanguages,
             time_in_app: timeInAppDisplay,
+            consultations_count: consultationsCount || 0, // Додаємо кількість консультацій
           };
         });
+
+        const processedDoctors = await Promise.all(processedDoctorsPromises);
+
 
         const sortedDoctors = [...processedDoctors].sort((a, b) => {
           const pointsA = a.profile_doctor?.[0]?.doctor_points || 0;
@@ -663,18 +700,18 @@ const ChooseSpecial = () => {
     closeSortModal();
   };
 
-  const getHeaderTitle = () => {
+ const getHeaderTitle = () => {
     if (initialSpecialization) {
       const spec = specializationsList.find(
         (s) => s.value === initialSpecialization
       );
-      return spec ? t(spec.nameKey) : t("doctors");
+      return spec ? t(spec.nameKey) : t("doctors_general"); // Замість "doctors", використовуємо "doctors_general" або щось більш унікальне
     }
     if (searchQuery) {
         return `${t("search_results_for")} "${searchQuery}"`;
     }
-    return t("doctors");
-  };
+    return t("doctors"); // Якщо нічого не обрано, показуємо "Лікарі"
+};
 
   if (loading) {
     return (
@@ -704,7 +741,8 @@ const ChooseSpecial = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.rightIcon}>
-          {/* <Icon width={50} height={50} /> */}
+          {/* Повернення відображення логотипу */}
+          <Icon width={moderateScale(40)} height={moderateScale(40)} />
         </View>
       </View>
 
@@ -790,7 +828,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: "#000000",
-    // fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular",
   },
   errorContainer: {
     flex: 1,
@@ -804,7 +842,7 @@ const styles = StyleSheet.create({
     color: "#000000",
     textAlign: "center",
     marginBottom: 15,
-    // fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular",
   },
   retryButton: {
     backgroundColor: "#0EB3EB",
@@ -816,14 +854,14 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   noDoctorsFound: {
     fontSize: 18,
     textAlign: "center",
     marginTop: 50,
     color: "#777",
-    // fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular",
   },
   header: {
     flexDirection: "row",
@@ -851,7 +889,7 @@ const styles = StyleSheet.create({
     color: "#333",
     flex: 1,
     textAlign: "center",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   rightIcon: {
     width: 50,
@@ -878,7 +916,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   scrollViewContent: {
     paddingHorizontal: 15,
@@ -927,7 +965,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     marginBottom: 8,
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   infoBoxRow: {
     flexDirection: "row",
@@ -938,7 +976,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#555",
     marginRight: 5,
-    // fontFamily: "Mont-Medium",
+    fontFamily: "Mont-Medium",
   },
   infoBoxValueContainer: {
     flex: 1,
@@ -950,7 +988,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     fontWeight: "500",
-    // fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular",
     flexShrink: 1,
   },
   notSpecifiedText: {
@@ -970,7 +1008,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 5,
-    // fontFamily: 'Mont-Regular',
+    fontFamily: 'Mont-Regular',
   },
   cardDetails: {
     paddingTop: 10,
@@ -1000,13 +1038,13 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 15,
     fontWeight: "bold",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   priceText: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#3498DB",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   modalOverlay: {
     flex: 1,
@@ -1040,7 +1078,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     fontWeight: "500",
-    // fontFamily: "Mont-Regular",
+    fontFamily: "Mont-Regular",
   },
   sortOptionSelected: {
     backgroundColor: "rgba(14, 179, 235, 0.1)",
@@ -1049,7 +1087,7 @@ const styles = StyleSheet.create({
   sortOptionTextSelected: {
     fontWeight: "bold",
     color: "#0EB3EB",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
   closeSortButton: {
     backgroundColor: "#0EB3EB",
@@ -1063,7 +1101,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
-    // fontFamily: "Mont-Bold",
+    fontFamily: "Mont-Bold",
   },
 });
 

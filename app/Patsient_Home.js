@@ -1,76 +1,117 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   StyleSheet,
   View,
-  Text,
-  Image,
-  TouchableOpacity,
   TextInput,
-  Dimensions,
-  Alert,
+  TouchableOpacity,
+  Text,
   ScrollView,
+  SafeAreaView,
+  Dimensions,
   Platform,
+  ActivityIndicator,
   Modal,
   TouchableWithoutFeedback,
-  ActivityIndicator,
+  Alert,
   RefreshControl,
-  KeyboardAvoidingView,
-  StatusBar,
+  StatusBar // Імпортуємо StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Icon from "../assets/icon.svg";
-import People from "../assets/Main/people.svg";
+import Constants from "expo-constants";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
-import TabBar from "../components/TopBar.js";
+import * as Notifications from 'expo-notifications'; // Для push-сповіщень
+import * as Device from 'expo-device'; // Для push-сповіщень
 
-import { useTranslation } from "react-i18next";
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
+// Ваші SVG компоненти
+import Icon from "../assets/icon.svg";
+import People from "../assets/Main/people.svg";
+// Компонент TabBar, який ви не надали, але він використовується
+// Припускаємо, що він імпортується з окремого файлу
+import TabBar from "../components/TopBar.js"; // Замініть на правильний шлях, якщо він інший
 
-// Встановіть обробник для сповіщень, коли додаток активний
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
 
-const { width } = Dimensions.get("window");
+// Отримання розмірів екрану
+const { width, height } = Dimensions.get("window");
+
+// Функції для масштабування розмірів
+const scale = (size) => (width / 375) * size;
+const verticalScale = (size) => (height / 812) * size;
+const moderateScale = (size, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
+
+// Визначаємо containerWidth для адаптивності
 const containerWidth = width * 0.9;
 
+// --- ОНОВЛЕНИЙ МАСИВ ВСІХ СПЕЦІАЛІЗАЦІЙ ---
+// Тепер nameKey для всіх спеціалізацій має префікс "categories."
+// Це забезпечить коректне звернення до перекладів у файлах локалізації
 const allDoctorSpecializations = [
-  { key: "traumatologist", nameKey: "categories.traumatologist" },
-  { key: "pediatrician", nameKey: "categories.pediatrician" },
-  { key: "gynecologist", nameKey: "categories.gynecologist" },
-  { key: "ent", nameKey: "categories.ent" },
-  { key: "surgeon", nameKey: "categories.surgeon" },
-  { key: "cardiologist", nameKey: "categories.cardiologist" },
-  { key: "dentist", nameKey: "categories.dentist" },
-  { key: "dermatologist", nameName: "categories.dermatologist" },
-  { key: "ophthalmologist", nameKey: "categories.ophthalmologist" },
-  { key: "neurologist", nameKey: "categories.neurologist" },
-  { key: "endocrinologist", nameKey: "categories.endocrinologist" },
-  { key: "gastroenterologist", nameKey: "categories.gastroenterologist" },
-  { key: "urologist", nameKey: "categories.urologist" },
-  { key: "pulmonologist", nameKey: "categories.pulmonologist" },
-  { key: "nephrologist", nameKey: "categories.nephrologist" },
-  { key: "rheumatologist", nameKey: "categories.rheumatologist" },
-  { key: "oncologist", nameKey: "categories.oncologist" },
-  { key: "allergist", nameKey: "categories.allergist" },
-  {key: "infectiousDiseasesSpecialist",nameKey: "categories.infectiousDiseasesSpecialist"},
-  { key: "psychiatrist", nameKey: "categories.psychiatrist" },
-  { key: "psychologist", nameKey: "categories.psychologist" },
-  { key: "physiotherapist", nameKey: "categories.physiotherapist" },
-  { key: "nutritionist", nameKey: "categories.nutritionist" },
-  { key: "radiologist", nameKey: "categories.radiologist" },
-  { key: "anesthesiologist", nameKey: "categories.anesthesiologist" },
-  { key: "general_practitioner", nameKey: "categories.general_practitioner" },
+  { value: "general_practitioner", nameKey: "general_practitioner" },
+  { value: "pediatrician", nameKey: "pediatrician" },
+  { value: "cardiologist", nameKey: "cardiologist" },
+  { value: "dermatologist", nameKey: "dermatologist" },
+  { value: "neurologist", nameKey: "neurologist" },
+  { value: "surgeon", nameKey: "surgeon" },
+  { value: "psychiatrist", nameKey: "psychiatrist" },
+  { value: "dentist", nameKey: "dentist" },
+  { value: "ophthalmologist", nameKey: "ophthalmologist" },
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "gastroenterologist", nameKey: "gastroenterologist" },
+  { value: "endocrinologist", nameKey: "endocrinologist" },
+  { value: "oncologist", nameKey: "oncologist" },
+  { value: "allergist", nameKey: "allergist" },
+  { value: "physiotherapist", nameKey: "physiotherapist" },
+  { value: "traumatologist", nameKey: "traumatologist" }, // Додано
+  { value: "gynecologist", nameKey: "gynecologist" },       // Додано
+  { value: "urologist", nameKey: "urologist" },             // Додано
+  { value: "pulmonologist", nameKey: "pulmonologist" },     // Додано
+  { value: "nephrologist", nameKey: "nephrologist" },       // Додано
+  { value: "rheumatologist", nameKey: "rheumatologist" },   // Додано
+  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" }, // Додано
+  { value: "psychologist", nameKey: "psychologist" },       // Додано
+  { value: "nutritionist", nameKey: "nutritionist" },       // Додано
+  { value: "radiologist", nameKey: "radiologist" },         // Додано
+  { value: "anesthesiologist", nameKey: "anesthesiologist" }, // Додано
+  { value: "oncologist_radiation", nameKey: "oncologist_radiation" }, // Додано
+  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" }, // Додано
+  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" }, // Додано
+  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" }, // Додано
+  { value: "immunologist", nameKey: "immunologist" }, // Додано
+  { value: "genetics_specialist", nameKey: "genetics_specialist" }, // Додано
+  { value: "geriatrician", nameKey: "geriatrician" }, // Додано
+  { value: "toxicologist", nameKey: "toxicologist" }, // Додано
+  { value: "forensic_expert", nameKey: "forensic_expert" }, // Додано
+  { value: "epidemiologist", nameKey: "epidemiologist" }, // Додано
+  { value: "pathologist", nameKey: "pathologist" }, // Додано
+  { value: "rehabilitologist", nameKey: "rehabilitologist" }, // Додано
+  { value: "manual_therapist", nameKey: "manual_therapist" }, // Додано
+  { value: "chiropractor", nameKey: "chiropractor" }, // Додано
+  { value: "reflexologist", nameKey: "reflexologist" }, // Додано
+  { value: "massage_therapist", nameKey: "massage_therapist" }, // Додано
+  { value: "dietitian", nameKey: "dietitian" }, // Додано
+  { value: "sexologist", nameKey: "sexologist" }, // Додано
+  { value: "phlebologist", nameKey: "phlebologist" }, // Додано
+  { value: "mammologist", nameKey: "mammologist" }, // Додано
+  { value: "proctologist", nameKey: "proctologist" }, // Додано
+  { value: "andrologist", nameKey: "andrologist" }, // Додано
+  { value: "reproductive_specialist", nameKey: "reproductive_specialist" }, // Додано
+  { value: "transfusiologist", nameKey: "transfusiologist" }, // Додано
+  { value: "balneologist", nameKey: "balneologist" }, // Додано
+  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" }, // Додано
+  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" }, // Додано
+  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" }, // Додано
+  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" }, // Додано
+  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" }, // Додано
+  { value: "neonatologist", nameKey: "neonatologist" }, // Додано
+  { value: "speech_therapist", nameKey: "speech_therapist" }, // Додано
+  { value: "ergotherapist", nameKey: "ergotherapist" }, // Додано
+  { value: "osteopath", nameKey: "osteopath" }, // Додано
+  { value: "homeopath", nameKey: "homeopath" }, // Додано
+  { value: "acupuncturist", nameKey: "acupuncturist" }, // Додано
 ];
-
 const Patsient_Home = () => {
   const navigation = useNavigation();
   const { session, loading: authLoading } = useAuth();
@@ -90,18 +131,14 @@ const Patsient_Home = () => {
   const [loadingSpecializations, setLoadingSpecializations] = useState(true);
   const [specializationsError, setSpecializationsError] = useState(null);
 
-  // Додаємо стан для кількості непрочитаних повідомлень
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-  // Додаємо стан для Pull-to-Refresh
   const [refreshing, setRefreshing] = useState(false);
 
 
-  // Функція для отримання кількості непрочитаних повідомлень
   const fetchUnreadMessagesCount = useCallback(async () => {
-    // Перевіряємо наявність сесії користувача перед виконанням запиту
     if (!session?.user) {
       console.log("No user session found, cannot fetch unread messages.");
-      setUnreadMessagesCount(0); // Скидаємо лічильник, якщо немає користувача
+      setUnreadMessagesCount(0);
       return;
     }
 
@@ -126,7 +163,6 @@ const Patsient_Home = () => {
   }, [session?.user]);
 
 
-  // Функція для реєстрації та збереження push-токену
   const registerForPushNotificationsAsync = useCallback(async (userId) => {
     console.log("--- START registerForPushNotificationsAsync ---");
     console.log("Input userId:", userId);
@@ -178,7 +214,12 @@ const Patsient_Home = () => {
       console.log("DEBUG: Notification permissions GRANTED. Attempting to get Expo Push Token.");
 
       try {
-        const expoProjectId = "e2619b61-6ef5-4958-90bc-a400bbc8c50a";
+        const expoProjectId = Constants.expoConfig?.extra?.eas?.projectId;
+        if (!expoProjectId) {
+            console.error("DEBUG ERROR: Expo Project ID is not defined in app.json extra.eas.projectId.");
+            Alert.alert(t("error"), t("expo_project_id_missing"));
+            return null;
+        }
         console.log("DEBUG: Using Expo Project ID for token generation:", expoProjectId);
         token = (
           await Notifications.getExpoPushTokenAsync({
@@ -204,7 +245,6 @@ const Patsient_Home = () => {
       }
     } else {
       console.log("DEBUG: Not a physical device. Skipping push notification registration.");
-      Alert.alert(t("error"), t("push_notifications_only_on_physical_devices"));
       console.log("Must use physical device for Push Notifications");
       return null;
     }
@@ -236,13 +276,10 @@ const Patsient_Home = () => {
   useFocusEffect(
     useCallback(() => {
       setActiveTab("Home");
-      // Викликаємо функцію для отримання непрочитаних повідомлень лише якщо сесія є
       if (session?.user) {
         fetchUnreadMessagesCount();
       }
-      return () => {
-        // Опціонально, якщо потрібно щось очистити при втраті фокусу
-      };
+      return () => {};
     }, [fetchUnreadMessagesCount, session?.user])
   );
 
@@ -250,86 +287,36 @@ const Patsient_Home = () => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
-  // Виклик registerForPushNotificationsAsync та fetchUnreadMessagesCount при завантаженні та зміні сесії
   useEffect(() => {
-    // Викликаємо ці функції лише якщо сесія завантажена і користувач авторизований
     if (!authLoading && session?.user) {
       console.log("Attempting to register for push notifications for user:", session.user.id);
       registerForPushNotificationsAsync(session.user.id);
-      fetchUnreadMessagesCount(); // Завантажуємо лічильник при успішній автентифікації
+      fetchUnreadMessagesCount();
     }
   }, [session, authLoading, registerForPushNotificationsAsync, fetchUnreadMessagesCount]);
 
 
   useEffect(() => {
-    const updateDimensions = () => {
-      // Logic for updating dimensions if needed
-    };
+    const updateDimensions = () => {};
     updateDimensions();
-    if (Platform.OS === "web") {
-      const handleResize = () => updateDimensions();
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    } else {
-      const subscription = Dimensions.addEventListener(
-        "change",
-        updateDimensions
-      );
-      return () => {
-        if (subscription) {
-          subscription.remove();
-        }
-      };
-    }
+    const subscription = Dimensions.addEventListener(
+      "change",
+      updateDimensions
+    );
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
   }, []);
 
+  // Оновлена функція fetchAvailableSpecializations
   const fetchAvailableSpecializations = useCallback(async () => {
     setLoadingSpecializations(true);
     setSpecializationsError(null);
     try {
-      const { data, error } = await supabase
-        .from("anketa_doctor")
-        .select("specialization");
-
-      if (error) {
-        console.error("Error fetching doctor specializations:", error);
-        setSpecializationsError(
-          t("error_fetching_specializations") + ": " + error.message
-        );
-        setAvailableSpecializations([]);
-        return;
-      }
-
-      const uniqueSpecs = new Set();
-      data.forEach((doctor) => {
-        if (doctor.specialization) {
-          const currentSpecializations = Array.isArray(doctor.specialization)
-            ? doctor.specialization
-            : (() => {
-                try {
-                  return JSON.parse(doctor.specialization);
-                } catch (e) {
-                  console.warn(
-                    "Warning: Invalid specialization format for doctor (expected array or parsable JSON string):",
-                    doctor.user_id,
-                    doctor.specialization,
-                    e
-                  );
-                  return [];
-                }
-              })();
-
-          currentSpecializations.forEach((spec) => {
-            const matchingSpec = allDoctorSpecializations.find(
-              (s) => s.key === spec
-            );
-            if (matchingSpec) {
-              uniqueSpecs.add(matchingSpec);
-            }
-          });
-        }
-      });
-      setAvailableSpecializations(Array.from(uniqueSpecs));
+      // Замість запиту до Supabase, просто використовуємо весь локальний масив
+      setAvailableSpecializations(allDoctorSpecializations);
     } catch (err) {
       console.error("Unexpected error fetching specializations:", err);
       setSpecializationsError(
@@ -424,28 +411,23 @@ const Patsient_Home = () => {
     setLanguageModalVisible(false);
   };
 
-  // ОНОВЛЕНА ФУНКЦІЯ handleLanguageSelect
   const handleLanguageSelect = async (langCode) => {
-    // 1. Змінюємо мову інтерфейсу за допомогою i18n
     i18n.changeLanguage(langCode);
-    setDisplayedLanguageCode(langCode.toUpperCase()); // Оновлюємо відображення мови
+    setDisplayedLanguageCode(langCode.toUpperCase());
     closeLanguageModal();
 
-    // 2. Зберігаємо вибрану мову в Supabase, якщо користувач авторизований
     if (session?.user) {
       try {
         const { error } = await supabase
-          .from('profiles') // Назва вашої таблиці з профілями
-          .update({ language: langCode }) // Оновлюємо колонку 'language'
-          .eq('user_id', session.user.id); // Для поточного користувача
+          .from('profiles')
+          .update({ language: langCode })
+          .eq('user_id', session.user.id);
 
         if (error) {
           console.error("Error updating user language in Supabase:", error.message);
           Alert.alert(t("error_title"), t("failed_to_save_language", { error: error.message }));
         } else {
           console.log(`User ${session.user.id} language updated to: ${langCode}`);
-          // Опціонально: можна додати невелике сповіщення про успіх
-          // Alert.alert(t("success_title"), t("language_saved_successfully"));
         }
       } catch (err) {
         console.error("Unexpected error updating user language:", err);
@@ -464,9 +446,20 @@ const Patsient_Home = () => {
     setSpecializationModalVisible(false);
   };
 
-  const handleSpecializationSelect = (specializationKey) => {
-    closeSpecializationModal();
-    navigation.navigate("ChooseSpecial", { specialization: specializationKey });
+  // Оновлена функція handleSpecializationSelect
+  const handleSpecializationSelect = (specializationItem) => {
+    // Додаємо лог для перевірки, що саме приходить:
+    console.log("Selected Specialization Item:", specializationItem);
+
+    // Перевіряємо, чи об'єкт specializationItem існує і має властивість 'value'
+    if (specializationItem && specializationItem.value) {
+      closeSpecializationModal();
+      // Передаємо specializationItem.value, як і очікує ChooseSpecial
+      navigation.navigate("ChooseSpecial", { specialization: specializationItem.value });
+    } else {
+      console.error("Error: Selected specialization item is undefined or missing 'value'.", specializationItem);
+      Alert.alert(t("error_title"), t("specialization_selection_error"));
+    }
   };
 
   const languagesForModal = [
@@ -474,37 +467,31 @@ const Patsient_Home = () => {
     { nameKey: "english", code: "en", emoji: "🇬🇧" },
   ];
 
-  // Функція, яка викликається при "потягни, щоб оновити"
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Викликаємо функції, які потрібно оновити
     await fetchUnreadMessagesCount();
     await fetchAvailableSpecializations();
-    // Додайте сюди інші функції, які ви хочете оновити
     setRefreshing(false);
   }, [fetchUnreadMessagesCount, fetchAvailableSpecializations]);
 
-  // ... (решта вашого коду компонента)
-  // Я залишив тільки ту частину, яку ви надали, щоб уникнути дублювання
-  // Ваша секція 'return' і стилі залишаються незмінними.
   return (
     <View style={styles.fullScreenContainer}>
       <SafeAreaView style={styles.safeAreaContent}>
         <ScrollView
           contentContainerStyle={styles.scrollContentContainer}
-          refreshControl={ // Додаємо RefreshControl
+          refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={["#0EB3EB"]} // Колір індикатора оновлення
-              tintColor="#0EB3EB" // Колір індикатора оновлення для iOS
+              colors={["#0EB3EB"]}
+              tintColor="#0EB3EB"
             />
           }
         >
           <View style={styles.container}>
             <View style={styles.header}>
               <View style={styles.logoContainer}>
-                <Icon width={50} height={50} />
+                <Icon width={moderateScale(50)} height={moderateScale(50)} />
               </View>
               <TouchableOpacity
                 style={styles.languageButton}
@@ -514,8 +501,7 @@ const Patsient_Home = () => {
                   <Text style={styles.languageText}>
                     {displayedLanguageCode}
                   </Text>
-                  <Ionicons name="globe-outline" size={16} color="white" />
-                  
+                  <Ionicons name="globe-outline" size={moderateScale(16)} color="white" />
                 </View>
               </TouchableOpacity>
               <TouchableOpacity
@@ -524,10 +510,10 @@ const Patsient_Home = () => {
               >
                 <Ionicons
                   name="notifications-outline"
-                  size={24}
+                  size={moderateScale(24)}
                   color="white"
                 />
-                {unreadMessagesCount > 0 && ( // Відображаємо бейдж тільки якщо є непрочитані
+                {unreadMessagesCount > 0 && (
                   <View style={styles.notificationBadge}>
                     <Text style={styles.notificationNumber}>{unreadMessagesCount}</Text>
                   </View>
@@ -537,10 +523,10 @@ const Patsient_Home = () => {
 
             <View style={styles.mainContent}>
               <TouchableOpacity
-                style={styles.signOutButtonAboveSearch}
+                style={styles.signOutButton}
                 onPress={handleSignOut}
               >
-                <Ionicons name="log-out-outline" size={24} color="white" />
+                <Ionicons name="log-out-outline" size={moderateScale(24)} color="white" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -563,7 +549,7 @@ const Patsient_Home = () => {
               >
                 <Ionicons
                   name="search"
-                  size={20}
+                  size={moderateScale(20)}
                   color="#BDBDBD"
                   style={styles.searchIcon}
                 />
@@ -641,14 +627,11 @@ const Patsient_Home = () => {
                     style={styles.modalCloseButton}
                     onPress={closeSpecializationModal}
                   >
-                    <Text style={styles.modalCloseButtonText} numberOfLines={1} adjustsFontSizeToFit>
-                      {t("cancel")}
-                    </Text>
                     <Ionicons
                       name="close-circle-outline"
-                      size={24}
+                      size={moderateScale(28)}
                       color="#0EB3EB"
-                      style={{ marginLeft: 5 }}
+                      style={{ marginLeft: moderateScale(5) }}
                     />
                   </TouchableOpacity>
                 </View>
@@ -674,9 +657,9 @@ const Patsient_Home = () => {
                   >
                     {availableSpecializations.map((spec) => (
                       <TouchableOpacity
-                        key={spec.key}
+                        key={spec.value} 
                         style={styles.specializationItem}
-                        onPress={() => handleSpecializationSelect(spec.key)}
+                        onPress={() => handleSpecializationSelect(spec)} 
                       >
                         <Text
                           style={styles.specializationItemText}
@@ -691,9 +674,9 @@ const Patsient_Home = () => {
                           </Text>
                           <Ionicons
                             name="play"
-                            size={14}
+                            size={moderateScale(14)}
                             color="white"
-                            style={{ marginLeft: 5 }}
+                            style={{ marginLeft: moderateScale(5) }}
                           />
                         </View>
                       </TouchableOpacity>
@@ -714,7 +697,6 @@ const Patsient_Home = () => {
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
@@ -723,14 +705,13 @@ const styles = StyleSheet.create({
   safeAreaContent: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop: Platform.OS === "ios" ? (StatusBar.currentHeight ? 5 : 10) : 0,
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   scrollContentContainer: {
     flexGrow: 1,
     justifyContent: "flex-start",
     alignItems: "center",
-    paddingBottom: 90,
+    paddingBottom: verticalScale(90),
   },
   container: {
     flex: 1,
@@ -742,50 +723,52 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: containerWidth,
-    height: 60,
+    height: verticalScale(60),
+    paddingTop: verticalScale(10),
+    paddingBottom: verticalScale(5),
     zIndex: 10,
   },
   logoContainer: {
-    paddingLeft: 5,
+    paddingLeft: scale(5),
   },
   languageButton: {
     backgroundColor: "#0EB3EB",
-    borderRadius: 10,
-    paddingVertical: 5,
+    borderRadius: moderateScale(10),
+    paddingVertical: verticalScale(5),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
-    minWidth: 70,
+    minWidth: scale(70),
   },
   languageButtonContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 5,
+    paddingHorizontal: scale(5),
     flexWrap: 'nowrap',
   },
   languageText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontFamily: "Mont-Bold",
     color: "white",
-    marginRight: 5,
+    marginRight: scale(5),
   },
   notificationButton: {
-    width: width * 0.12,
-    height: width * 0.12,
+    width: moderateScale(48),
+    height: moderateScale(48),
     backgroundColor: "rgba(14, 179, 235, 0.69)",
-    borderRadius: width * 0.06,
+    borderRadius: moderateScale(24),
     justifyContent: "center",
     alignItems: "center",
   },
   notificationBadge: {
     position: "absolute",
-    top: 5,
-    right: 10,
+    top: verticalScale(5),
+    right: scale(10),
     backgroundColor: "#E04D53",
-    borderRadius: 1000,
-    width: 17,
-    height: 17,
+    borderRadius: moderateScale(1000),
+    width: moderateScale(17),
+    height: moderateScale(17),
     justifyContent: "center",
     alignItems: "center",
     borderColor: "white",
@@ -793,42 +776,69 @@ const styles = StyleSheet.create({
   },
   notificationNumber: {
     color: "white",
-    fontSize: 10,
+    fontSize: moderateScale(10),
   },
   mainContent: {
     flex: 1,
     alignItems: "center",
     width: containerWidth,
-    paddingTop: 20,
-    paddingBottom: 20,
+    paddingTop: verticalScale(20),
+    paddingBottom: verticalScale(20),
     position: "relative",
   },
+  signOutButton: {
+    position: "absolute",
+    top: verticalScale(0),
+    right: scale(0),
+    backgroundColor: "rgba(255, 0, 0, 0.7)",
+    borderRadius: moderateScale(30),
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(15),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: verticalScale(2),
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: moderateScale(3.84),
+    elevation: 5,
+    zIndex: 100,
+  },
+  signOutButtonText: {
+    color: "white",
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-Bold",
+    marginLeft: scale(8),
+  },
   specializationButton: {
-    marginTop: 30,
+    marginTop: verticalScale(30),
     backgroundColor: "#0EB3EB",
-    borderRadius: 555,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    borderRadius: moderateScale(555),
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(20),
     width: "90%",
-    height: 52,
+    height: verticalScale(52),
     alignItems: "center",
     justifyContent: 'center',
-    marginBottom: 50,
+    marginBottom: verticalScale(50),
   },
   specializationText: {
-    fontSize: 18,
+    fontSize: moderateScale(18), // Збільшено, як і раніше
     fontFamily: "Mont-Bold",
     color: "white",
     textAlign: 'center',
     flexShrink: 1,
   },
   doctorsImageContainer: {
-    marginTop: 20,
+    marginTop: verticalScale(20),
     alignItems: "center",
     justifyContent: "center",
-    height: 300,
+    height: verticalScale(300),
     width: "100%",
-    marginBottom: 10,
+    marginBottom: verticalScale(10),
   },
   peopleImage: {
     width: "100%",
@@ -839,52 +849,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: 555,
-    paddingHorizontal: 15,
+    borderRadius: moderateScale(555),
+    paddingHorizontal: scale(15),
     width: width * 0.9,
-    height: 52,
-    marginTop: 80,
+    height: verticalScale(52),
+    marginTop: verticalScale(80),
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: scale(10),
     color: "#BDBDBD",
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    paddingVertical: 10,
+    fontSize: moderateScale(16),
+    paddingVertical: verticalScale(10),
     paddingLeft: 0,
     borderWidth: 0,
     color: "#212121",
     fontFamily: "Mont-Regular",
-  },
-
-  signOutButtonAboveSearch: {
-    position: "absolute",
-    right: 0,
-    backgroundColor: "rgba(255, 0, 0, 0.7)",
-    bottom: 85,
-    borderRadius: 30,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    zIndex: 100,
-  },
-  signOutButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontFamily: "Mont-Bold",
-    marginLeft: 8,
   },
 
   modalOverlay: {
@@ -895,8 +877,8 @@ const styles = StyleSheet.create({
   },
   languageModalContent: {
     backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: moderateScale(20),
+    padding: moderateScale(20),
     borderColor: "#0EB3EB",
     borderWidth: 1,
     alignItems: "center",
@@ -904,29 +886,29 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: verticalScale(2),
     },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(4),
     elevation: 5,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: moderateScale(22),
     fontFamily: "Mont-Bold",
-    marginBottom: 20,
+    marginBottom: verticalScale(20),
     color: "#0EB3EB",
     textAlign: 'center',
     flexWrap: 'wrap',
   },
   languageOption: {
-    paddingVertical: 15,
+    paddingVertical: verticalScale(15),
     width: "100%",
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(14, 179, 235, 0.3)",
   },
   languageOptionText: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontFamily: "Mont-Regular",
     color: "#333333",
     textAlign: 'center',
@@ -935,19 +917,19 @@ const styles = StyleSheet.create({
 
   specializationModalContent: {
     backgroundColor: "white",
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
     borderColor: "#0EB3EB",
     borderWidth: 1,
-    padding: 20,
+    padding: moderateScale(20),
     width: width * 0.9,
-    maxHeight: Dimensions.get("window").height * 0.75,
+    maxHeight: height * 0.75,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: verticalScale(2),
     },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(4),
     elevation: 5,
     flexDirection: "column",
     justifyContent: "flex-start",
@@ -956,26 +938,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: verticalScale(20),
     width: "100%",
   },
+  // Оновлений стиль для заголовка модального вікна спеціалізацій
   specializationModalTitle: {
-    fontSize: 22,
+    fontSize: moderateScale(18), // Зменшено базовий розмір для кращого вмісту
     fontFamily: "Mont-Bold",
     color: "#0EB3EB",
-    flex: 1,
     textAlign: "center",
-    marginHorizontal: 10,
-    flexWrap: 'wrap',
+    marginHorizontal: scale(10),
   },
   modalCloseButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 5,
-    marginLeft: 10,
+    padding: moderateScale(5),
+    marginLeft: scale(10),
   },
   modalCloseButtonText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontFamily: "Mont-Regular",
     color: "#0EB3EB",
     flexShrink: 1,
@@ -991,37 +972,37 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "white",
-    borderRadius: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    borderRadius: moderateScale(10),
+    paddingVertical: verticalScale(15),
+    paddingHorizontal: scale(20),
+    marginBottom: verticalScale(10),
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: verticalScale(1) },
     shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    shadowRadius: moderateScale(1.41),
     elevation: 2,
   },
   specializationItemText: {
-    fontSize: 18,
-    fontFamily: "Mont-Regular",
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-Medium",
     color: "#333333",
     flex: 1,
-    marginRight: 10,
+    marginRight: scale(5),
     textAlign: 'left',
   },
   goToButton: {
     backgroundColor: "#0EB3EB",
-    borderRadius: 555,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    borderRadius: moderateScale(555),
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: scale(15),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 80,
+    minWidth: scale(80),
   },
   goToButtonText: {
     color: "white",
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontFamily: "Mont-Bold",
     flexShrink: 1,
   },
@@ -1029,11 +1010,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: moderateScale(20),
   },
   loadingSpecializationsText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: verticalScale(10),
+    fontSize: moderateScale(16),
     fontFamily: "Mont-Regular",
     color: "#000000",
     textAlign: 'center',
@@ -1042,12 +1023,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: moderateScale(20),
     backgroundColor: "#ffebee",
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
   },
   errorSpecializationsText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontFamily: "Mont-Regular",
     color: "#000000",
     textAlign: "center",
@@ -1056,10 +1037,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: moderateScale(20),
   },
   noSpecializationsText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontFamily: "Mont-SemiBold",
     color: "#777777",
     textAlign: "center",

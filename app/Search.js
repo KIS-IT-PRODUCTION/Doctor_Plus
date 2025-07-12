@@ -50,34 +50,71 @@ const getParsedArray = (value) => {
   }
 };
 
-const specializationsList = [
-  { value: "general_practitioner", nameKey: "categories.general_practitioner" },
-  { value: "pediatrician", nameKey: "categories.pediatrician" },
-  { value: "cardiologist", nameKey: "categories.cardiologist" },
-  { value: "dermatologist", nameKey: "categories.dermatologist" },
-  { value: "neurologist", nameKey: "categories.neurologist" },
-  { value: "surgeon", nameKey: "categories.surgeon" },
-  { value: "psychiatrist", nameKey: "categories.psychiatrist" },
-  { value: "dentist", nameKey: "categories.dentist" },
-  { value: "ophthalmologist", nameKey: "categories.ophthalmologist" },
-  { value: "categories.ent_specialist", nameKey: "ent_specialist" },
-  { value: "gastroenterologist", nameKey: "categories.gastroenterologist" },
-  { value: "endocrinologist", nameKey: "categories.endocrinologist" },
-  { value: "oncologist", nameKey: "categories.oncologist" },
-  { value: "allergist", nameKey: "categories.allergist" },
-  { value: "physiotherapist", nameKey: "categories.physiotherapist" },
-  { value: "traumatologist", nameKey: "categories.traumatologist" },
-  { value: "gynecologist", nameKey: "categories.gynecologist" },
-  { value: "urologist", nameKey: "categories.urologist" },
-  { value: "pulmonologist", nameKey: "categories.pulmonologist" },
-  { value: "nephrologist", nameKey: "categories.nephrologist" },
-  { value: "rheumatologist", nameKey: "categories.rheumatologist" },
-  { value: "infectiousDiseasesSpecialist", nameKey: "categories.infectiousDiseasesSpecialist" },
-  { value: "psychologist", nameKey: "categories.psychologist" },
-  { value: "nutritionist", nameKey: "categories.nutritionist" },
-  { value: "radiologist", nameKey: "categories.radiologist" },
-  { value: "anesthesiologist", nameKey: "categories.anesthesiologist" },
+  const specializationsList = [
+  { value: "general_practitioner", nameKey: "general_practitioner" },
+  { value: "pediatrician", nameKey: "pediatrician" },
+  { value: "cardiologist", nameKey: "cardiologist" },
+  { value: "dermatologist", nameKey: "dermatologist" },
+  { value: "neurologist", nameKey: "neurologist" },
+  { value: "surgeon", nameKey: "surgeon" },
+  { value: "psychiatrist", nameKey: "psychiatrist" },
+  { value: "dentist", nameKey: "dentist" },
+  { value: "ophthalmologist", nameKey: "ophthalmologist" },
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "gastroenterologist", nameKey: "gastroenterologist" },
+  { value: "endocrinologist", nameKey: "endocrinologist" },
+  { value: "oncologist", nameKey: "oncologist" },
+  { value: "allergist", nameKey: "allergist" },
+  { value: "physiotherapist", nameKey: "physiotherapist" },
+  { value: "traumatologist", nameKey: "traumatologist" },
+  { value: "gynecologist", nameKey: "gynecologist" },
+  { value: "urologist", nameKey: "urologist" },
+  { value: "pulmonologist", nameKey: "pulmonologist" },
+  { value: "nephrologist", nameKey: "nephrologist" },
+  { value: "rheumatologist", nameKey: "rheumatologist" },
+  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" },
+  { value: "psychologist", nameKey: "psychologist" },
+  { value: "nutritionist", nameKey: "nutritionist" },
+  { value: "radiologist", nameKey: "radiologist" },
+  { value: "anesthesiologist", nameKey: "anesthesiologist" },
+  { value: "oncologist_radiation", nameKey: "oncologist_radiation" },
+  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" },
+  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" },
+  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" },
+  { value: "immunologist", nameKey: "immunologist" },
+  { value: "genetics_specialist", nameKey: "genetics_specialist" },
+  { value: "geriatrician", nameKey: "geriatrician" },
+  { value: "toxicologist", nameKey: "toxicologist" },
+  { value: "forensic_expert", nameKey: "forensic_expert" },
+  { value: "epidemiologist", nameKey: "epidemiologist" },
+  { value: "pathologist", nameKey: "pathologist" },
+  { value: "rehabilitologist", nameKey: "rehabilitologist" },
+  { value: "manual_therapist", nameKey: "manual_therapist" },
+  { value: "chiropractor", nameKey: "chiropractor" },
+  { value: "reflexologist", nameKey: "reflexologist" },
+  { value: "massage_therapist", nameKey: "massage_therapist" },
+  { value: "dietitian", nameKey: "dietitian" },
+  { value: "sexologist", nameKey: "sexologist" },
+  { value: "phlebologist", nameKey: "phlebologist" },
+  { value: "mammologist", nameKey: "mammologist" },
+  { value: "proctologist", nameKey: "proctologist" },
+  { value: "andrologist", nameKey: "andrologist" },
+  { value: "reproductive_specialist", nameKey: "reproductive_specialist" },
+  { value: "transfusiologist", nameKey: "transfusiologist" },
+  { value: "balneologist", nameKey: "balneologist" },
+  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" },
+  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" },
+  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" },
+  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" },
+  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" },
+  { value: "neonatologist", nameKey: "neonatologist" },
+  { value: "speech_therapist", nameKey: "speech_therapist" },
+  { value: "ergotherapist", nameKey: "ergotherapist" },
+  { value: "osteopath", nameKey: "osteopath" },
+  { value: "homeopath", nameKey: "homeopath" },
+  { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
+
 
 
 const COUNTRY_FLAGS_MAP = {
@@ -489,25 +526,11 @@ const Search = () => {
         data = categoryData;
         error = categoryError;
       } else if (query) {
-        // Якщо RPC функція `search_doctors_by_name_or_specialization` не має вбудованої фільтрації за `doctor_check`,
-        // її потрібно буде модифікувати на стороні бази даних, АБО фільтрувати на стороні клієнта після отримання.
-        // Оптимальніше - модифікувати RPC функцію, щоб вона враховувала `doctor_check = true`.
-        // Нижче приклад, як це може виглядати, якщо ви будете робити додатковий запит.
-        // НАЙКРАЩЕ РІШЕННЯ: ОНОВИТИ ВАШУ RPC ФУНКЦІЮ `search_doctors_by_name_or_specialization`
-        // НА СТОРОНІ SUPABASE, ЩОБ ВОНА ВКЛЮЧАЛА ФІЛЬТРАЦІЮ `doctor_check = true`.
-        // Наприклад, у вашій SQL функції Supabase:
-        // SELECT ad.*, pd.doctor_points
-        // FROM anketa_doctor ad
-        // LEFT JOIN profile_doctor pd ON ad.user_id = pd.user_id
-        // WHERE ad.doctor_check = TRUE
-        // AND (ad.full_name ILIKE '%' || p_search_query || '%' OR ad.search_tags::text ILIKE '%' || p_search_query || '%');
-
         const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
             p_search_query: query,
         });
 
         if (rpcData && !rpcError) {
-          // Якщо RPC не повертає profile_doctor, його потрібно додати вручну або оновити RPC.
           const doctorIds = rpcData.map(d => d.user_id);
           const { data: profileData, error: profileError } = await supabase
             .from('profile_doctor')
@@ -520,15 +543,13 @@ const Search = () => {
               ...d,
               profile_doctor: { doctor_points: profileMap.get(d.user_id) }
             }));
-            error = rpcError; // Зберігаємо оригінальну помилку RPC, якщо є
+            error = rpcError;
           } else {
             console.warn("Could not fetch doctor_points for RPC results:", profileError.message);
-            data = rpcData; // Використовуємо дані без рейтингу, якщо не вдалося завантажити
+            data = rpcData;
             error = rpcError || profileError;
           }
 
-          // <<< ДОДАНО: Фільтруємо отримані дані з RPC на клієнті, якщо RPC не враховує doctor_check.
-          // Цей клієнтський фільтр є тимчасовим рішенням. Оптимально - оновити RPC функцію.
           if (data) {
             const { data: anketaDoctorData, error: anketaDoctorError } = await supabase
               .from('anketa_doctor')
@@ -537,7 +558,7 @@ const Search = () => {
 
             if (!anketaDoctorError) {
               const checkedDoctorsMap = new Map(anketaDoctorData.map(d => [d.user_id, d.doctor_check]));
-              data = data.filter(d => checkedDoctorsMap.get(d.user_id) === true); // Фільтруємо тільки перевірених
+              data = data.filter(d => checkedDoctorsMap.get(d.user_id) === true);
             } else {
               console.warn("Could not fetch doctor_check status for RPC results:", anketaDoctorError.message);
             }
@@ -559,7 +580,7 @@ const Search = () => {
         setSearchError(`${t("error_fetching_doctors")}: ${error.message}`);
         setDoctors([]);
       } else {
-        const processedDoctors = data.map((doctor) => {
+        const processedDoctors = await Promise.all(data.map(async (doctor) => { // Added async here
           // Отримуємо мови, перетворюючи їх на верхній регістр та фільтруючи за COUNTRY_FLAGS_MAP
           const parsedCommunicationLanguages = getParsedArray(doctor.communication_languages).map(lang => {
             if (typeof lang === 'object' && lang !== null && lang.code) {
@@ -587,12 +608,25 @@ const Search = () => {
             }
           }
 
+          // Fetch consultations count for each doctor
+          const { count: consultationsCount, error: countError } = await supabase
+            .from('patient_bookings')
+            .select('id', { count: 'exact' })
+            .eq('doctor_id', doctor.user_id)
+            .eq('consultation_conducted', true); // Фільтруємо лише проведені консультації
+
+          if (countError) {
+            console.error(`Error fetching consultations count for doctor ${doctor.user_id}:`, countError);
+            // Optionally, handle this error, e.g., set count to 0 or leave it undefined
+          }
+
           return {
             ...doctor,
             communication_languages: parsedCommunicationLanguages,
             time_in_app: timeInAppDisplay,
+            consultations_count: consultationsCount || 0, // Додаємо кількість консультацій
           };
-        });
+        }));
         setDoctors(processedDoctors);
       }
     } catch (e) {

@@ -23,11 +23,19 @@ import { useTranslation } from "react-i18next";
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../../providers/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
-import { parseISO, format, isFuture, isPast } from 'date-fns'; // Імпорт date-fns
-import { uk, enUS } from 'date-fns/locale'; // Імпорт локалей для date-fns
-import ConsultationCompletionModal from '../../components/ConsultationCompletionModal'; // Переконайтеся, що шлях правильний
+import { parseISO, format, isFuture, isPast } from 'date-fns';
+import { uk, enUS } from 'date-fns/locale';
+import ConsultationCompletionModal from '../../components/ConsultationCompletionModal';
 
 const { width, height } = Dimensions.get("window");
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
@@ -36,7 +44,7 @@ const moderateScale = (size, factor = 0.5) =>
 
 export default function Message() {
   const navigation = useNavigation();
-  const { t, i18n } = useTranslation(); // Додано i18n для вибору локалі date-fns
+  const { t, i18n } = useTranslation();
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,12 +52,12 @@ export default function Message() {
   const [currentDoctorUserId, setCurrentDoctorUserId] = useState(null);
   const [doctorFullName, setDoctorFullName] = useState(t('doctor'));
   const [loadingCompletion, setLoadingCompletion] = useState(false);
-  const [isModalVisible, setIsModalVisible] = useState(false); // Стан для модального вікна
-  const [selectedMessageForCompletion, setSelectedMessageForCompletion] = useState(null); // Повідомлення для модального вікна
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedMessageForCompletion, setSelectedMessageForCompletion] = useState(null);
 
   const notificationReceivedListener = useRef(null);
   const notificationResponseListener = useRef(null);
-  const locale = i18n.language === 'uk' ? uk : enUS; // Визначення локалі для date-fns
+  const locale = i18n.language === 'uk' ? uk : enUS;
 
   const handleBackPress = () => {
     navigation.goBack();
@@ -58,7 +66,6 @@ export default function Message() {
   const addNewMessage = useCallback((notificationContent) => {
     const { title, body, data } = notificationContent;
     const now = new Date();
-    // Використовуємо date-fns для форматування
     const messageDate = format(now, 'PPP', { locale });
     const messageTime = format(now, 'p', { locale });
 
@@ -74,8 +81,15 @@ export default function Message() {
         return prevMessages;
       }
 
-      const messageStatus = (data && data.payment_status) ? String(data.payment_status).toLowerCase() : ((data && data.status) ? String(data.status).toLowerCase() : 'pending');
       const messageType = (data && data.type) || 'general';
+
+      let messageStatus = 'N/A';
+      if (messageType === 'new_booking') {
+          messageStatus = (data && data.payment_status) ? String(data.payment_status).toLowerCase() : ((data && data.status) ? String(data.status).toLowerCase() : 'pending');
+      } else if (messageType === 'payment_received' || messageType === 'payment_update_doctor') {
+          messageStatus = (data && data.payment_status) ? String(data.payment_status).toLowerCase() : 'pending';
+      }
+      // Для admin_announcement статус може бути нерелевантним або просто 'info'
 
       return [
         {
@@ -90,7 +104,6 @@ export default function Message() {
           rawData: {
             ...data,
             status: messageStatus,
-            // Додані поля для ConsultationCompletionModal
             consultation_conducted: data.consultation_conducted,
             consultation_started_on_time: data.consultation_started_on_time,
             doctor_feedback: data.doctor_feedback,
@@ -100,7 +113,7 @@ export default function Message() {
         ...prevMessages,
       ];
     });
-  }, [t, locale]); // Додано locale в залежності
+  }, [t, locale]);
 
   const fetchMessagesFromSupabase = useCallback(async (doctorUserId, isRefreshing = false) => {
     if (!doctorUserId) {
@@ -115,32 +128,57 @@ export default function Message() {
 
     console.log("Fetching notifications for doctor (user ID):", doctorUserId);
     try {
-      const { data, error } = await supabase
+      // Запит для повідомлень лікаря (не адмін-оголошень)
+      const { data: doctorNotifications, error: doctorError } = await supabase
         .from('doctor_notifications')
         .select('*')
         .eq('doctor_id', doctorUserId)
+        .not('data->>type', 'eq', 'admin_announcement') // Фільтруємо, щоб не включати адмін-оголошення
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
+      if (doctorError) {
+        throw doctorError;
       }
 
-      console.log("Fetched notifications:", data);
+      // Запит для повідомлень адміністратора (які є 'admin_announcement')
+      const { data: adminNotifications, error: adminError } = await supabase
+        .from('doctor_notifications') // Припускаємо, що адмін-повідомлення також тут
+        .select('*')
+        .eq('data->>type', 'admin_announcement')
+        .order('created_at', { ascending: false });
 
-      const formattedMessages = data.map(notif => {
+      if (adminError) {
+        console.warn("Error fetching admin notifications:", adminError.message);
+      }
+
+      // Об'єднайте повідомлення лікаря та адміністратора
+      const combinedNotifications = [
+        ...(doctorNotifications || []),
+        ...(adminNotifications || [])
+      ];
+
+      // Сортуємо за created_at, щоб усі повідомлення були в хронологічному порядку
+      combinedNotifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      const formattedMessages = combinedNotifications.map(notif => {
         const rawData = notif.data || {};
-        const messageStatus = (rawData.payment_status) ? String(rawData.payment_status).toLowerCase() : ((rawData.status) ? String(rawData.status).toLowerCase() : 'pending');
-        const messageType = rawData.type || 'general';
+        const messageType = rawData.type || notif.type || 'general';
+
+        let messageStatus = 'N/A';
+        if (messageType === 'new_booking') {
+            messageStatus = (rawData.status) ? String(rawData.status).toLowerCase() : 'pending';
+        } else if (messageType === 'payment_received' || messageType === 'payment_update_doctor') {
+            messageStatus = (rawData.payment_status) ? String(rawData.payment_status).toLowerCase() : 'pending';
+        }
 
         let formattedDate = '';
         let formattedTime = '';
         try {
-          const createdAtDate = parseISO(notif.created_at); // Використовуємо parseISO
+          const createdAtDate = parseISO(notif.created_at);
           formattedDate = format(createdAtDate, 'PPP', { locale });
           formattedTime = format(createdAtDate, 'p', { locale });
         } catch (dateError) {
           console.error("Error parsing created_at date with date-fns:", notif.created_at, dateError);
-          // Повернення до оригінального форматування, якщо date-fns не справляється
           formattedDate = new Intl.DateTimeFormat(i18n.language, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(notif.created_at));
           formattedTime = new Intl.DateTimeFormat(i18n.language, { hour: '2-digit', minute: '2-digit' }).format(new Date(notif.created_at));
         }
@@ -157,7 +195,6 @@ export default function Message() {
           rawData: {
             ...rawData,
             status: messageStatus,
-            // Додані поля для ConsultationCompletionModal
             consultation_conducted: rawData.consultation_conducted,
             consultation_started_on_time: rawData.consultation_started_on_time,
             doctor_feedback: rawData.doctor_feedback,
@@ -178,7 +215,7 @@ export default function Message() {
       if (!isRefreshing) setLoading(false);
       else setRefreshing(false);
     }
-  }, [t, i18n.language, locale]); // Додано locale та i18n.language в залежності
+  }, [t, i18n.language, locale]);
 
   const onRefresh = useCallback(() => {
     if (currentDoctorUserId) {
@@ -308,6 +345,12 @@ export default function Message() {
             } : null
           ].filter(Boolean)
         );
+      } else if (data && data.type === 'admin_announcement') { // <-- НОВА ОБРОБКА ДЛЯ АДМІН-ОГОЛОШЕНЬ
+        Alert.alert(
+          title || t('admin_announcement_label'),
+          body || t('notification_body_default'),
+          [{ text: t('ok') }]
+        );
       }
       else {
           Alert.alert(title || t('notification_title_default'), body || t('notification_body_default'), [{ text: t('ok') }]);
@@ -391,11 +434,30 @@ export default function Message() {
               .from('doctor_notifications')
               .select('*', { count: 'exact', head: true })
               .eq('doctor_id', currentDoctorUserId)
-              .eq('is_read', false);
+              .eq('is_read', false)
+              // Враховуйте адмін-оголошення, якщо вони мають doctor_id,
+              // або окремо порахуйте, якщо вони не пов'язані з doctor_id
+              .not('data->>type', 'eq', 'admin_announcement'); // Виключаємо, якщо не хочемо, щоб вони впливали на лічильник лікаря
+
+            // Додайте логіку для адмін-оголошень, якщо вони мають впливати на лічильник
+            // Наприклад, якщо вони глобальні і не мають doctor_id:
+            const { count: unreadAdminCount, error: adminCountError } = await supabase
+                .from('doctor_notifications') // Або ваша адмін-таблиця
+                .select('*', { count: 'exact', head: true })
+                .eq('data->>type', 'admin_announcement')
+                .eq('is_read', false);
+
+            let totalUnreadCount = 0;
+            if (!countError && unreadCountAfterRead !== null) {
+                totalUnreadCount += unreadCountAfterRead;
+            }
+            if (!adminCountError && unreadAdminCount !== null) {
+                totalUnreadCount += unreadAdminCount;
+            }
 
             if (!countError && unreadCountAfterRead !== null) {
-                await Notifications.setBadgeCountAsync(unreadCountAfterRead);
-                console.log(`Badge count updated to ${unreadCountAfterRead} after marking message as read.`);
+                await Notifications.setBadgeCountAsync(totalUnreadCount);
+                console.log(`Badge count updated to ${totalUnreadCount} after marking message as read.`);
             } else {
                 console.error("Error re-fetching unread count after marking message as read:", countError?.message);
             }
@@ -431,17 +493,32 @@ export default function Message() {
       } else {
         console.log(`Message ${messageId} marked as read in DB.`);
         if (currentDoctorUserId) {
-            const { count: unreadCountAfterRead, error: countError } = await supabase
+            const { count: unreadDoctorCount, error: doctorCountError } = await supabase
               .from('doctor_notifications')
               .select('*', { count: 'exact', head: true })
               .eq('doctor_id', currentDoctorUserId)
-              .eq('is_read', false);
+              .eq('is_read', false)
+              .not('data->>type', 'eq', 'admin_announcement');
 
-            if (!countError && unreadCountAfterRead !== null) {
-                await Notifications.setBadgeCountAsync(unreadCountAfterRead);
-                console.log(`Badge count updated to ${unreadCountAfterRead} after marking a single message as read.`);
+            const { count: unreadAdminCount, error: adminCountError } = await supabase
+                .from('doctor_notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('data->>type', 'admin_announcement')
+                .eq('is_read', false);
+
+            let totalUnreadCount = 0;
+            if (!doctorCountError && unreadDoctorCount !== null) {
+                totalUnreadCount += unreadDoctorCount;
+            }
+            if (!adminCountError && unreadAdminCount !== null) {
+                totalUnreadCount += unreadAdminCount;
+            }
+
+            if (!doctorCountError && unreadDoctorCount !== null) { // Перевірка будь-якої з помилок
+                await Notifications.setBadgeCountAsync(totalUnreadCount);
+                console.log(`Badge count updated to ${totalUnreadCount} after marking a single message as read.`);
             } else {
-                console.error("Error re-fetching unread count after marking single message as read:", countError?.message);
+                console.error("Error re-fetching unread count after marking single message as read:", doctorCountError?.message || adminCountError?.message);
             }
         }
       }
@@ -675,7 +752,7 @@ export default function Message() {
     const bookingDate = message.rawData.booking_date || message.rawData.date;
     const bookingTimeSlot = message.rawData.booking_time_slot || message.rawData.time;
     const doctorFinalName = doctorFullName || t('doctor');
-    const notificationDbId = message.db_id; // Використовуємо message.db_id для оновлення сповіщення в doctor_notifications
+    const notificationDbId = message.db_id;
 
     try {
         const { error: updateBookingError } = await supabase
@@ -767,43 +844,32 @@ export default function Message() {
         console.log('Meet link notification sent successfully. Response:', await response.json());
         Alert.alert(t('success'), t('meet_link_sent_successfully'));
 
+        // Оновити стан UI, позначивши повідомлення як прочитане та оновивши meet_link
         setMessages(prevMessages =>
             prevMessages.map(msg =>
                 msg.id === message.id
                     ? {
                         ...msg,
-                        meetLinkInput: meetLink,
-                        rawData: {
-                            ...msg.rawData,
-                            meet_link: meetLink
-                        },
-                        is_read: true
+                        is_read: true,
+                        rawData: { ...msg.rawData, meet_link: meetLink },
+                        meetLinkInput: meetLink, // Переконаємось, що поле введення оновлене
                     }
                     : msg
             )
         );
-        if (currentDoctorUserId) {
-            const { count: unreadCountAfterSend, error: countError } = await supabase
-              .from('doctor_notifications')
-              .select('*', { count: 'exact', head: true })
-              .eq('doctor_id', currentDoctorUserId)
-              .eq('is_read', false);
 
-            if (!countError && unreadCountAfterSend !== null) {
-                await Notifications.setBadgeCountAsync(unreadCountAfterSend);
-                console.log(`Badge count updated to ${unreadCountAfterSend} after sending meet link.`);
-            } else {
-                console.error("Error re-fetching unread count after sending meet link:", countError?.message);
-            }
+        if (message.db_id) {
+          // Якщо ви хочете також позначити повідомлення в БД як прочитане після відправки Meet Link
+          await markMessageAsRead(message.db_id);
         }
+
     } catch (error) {
         console.error("Error sending meet link:", error.message);
         Alert.alert(t('error'), `${t('failed_to_send_meet_link')}: ${error.message}`);
     }
-  }, [t, currentDoctorUserId, doctorFullName]);
+  }, [t, currentDoctorUserId, doctorFullName, markMessageAsRead]);
 
   const handleCompleteConsultation = useCallback((message) => {
-    // Відкриваємо модальне вікно і передаємо дані
     setSelectedMessageForCompletion(message);
     setIsModalVisible(true);
   }, []);
@@ -829,6 +895,9 @@ export default function Message() {
 
     setLoadingCompletion(true);
     try {
+      // Зверніть увагу: назва Edge Function "send-meet-link-notification" може бути неточною
+      // для функціоналу "завершення консультації". Можливо, варто створити окрему функцію,
+      // наприклад, 'complete-consultation-notification' для кращої семантики.
       const completeConsultationUrl = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/send-meet-link-notification';
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
@@ -845,7 +914,6 @@ export default function Message() {
         doctor_name: doctorFinalName,
         booking_date: bookingDate,
         booking_time_slot: bookingTimeSlot,
-        // НОВІ ДАНІ З МОДАЛЬНОГО ВІКНА:
         consultation_conducted: consultationConducted,
         consultation_started_on_time: consultationStartedOnTime,
         doctor_feedback: doctorFeedback,
@@ -901,17 +969,32 @@ export default function Message() {
       );
 
       if (currentDoctorUserId) {
-        const { count: unreadCountAfterComplete, error: countError } = await supabase
+        const { count: unreadDoctorCount, error: doctorCountError } = await supabase
           .from('doctor_notifications')
           .select('*', { count: 'exact', head: true })
           .eq('doctor_id', currentDoctorUserId)
-          .eq('is_read', false);
+          .eq('is_read', false)
+          .not('data->>type', 'eq', 'admin_announcement');
 
-        if (!countError && unreadCountAfterComplete !== null) {
-          await Notifications.setBadgeCountAsync(unreadCountAfterComplete);
-          console.log(`Badge count updated to ${unreadCountAfterComplete} after completing consultation.`);
+        const { count: unreadAdminCount, error: adminCountError } = await supabase
+            .from('doctor_notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('data->>type', 'admin_announcement')
+            .eq('is_read', false);
+
+        let totalUnreadCount = 0;
+        if (!doctorCountError && unreadDoctorCount !== null) {
+            totalUnreadCount += unreadDoctorCount;
+        }
+        if (!adminCountError && unreadAdminCount !== null) {
+            totalUnreadCount += unreadAdminCount;
+        }
+
+        if (!doctorCountError && unreadDoctorCount !== null) {
+            await Notifications.setBadgeCountAsync(totalUnreadCount);
+            console.log(`Badge count updated to ${totalUnreadCount} after completing consultation.`);
         } else {
-          console.error("Error re-fetching unread count after completing consultation:", countError?.message);
+            console.error("Error re-fetching unread count after completing consultation:", doctorCountError?.message || adminCountError?.message);
         }
       }
 
@@ -920,10 +1003,10 @@ export default function Message() {
       Alert.alert(t('error'), `${t('failed_to_complete_consultation')}: ${error.message}`);
     } finally {
       setLoadingCompletion(false);
-      setIsModalVisible(false); // Закриття модального вікна
-      setSelectedMessageForCompletion(null); // Скидання вибраного повідомлення
+      setIsModalVisible(false);
+      setSelectedMessageForCompletion(null);
     }
-  }, [t, currentDoctorUserId, doctorFullName, selectedMessageForCompletion]); // Додано selectedMessageForCompletion
+  }, [t, currentDoctorUserId, doctorFullName, selectedMessageForCompletion]);
 
   if (loading && !refreshing) {
     return (
@@ -977,13 +1060,16 @@ export default function Message() {
             const isPaymentFailed = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'failure' || message.rawData.status === 'error' || message.rawData.status === 'declined');
             const isPaymentPending = (isPaymentReceived || isPaymentUpdate) && (message.rawData.status === 'pending' || message.rawData.status === 'wait_secure' || message.rawData.status === '3ds_verify');
 
-            // Визначення, чи зустріч у минулому
-            const isPastConsultation = message.rawData.booking_date && message.rawData.booking_time_slot
+            // НОВА ЗМІНА: Визначення, чи це адмін-оголошення
+            const isAdminAnnouncement = message.type === 'admin_announcement';
+
+            // Визначення, чи зустріч у минулому (тільки для бронювань)
+            const isPastConsultation = !isAdminAnnouncement && message.rawData.booking_date && message.rawData.booking_time_slot
                 ? isPast(parseISO(`${message.rawData.booking_date}T${message.rawData.booking_time_slot}`))
                 : false;
 
-            // Чи вже завершена консультація
-            const isConsultationCompleted = message.rawData.status_meet === true;
+            // Чи вже завершена консультація (тільки для бронювань)
+            const isConsultationCompleted = !isAdminAnnouncement && message.rawData.status_meet === true;
 
 
             let cardColors = ['#FFFFFF', '#FDFDFD'];
@@ -991,7 +1077,10 @@ export default function Message() {
             let showActions = false;
             let showStatusText = false;
 
-            if (isPendingBooking) {
+            if (isAdminAnnouncement) {
+              cardColors = ['#E3F2FD', '#BBDEFB']; // Світло-сині відтінки для адмін-повідомлень
+              cardBorderStyle = styles.messageCardAdminBorder;
+            } else if (isPendingBooking) {
                 cardColors = ['#E0F7FA', '#B2EBF2'];
                 cardBorderStyle = styles.messageCardPendingBorder;
                 showActions = true;
@@ -1053,7 +1142,8 @@ export default function Message() {
 
                   <Text style={styles.messageBody}>{message.body}</Text>
 
-                  {message.type === 'new_booking' && (
+                  {/* Умовний рендеринг: Показувати секції тільки якщо це НЕ адмін-оголошення */}
+                  {!isAdminAnnouncement && message.type === 'new_booking' && (
                     <View style={styles.bookingDetailsSection}>
                       <Text style={styles.cardText}>
                         {t('patient')}: {message.rawData.patient_name || t('not_specified')}
@@ -1105,7 +1195,7 @@ export default function Message() {
                     </View>
                   )}
 
-                  {(isPaymentReceived || isPaymentUpdate) && (
+                  {!isAdminAnnouncement && (isPaymentReceived || isPaymentUpdate) && (
                       <View style={styles.paymentDetailsSection}>
                           <Text style={styles.paymentDetailsText}>
                               {t('payment_status')}:{" "}
@@ -1225,7 +1315,7 @@ export default function Message() {
                             )}
                             {typeof message.rawData.consultation_started_on_time === 'boolean' && (
                               <Text style={styles.doctorFeedbackDisplay}>
-                                <Text style={styles.doctorFeedbackLabel}>
+                                <Text style={styles.doctor_feedbackLabel}>
                                   {t('consultation_started_on_time_question')}:
                                 </Text>
                                 {message.rawData.consultation_started_on_time ? t('yes') : t('no')}
@@ -1234,6 +1324,14 @@ export default function Message() {
                         </View>
                       )}
 
+                    </View>
+                  )}
+
+                  {/* НОВИЙ БЛОК: Відображення для адмін-оголошення */}
+                  {isAdminAnnouncement && (
+                    <View style={styles.adminMessageIndicator}>
+                        <Ionicons name="information-circle-outline" size={moderateScale(18)} color="#2196F3" />
+                        <Text style={styles.adminMessageText}>{t('admin_announcement_label')}</Text>
                     </View>
                   )}
 
@@ -1253,7 +1351,6 @@ export default function Message() {
         )}
       </ScrollView>
 
-      {/* КОМПОНЕНТ МОДАЛЬНОГО ВІКНА ДЛЯ ЗАВЕРШЕННЯ КОНСУЛЬТАЦІЇ */}
       <ConsultationCompletionModal
         isVisible={isModalVisible}
         onClose={() => {
@@ -1331,6 +1428,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   unreadMessageCard: {
+    // Стилі для непрочитаних карток, якщо вони потрібні поверх градієнта
   },
   messageCardDefaultBorder: {
     borderColor: '#e0e0e0',
@@ -1350,6 +1448,27 @@ const styles = StyleSheet.create({
   messageCardUnreadBorder: {
     borderColor: '#0EB3EB',
   },
+  // НОВІ СТИЛІ ДЛЯ АДМІН-ПОВІДОМЛЕНЬ
+  messageCardAdminBorder: {
+    borderColor: '#2196F3', // Колір рамки для адмін-повідомлень (синій)
+  },
+  adminMessageIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: verticalScale(10),
+    paddingVertical: verticalScale(5),
+    paddingHorizontal: moderateScale(10),
+    backgroundColor: 'rgba(33, 150, 243, 0.1)', // Світло-синій фон
+    borderRadius: moderateScale(8),
+    alignSelf: 'flex-start',
+  },
+  adminMessageText: {
+    fontFamily: "Mont-SemiBold",
+    fontSize: moderateScale(13),
+    color: '#2196F3',
+    marginLeft: moderateScale(5),
+  },
+  // КІНЕЦЬ НОВИХ СТИЛІВ
   messageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1516,8 +1635,8 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(15),
   },
   consultationCompletedIndicator: {
-    flexDirection: 'row', // Змінено на column для кращого відображення деталей
-    alignItems: 'flex-start', // Вирівнювання по лівому краю
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     marginTop: verticalScale(15),
     paddingVertical: verticalScale(8),
     paddingHorizontal: moderateScale(15),
@@ -1531,8 +1650,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(15),
     color: '#2E7D32',
     marginLeft: moderateScale(8),
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: verticalScale(2), // Для кращого вирівнювання з іконкою
   },
   doctorFeedbackDisplay: {
     fontFamily: 'Mont-Regular',

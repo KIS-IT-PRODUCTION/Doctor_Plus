@@ -1,3 +1,5 @@
+import "react-native-url-polyfill/auto"; // Залишаємо для Supabase
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -10,17 +12,18 @@ import {
   ActivityIndicator,
   Platform,
   StatusBar,
-  Animated, // <--- Імпортуємо Animated
-  Easing,   // <--- Імпортуємо Easing для ефектів анімації
+  Animated,
+  Easing,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../providers/supabaseClient';
-import { LinearGradient } from 'expo-linear-gradient'; // Import LinearGradient
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
+const CONSULTATION_DURATION_MINUTES = 45; // Константа для тривалості консультації
 
 const ConsultationTime = ({ route }) => {
   const navigation = useNavigation();
@@ -32,86 +35,188 @@ const ConsultationTime = ({ route }) => {
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [doctorTimezone, setDoctorTimezone] = useState(null); // Стан для часового поясу лікаря
 
-  // Створюємо анімовану змінну для іконки
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
-  // Ефект для запуску анімації обертання іконки
   useEffect(() => {
-    // Функція, що запускає анімацію безкінечно
     const startRotation = () => {
-      rotateAnim.setValue(0); // Скидаємо значення анімації до початкового
+      rotateAnim.setValue(0);
       Animated.timing(rotateAnim, {
-        toValue: 1, // Кінцеве значення (один повний оберт)
-        duration: 2000, // Зменшено тривалість до 2 секунд для більш помітної постійної анімації
-        easing: Easing.linear, // Лінійна швидкість
-        useNativeDriver: true, // Використовувати нативний драйвер для плавності
-      }).start(() => startRotation()); // Запускаємо анімацію знову після завершення (це робить її постійною)
+        toValue: 1,
+        duration: 2000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(() => startRotation());
     };
 
-    startRotation(); // Запускаємо анімацію при монтуванні компонента
-  }, []); // Пустий масив залежностей означає, що ефект запуститься один раз при монтуванні
-
-  const generateSchedule = useCallback(() => {
-    const today = new Date();
-    const days = [];
-    for (let i = 0; i < 14; i++) {
-      const currentDay = new Date(today);
-      currentDay.setDate(today.getDate() + i);
-
-      const options = { weekday: 'long', day: 'numeric', month: 'long' };
-      const displayDate = new Intl.DateTimeFormat('uk-UA', options).format(currentDay);
-      const dateString = currentDay.toISOString().split('T')[0];
-
-      const slots = [];
-      for (let hour = 9; hour <= 17; hour++) {
-        const startHour = String(hour).padStart(2, '0');
-        const slotId = `${dateString}-${startHour}:00`;
-        slots.push({
-          time: `${startHour}:00-${String(hour + 1).padStart(2, '0')}:00`,
-          id: slotId,
-          date: dateString,
-          rawTime: `${startHour}:00`,
-        });
-      }
-      days.push({
-        date: currentDay,
-        displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
-        slots: slots,
-      });
-    }
-    console.log("Schedule generated:", days);
-    return days;
+    startRotation();
   }, []);
 
+  // Функція для завантаження часового поясу лікаря
+  const fetchDoctorTimezone = useCallback(async () => {
+    if (!doctorId) {
+      console.warn("No doctorId provided to fetch timezone.");
+      return null;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('anketa_doctor')
+        .select('country_timezone')
+        .eq('user_id', doctorId)
+        .single();
+
+      if (error && error.code !== "PGRST116") { // PGRST116 = no rows found
+        console.error("Error fetching doctor timezone:", error.message);
+        return null;
+      }
+      if (data && data.country_timezone) {
+        let tz = data.country_timezone;
+        // Проста логіка мапування для "UTC+X" на IANA, або використання системної
+        if (tz && tz.startsWith('UTC')) {
+            console.warn(`Doctor timezone is ${data.country_timezone}, which might not be an IANA format. Attempting to map or fallback.`);
+            if (data.country_timezone === 'UTC+10') {
+                tz = 'Australia/Brisbane';
+            } else if (data.country_timezone === 'UTC+2' || data.country_timezone === 'UTC+3') {
+                tz = 'Europe/Kiev'; // Якщо це Україна
+            }
+            if (!tz || tz.startsWith('UTC+')) { // Якщо мапування не відбулося або все ще "UTC+X"
+               tz = Intl.DateTimeFormat().resolvedOptions().timeZone; // Системна часова зона пристрою
+               console.warn(`No specific IANA mapping found for ${data.country_timezone}. Falling back to system timezone: ${tz}`);
+            }
+        }
+        console.log("Resolved doctor timezone:", tz);
+        setDoctorTimezone(tz);
+        return tz;
+      }
+      console.warn("Doctor timezone not found in anketa_doctor for ID:", doctorId);
+      const fallbackTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      console.warn("Falling back to system timezone for doctor:", fallbackTimezone);
+      setDoctorTimezone(fallbackTimezone);
+      return fallbackTimezone;
+    } catch (err) {
+      console.error("General error fetching doctor timezone:", err.message);
+      const fallbackTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      console.error("Falling back to system timezone for doctor due to error:", fallbackTimezone);
+      setDoctorTimezone(fallbackTimezone);
+      return fallbackTimezone;
+    }
+  }, [doctorId]);
+
+  // Модифікована generateSchedule без date-fns
+  const generateSchedule = useCallback((tz = null) => {
+    const effectiveTimezone = tz || doctorTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    console.log("Generating schedule with effective timezone:", effectiveTimezone);
+
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: effectiveTimezone });
+    } catch (e) {
+      console.error(`Invalid timezone "${effectiveTimezone}" detected in generateSchedule. Falling back to system timezone.`, e);
+      const fallbackTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      console.log("Using final fallback timezone for display:", fallbackTimezone);
+      return [];
+    }
+
+    const schedule = [];
+    const now = new Date(); // Поточний час у локальній зоні пристрою
+    const currentLocale = i18n.language;
+
+    for (let i = 0; i < 14; i++) { // На 14 днів вперед
+      const currentDay = new Date(now);
+      currentDay.setDate(now.getDate() + i); // Переходимо на наступний день
+      currentDay.setHours(0, 0, 0, 0); // Обнуляємо час для початку дня (у локальній зоні)
+
+      // Створюємо дату для відображення в конкретній часовій зоні
+      const displayDateOptions = { weekday: 'long', day: 'numeric', month: 'long', timeZone: effectiveTimezone };
+      const displayDate = new Intl.DateTimeFormat(currentLocale, displayDateOptions).format(currentDay);
+
+      // Дата для зберігання в DB у форматі YYYY-MM-DD
+      const year = currentDay.getFullYear();
+      const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDay.getDate()).padStart(2, '0');
+      const dateStringForDB = `${year}-${month}-${day}`;
+
+      const daySlots = [];
+
+      for (let hour = 9; hour < 18; hour++) {
+        for (let minute = 0; minute < 60; minute += CONSULTATION_DURATION_MINUTES) {
+          // Створюємо об'єкт Date у локальному часі, а потім використовуємо для форматування з TZ
+          const startTime = new Date(currentDay);
+          startTime.setHours(hour, minute, 0, 0);
+
+          const endTime = new Date(startTime.getTime() + CONSULTATION_DURATION_MINUTES * 60 * 1000);
+
+          // Перевірка, чи слот не в минулому (порівнюємо з поточним часом пристрою)
+          // Важливо: для порівняння з 'now' ми використовуємо локальний час, оскільки саме на його основі JS оперує Date об'єктами
+          if (endTime.getTime() <= now.getTime()) {
+            continue;
+          }
+
+          if (startTime.getHours() >= 18) continue; // Пропускаємо слоти, що починаються після 17:00
+          if (endTime.getHours() >= 18 && endTime.getMinutes() > 0) continue; // Пропускаємо слоти, що закінчуються після 18:00
+
+          // Форматуємо час для відображення у вибраній часовій зоні
+          const timeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: effectiveTimezone };
+          const displayStartTime = new Intl.DateTimeFormat('uk-UA', timeFormatOptions).format(startTime);
+          const displayEndTime = new Intl.DateTimeFormat('uk-UA', timeFormatOptions).format(endTime);
+          const displayTime = `${displayStartTime} - ${displayEndTime}`;
+
+          // `rawTime` для Supabase: HH:MM:SS. Це час у локальному часі лікаря.
+          const rawTimeForDB = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}:00`;
+
+          const slotId = `${dateStringForDB}-${rawTimeForDB}`;
+
+          daySlots.push({
+            time: displayTime,
+            id: slotId,
+            date: dateStringForDB,
+            rawTime: rawTimeForDB,
+          });
+        }
+      }
+      schedule.push({
+        date: currentDay, // Зберігаємо об'єкт Date для подальших маніпуляцій, якщо потрібно
+        displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
+        slots: daySlots,
+      });
+    }
+    console.log("Generated schedule for doctor display:", schedule);
+    return schedule;
+  }, [doctorTimezone, i18n.language]);
+
   const fetchDoctorSchedule = useCallback(async () => {
+    setLoading(true);
+    let timezone = null;
+    if (doctorId) {
+      timezone = await fetchDoctorTimezone();
+    }
+
     if (!doctorId) {
       console.warn("No doctorId provided to fetch schedule. Cannot fetch.");
+      setScheduleData(generateSchedule(timezone));
       setLoading(false);
-      setScheduleData(generateSchedule());
       return;
     }
-    setLoading(true);
+
     console.log("Attempting to fetch doctor schedule for doctorId:", doctorId);
     try {
       const { data, error } = await supabase
         .from('doctor_availability')
         .select('date, time_slot')
         .eq('doctor_id', doctorId)
-        .gte('date', new Date().toISOString().split('T')[0]);
+        .gte('date', new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 
       if (error) {
         console.error("Error fetching doctor schedule:", error.message);
         Alert.alert(t('error_title'), t('failed_to_load_schedule'));
-        setScheduleData(generateSchedule());
+        setScheduleData(generateSchedule(timezone));
         return;
       }
 
       const fetchedSlots = {};
       if (Array.isArray(data)) {
         data.forEach(item => {
-          const formattedTimeSlot = item.time_slot.substring(0, 5);
-          const slotId = `${item.date}-${formattedTimeSlot}`;
+          const slotId = `${item.date}-${item.time_slot}`;
           fetchedSlots[slotId] = true;
         });
       } else {
@@ -120,16 +225,16 @@ const ConsultationTime = ({ route }) => {
 
       console.log("Fetched slots from DB (fetchedSlots object):", fetchedSlots);
       setDoctorAvailableSlots(fetchedSlots);
-      setScheduleData(generateSchedule());
+      setScheduleData(generateSchedule(timezone));
       console.log("Doctor schedule fetched and states updated.");
     } catch (err) {
       console.error("Catch error fetching doctor schedule:", err.message);
       Alert.alert(t('error_title'), t('failed_to_load_schedule'));
-      setScheduleData(generateSchedule());
+      setScheduleData(generateSchedule(timezone));
     } finally {
       setLoading(false);
     }
-  }, [doctorId, t, generateSchedule]);
+  }, [doctorId, t, generateSchedule, fetchDoctorTimezone]);
 
   useEffect(() => {
     fetchDoctorSchedule();
@@ -177,7 +282,7 @@ const ConsultationTime = ({ route }) => {
 
       console.log("Slots prepared for insertion:", slotsToSave);
 
-      const todayDateString = new Date().toISOString().split('T')[0];
+      const todayDateString = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       console.log(`Deleting doctor's availability for doctor_id: ${doctorId} from date: ${todayDateString}`);
       const { error: deleteError } = await supabase
         .from('doctor_availability')
@@ -218,7 +323,6 @@ const ConsultationTime = ({ route }) => {
     navigation.goBack();
   };
 
-  // Інтерполяція для обертання
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -246,7 +350,7 @@ const ConsultationTime = ({ route }) => {
         >
 
           <LinearGradient
-            colors={['#0EB3EB', '#0A8BA6']} // Gradient colors for save button
+            colors={['#0EB3EB', '#0A8BA6']}
             style={styles.saveButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -270,7 +374,6 @@ const ConsultationTime = ({ route }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              {/* Анімована іконка розкладу (зараз time-outline, постійно анімується) */}
               <Animated.View style={[styles.iconContainer, { transform: [{ rotate }] }]}>
                 <Ionicons name="time-outline" size={32} color="#0EB3EB" />
               </Animated.View>
@@ -278,7 +381,6 @@ const ConsultationTime = ({ route }) => {
               <View style={styles.slotsContainer}>
                 {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
                   const isSlotSelected = doctorAvailableSlots[slot.id];
-                  console.log(`Slot ID: ${slot.id}, isSlotSelected: ${isSlotSelected}`);
                   return (
                     <TouchableOpacity
                       key={slot.id}
@@ -337,18 +439,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
     paddingTop: 50,
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderBottomWidth: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, // iOS shadow
-    shadowRadius: 4, // iOS shadow
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     ...Platform.select({
       android: {
-        elevation: 0.8, // Almost invisible shadow for Android
+        elevation: 0.8,
       },
     }),
   },
@@ -378,11 +479,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#0EB3EB',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, // iOS shadow
-    shadowRadius: 6, // iOS shadow
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
     ...Platform.select({
       android: {
-        elevation: 1, // Subtle shadow for Android save button
+        elevation: 1,
       },
     }),
   },
@@ -406,11 +507,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15, // iOS shadow
-    shadowRadius: 8, // iOS shadow
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
     ...Platform.select({
       android: {
-        elevation: 1, // Subtle shadow for Android cards
+        elevation: 1,
       },
     }),
     overflow: 'hidden',
@@ -420,12 +521,10 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    alignItems: 'center', // Центруємо вміст, щоб іконка була по центру зверху
-    // backdropFilter is web-specific, native platforms rely on transparent backgrounds and shadows
+    alignItems: 'center',
   },
-  // Стиль для обгортки анімованої іконки
   iconContainer: {
-    marginBottom: 10, // Відступ від тексту заголовка дня
+    marginBottom: 10,
   },
   dayHeader: {
     fontSize: 19,
@@ -446,11 +545,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, // iOS shadow
-    shadowRadius: 3, // iOS shadow
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
     ...Platform.select({
       android: {
-        elevation: 0.8, // Subtle shadow for Android time slots
+        elevation: 0.8,
       },
     }),
   },

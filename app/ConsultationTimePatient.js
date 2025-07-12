@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
 
+const CONSULTATION_DURATION_MINUTES = 45;
 const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor';
 
 const ConsultationTimePatient = ({ route }) => {
@@ -29,6 +31,7 @@ const ConsultationTimePatient = ({ route }) => {
 
   const [patientId, setPatientId] = useState(null);
   const [patientProfile, setPatientProfile] = useState(null);
+  const [patientTimezone, setPatientTimezone] = useState(null);
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
@@ -36,13 +39,14 @@ const ConsultationTimePatient = ({ route }) => {
   const [doctorAvailableSlotsMap, setDoctorAvailableSlotsMap] = useState({});
   const [allBookedSlotsMap, setAllBookedSlotsMap] = useState({});
   const [myBookingsMap, setMyBookingsMap] = useState({});
-  
-  // Зміни тут: Новий стан для зберігання ціни консультації лікаря
-  const [doctorConsultationCost, setDoctorConsultationCost] = useState(null); 
+
+  const [doctorConsultationCost, setDoctorConsultationCost] = useState(null);
 
   const [selectedSlots, setSelectedSlots] = useState([]);
 
+  // useEffect для отримання сесії пацієнта та його профілю
   useEffect(() => {
+    console.count('useEffect - getPatientSessionAndProfile call');
     const getPatientSessionAndProfile = async () => {
       setLoading(true);
       try {
@@ -62,7 +66,7 @@ const ConsultationTimePatient = ({ route }) => {
 
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, country_timezone')
           .eq('user_id', session.user.id)
           .single();
         if (profileError) {
@@ -70,14 +74,34 @@ const ConsultationTimePatient = ({ route }) => {
         }
         if (profileData) {
           setPatientProfile(profileData);
+          let tz = profileData.country_timezone;
+
+          // Логіка визначення часової зони пацієнта
+          if (tz && tz.startsWith('UTC')) {
+              console.warn(`Patient timezone is ${profileData.country_timezone}, which might not be an IANA format. Attempting to map or fallback.`);
+              if (profileData.country_timezone === 'UTC+10') {
+                  tz = 'Australia/Brisbane';
+              } else if (profileData.country_timezone === 'UTC+2' || profileData.country_timezone === 'UTC+3') {
+                  tz = 'Europe/Kiev';
+              }
+              // Якщо після мапування все ще UTC-формат або мапування не відбулося
+              if (!tz || tz.startsWith('UTC+')) {
+                 tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                 console.warn(`No specific IANA mapping found for ${profileData.country_timezone}. Falling back to system timezone: ${tz}`);
+              }
+          } else if (!tz) { // Якщо country_timezone порожній або null
+              tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              console.warn(`Patient country_timezone is empty/null. Falling back to system timezone: ${tz}`);
+          }
+          setPatientTimezone(tz); // Встановлюємо часову зону тут, тільки після її визначення
           console.log("Patient profile:", profileData);
+          console.log("Patient timezone (resolved):", tz);
         } else {
           console.warn("Patient profile not found for ID:", session.user.id);
           Alert.alert(t('error'), t('failed_to_get_patient_profile_data'));
           navigation.goBack();
         }
 
-        // Зміни тут: Отримання consultation_cost лікаря
         const { data: doctorProfileData, error: doctorProfileError } = await supabase
           .from('anketa_doctor')
           .select('consultation_cost')
@@ -86,19 +110,15 @@ const ConsultationTimePatient = ({ route }) => {
 
         if (doctorProfileError) {
           console.error("Error fetching doctor consultation cost:", doctorProfileError);
-          // Можливо, ви захочете встановити ціну за замовчуванням або повідомити користувача
-          setDoctorConsultationCost(0); // Встановлюємо 0 або значення за замовчуванням
+          setDoctorConsultationCost(0);
           Alert.alert(t('error'), t('failed_to_get_doctor_cost'));
         } else if (doctorProfileData) {
           setDoctorConsultationCost(doctorProfileData.consultation_cost);
           console.log("Doctor consultation cost:", doctorProfileData.consultation_cost);
         } else {
-          // Якщо лікаря знайдено, але вартість відсутня
-          setDoctorConsultationCost(0); // Або інше значення за замовчуванням
+          setDoctorConsultationCost(0);
           console.warn("Doctor profile found, but consultation_cost is null/undefined.");
         }
-
-
       } catch (err) {
         console.error("Error getting user session or patient profile:", err.message);
         Alert.alert(t('error'), t('failed_to_get_user_info_or_profile'));
@@ -108,38 +128,89 @@ const ConsultationTimePatient = ({ route }) => {
       }
     };
     getPatientSessionAndProfile();
-  }, [t, navigation, doctorId]); // Додаємо doctorId в залежності
+  }, [t, navigation, doctorId]);
 
+  // generateSchedule без date-fns
   const generateSchedule = useCallback(() => {
-    const today = new Date();
-    const days = [];
+    console.count('generateSchedule call');
+    const schedule = [];
+    const now = new Date();
+    const currentLocale = i18n.language;
+
+    // ВИПРАВЛЕНО: patientTimezone тепер не буде null тут, якщо викликається після його встановлення
+    // Однак, все одно краще мати запасний варіант
+    const targetTimezone = patientTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: targetTimezone });
+    } catch (e) {
+        console.error(`Invalid timezone "${targetTimezone}" detected in generateSchedule. Falling back to system timezone.`, e);
+        const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        // Запобігаємо нескінченній рекурсії, якщо системна TZ теж "не працює"
+        if (targetTimezone !== systemTimezone) {
+            return generateSchedule(systemTimezone); // Виклик з запасним варіантом (це теоретично може бути нескінченно, але дуже рідко)
+        }
+        return [];
+    }
+
+    console.log("Using target timezone for display:", targetTimezone);
+
     for (let i = 0; i < 14; i++) {
-      const currentDay = new Date(today);
-      currentDay.setDate(today.getDate() + i);
+      const currentDay = new Date(now);
+      currentDay.setDate(now.getDate() + i);
+      currentDay.setHours(0, 0, 0, 0);
 
-      const options = { weekday: 'long', day: 'numeric', month: 'long' };
-      const displayDate = new Intl.DateTimeFormat(i18n.language, options).format(currentDay);
-      const dateString = currentDay.toISOString().split('T')[0];
+      const displayDateOptions = { weekday: 'long', day: 'numeric', month: 'long', timeZone: targetTimezone };
+      const displayDate = new Intl.DateTimeFormat(currentLocale, displayDateOptions).format(currentDay);
 
-      const slots = [];
-      for (let hour = 9; hour <= 17; hour++) {
-        const startHour = String(hour).padStart(2, '0');
-        const slotId = `${dateString}-${startHour}:00`;
-        slots.push({
-          time: `${startHour}:00-${String(hour + 1).padStart(2, '0')}:00`,
-          id: slotId,
-          date: dateString,
-          rawTime: `${startHour}:00`,
-        });
+      const year = currentDay.getFullYear();
+      const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDay.getDate()).padStart(2, '0');
+      const dateStringForDB = `${year}-${month}-${day}`;
+
+      const daySlots = [];
+
+      for (let hour = 9; hour < 18; hour++) {
+        for (let minute = 0; minute < 60; minute += CONSULTATION_DURATION_MINUTES) {
+          const startTime = new Date(currentDay);
+          startTime.setHours(hour, minute, 0, 0);
+
+          const endTime = new Date(startTime.getTime() + CONSULTATION_DURATION_MINUTES * 60 * 1000);
+
+          if (endTime.getTime() <= now.getTime()) {
+            continue;
+          }
+
+          if (startTime.getHours() >= 18) continue;
+          if (endTime.getHours() >= 18 && endTime.getMinutes() > 0) continue;
+
+          const timeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: targetTimezone };
+          const displayStartTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(startTime);
+          const displayEndTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(endTime);
+          const displayTime = `${displayStartTime} - ${displayEndTime}`;
+
+          const rawTimeForDB = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}:${String(startTime.getSeconds()).padStart(2, '0')}`;
+
+          const slotId = `${dateStringForDB}-${rawTimeForDB}`;
+
+          daySlots.push({
+            time: displayTime,
+            id: slotId,
+            date: dateStringForDB,
+            rawTime: rawTimeForDB,
+            startTimeUtc: startTime.toISOString(),
+            endTimeUtc: endTime.toISOString(),
+          });
+        }
       }
-      days.push({
+      schedule.push({
         date: currentDay,
         displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
-        slots: slots,
+        slots: daySlots,
       });
     }
 
-    const allGeneratedSlotIds = days.flatMap(day => day.slots.map(slot => slot.id));
+    const allGeneratedSlotIds = schedule.flatMap(day => day.slots.map(slot => slot.id));
     const uniqueGeneratedSlotIds = new Set(allGeneratedSlotIds);
     if (allGeneratedSlotIds.length !== uniqueGeneratedSlotIds.size) {
       const duplicateIds = allGeneratedSlotIds.filter((item, index) => allGeneratedSlotIds.indexOf(item) !== index);
@@ -148,15 +219,16 @@ const ConsultationTimePatient = ({ route }) => {
       console.log("All generated slot IDs are unique as expected.");
     }
 
-    console.log("Schedule generated for patient:", days);
-    return days;
-  }, [i18n.language]);
+    console.log("Generated schedule for patient display:", schedule);
+    return schedule;
+  }, [patientTimezone, i18n.language]);
 
   const fetchAvailableSlotsAndBookings = useCallback(async () => {
-    if (!doctorId || !patientId) {
-      console.warn("Missing doctorId or patientId. Cannot fetch slots for booking.");
+    console.count('fetchAvailableSlotsAndBookings call');
+    if (!doctorId || !patientId || patientTimezone === null) {
+      console.warn("Missing doctorId, patientId, or patientTimezone. Cannot fetch slots for booking.");
       setLoading(false);
-      setScheduleData(generateSchedule());
+      setScheduleData(generateSchedule()); // Генеруємо розклад навіть при відсутності даних, але без фільтрації доступності
       return;
     }
     setLoading(true);
@@ -164,7 +236,7 @@ const ConsultationTimePatient = ({ route }) => {
     try {
       const { data: doctorAvailData, error: doctorAvailError } = await supabase
         .from('doctor_availability')
-        .select('date, time_slot')
+        .select('date, time_slot, doctor_id')
         .eq('doctor_id', doctorId)
         .gte('date', new Date().toISOString().split('T')[0]);
 
@@ -173,8 +245,7 @@ const ConsultationTimePatient = ({ route }) => {
       const availMap = {};
       if (Array.isArray(doctorAvailData)) {
         doctorAvailData.forEach(item => {
-          const formattedTimeSlot = item.time_slot.substring(0, 5);
-          const slotId = `${item.date}-${formattedTimeSlot}`;
+          const slotId = `${item.date}-${item.time_slot}`;
           availMap[slotId] = true;
         });
       }
@@ -193,8 +264,7 @@ const ConsultationTimePatient = ({ route }) => {
       const myBookings = {};
       if (Array.isArray(bookedData)) {
         bookedData.forEach(item => {
-          const formattedTimeSlot = item.booking_time_slot.substring(0, 5);
-          const slotId = `${item.booking_date}-${formattedTimeSlot}`;
+          const slotId = `${item.booking_date}-${item.booking_time_slot}`;
           allBookedMap[slotId] = true;
           if (item.patient_id === patientId) {
             myBookings[slotId] = true;
@@ -206,7 +276,7 @@ const ConsultationTimePatient = ({ route }) => {
       console.log("All booked slots map:", allBookedMap);
       console.log("My bookings map:", myBookings);
 
-      setScheduleData(generateSchedule());
+      setScheduleData(generateSchedule()); // Оновлюємо розклад після отримання даних
     } catch (err) {
       console.error("Error fetching slots for booking:", err.message);
       Alert.alert(t('error'), t('failed_to_load_slots_for_booking'));
@@ -214,14 +284,16 @@ const ConsultationTimePatient = ({ route }) => {
     } finally {
       setLoading(false);
     }
-  }, [doctorId, patientId, t, generateSchedule]);
+  }, [doctorId, patientId, patientTimezone, t, generateSchedule]);
 
+  // Цей useEffect тепер спрацьовує тільки тоді, коли всі необхідні дані для вибірки готові.
+  // patientTimezone встановлюється лише один раз у першому useEffect.
   useEffect(() => {
-    // Тригер для завантаження доступних слотів та бронювань
-    if (doctorId && patientId && patientProfile?.full_name) {
+    console.count('useEffect - fetchAvailableSlotsAndBookings trigger (corrected)');
+    if (doctorId && patientId && patientTimezone) { // patientTimezone має бути встановлений
       fetchAvailableSlotsAndBookings();
     }
-  }, [doctorId, patientId, patientProfile, fetchAvailableSlotsAndBookings]);
+  }, [doctorId, patientId, patientTimezone, fetchAvailableSlotsAndBookings]);
 
 
   const handleSlotPress = (slot) => {
@@ -243,15 +315,13 @@ const ConsultationTimePatient = ({ route }) => {
       if (isAlreadySelected) {
         return prevSelectedSlots.filter(s => s.id !== slot.id);
       } else {
-        return [...prevSelectedSlots, slot];
+        return [slot];
       }
     });
     console.log(`Slot ${slot.id} selection toggled. Current selectedSlots:`, selectedSlots.map(s => s.id));
   };
 
 
-  // --- ФУНКЦІЯ: Виклик Edge Function для надсилання сповіщення лікарю ---
-  // Додано параметр `amount`
   const sendNotificationViaEdgeFunction = async (doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId, amount) => {
     console.log("Calling Edge Function with:", { doctorId, patientFullName, bookingDate, bookingTimeSlot, bookingId, patientId, amount });
     try {
@@ -271,7 +341,9 @@ const ConsultationTimePatient = ({ route }) => {
           booking_time_slot: bookingTimeSlot,
           booking_id: bookingId,
           patient_id: patientId,
-          amount: amount // <-- Передаємо amount
+          amount: amount,
+          consultation_duration_minutes: CONSULTATION_DURATION_MINUTES,
+          patient_timezone: patientTimezone,
         }),
       });
 
@@ -303,53 +375,42 @@ const ConsultationTimePatient = ({ route }) => {
     }
   };
 
-  // --- ФУНКЦІЯ: Бронювання обраних слотів ---
   const bookSelectedSlots = async () => {
     if (selectedSlots.length === 0) {
       Alert.alert(t('no_slot_selected'), t('please_select_a_slot_to_book'));
       return;
     }
-    if (!patientId) {
-      Alert.alert(t('error'), t('user_not_logged_in_cannot_book'));
+    if (!patientId || !doctorId || !patientProfile || !patientProfile.full_name || patientTimezone === null) {
+      Alert.alert(t('error'), t('missing_booking_info'));
       return;
     }
-    if (!doctorId) {
-      Alert.alert(t('error'), t('doctor_id_missing_cannot_book'));
-      return;
-    }
-    if (!patientProfile || !patientProfile.full_name) {
-      Alert.alert(t('error'), t('failed_to_get_patient_name'));
-      console.error("Patient full_name is missing from profile. Cannot send notification.");
-      return;
-    }
-    
-    // Зміни тут: Перевіряємо, чи отримано ціну консультації
+
     if (doctorConsultationCost === null) {
       Alert.alert(t('error'), t('consultation_cost_not_loaded_yet'));
-      // Можливо, перезапустити завантаження або попросити користувача повторити спробу
-      await fetchDoctorDataAndCost(); // Спробувати завантажити ще раз
       return;
     }
-    // Якщо cost === 0, можна запитати підтвердження, чи це безкоштовно
     if (doctorConsultationCost === 0) {
-      Alert.alert(t('attention'), t('this_consultation_is_free_confirm_booking'));
-      // Або додати діалог підтвердження
+      Alert.alert(t('attention'), t('this_consultation_is_free_confirm_booking'), [
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('confirm'), onPress: () => processBookingAfterConfirmation() }
+      ]);
+      return;
     }
 
+    processBookingAfterConfirmation();
+  };
 
+  const processBookingAfterConfirmation = async () => {
     setBooking(true);
     let successfulBookingsCount = 0;
     const errors = [];
     const patientFullName = patientProfile.full_name;
-
-    // Зміни тут: Використовуємо doctorConsultationCost замість TEST_BOOKING_AMOUNT
-    const bookingAmount = doctorConsultationCost; 
+    const bookingAmount = doctorConsultationCost;
 
     for (const slot of selectedSlots) {
       try {
         console.log(`Attempting to book slot ${slot.id} for doctorId: ${doctorId}, patientId: ${patientId} with amount: ${bookingAmount}`);
 
-        // 1. Перевірка доступності слота в останній момент
         const { data: currentAvail, error: availCheckError } = await supabase
           .from('doctor_availability')
           .select('id')
@@ -366,7 +427,6 @@ const ConsultationTimePatient = ({ route }) => {
           throw availCheckError || new Error(t('slot_no_longer_available_by_doctor'));
         }
 
-        // 2. Перевірка, чи не заброньовано слот кимось іншим
         const { data: currentBookings, error: bookingCheckError } = await supabase
           .from('patient_bookings')
           .select('id, patient_id')
@@ -390,7 +450,10 @@ const ConsultationTimePatient = ({ route }) => {
           }
         }
 
-        // 3. Вставка нового бронювання
+        const bookingEndTime = new Date(slot.endTimeUtc);
+        const bookingEndTimeFormatted = `${String(bookingEndTime.getHours()).padStart(2, '0')}:${String(bookingEndTime.getMinutes()).padStart(2, '0')}:${String(bookingEndTime.getSeconds()).padStart(2, '0')}`;
+
+
         const { data: newBookingData, error: insertError } = await supabase
           .from('patient_bookings')
           .insert({
@@ -398,8 +461,11 @@ const ConsultationTimePatient = ({ route }) => {
             doctor_id: doctorId,
             booking_date: slot.date,
             booking_time_slot: slot.rawTime,
+            // booking_end_time: bookingEndTimeFormatted,
             status: 'pending',
-            amount: bookingAmount, // <-- Використовуємо doctorConsultationCost
+            amount: bookingAmount,
+            consultation_duration_minutes: CONSULTATION_DURATION_MINUTES,
+            patient_timezone: patientTimezone,
           })
           .select()
           .single();
@@ -409,7 +475,6 @@ const ConsultationTimePatient = ({ route }) => {
         const newBookingId = newBookingData.id;
         console.log("New booking successfully created with ID:", newBookingId);
 
-        // 4. Виклик Edge Function для надсилання сповіщення
         const notificationSent = await sendNotificationViaEdgeFunction(
           doctorId,
           patientFullName,
@@ -417,7 +482,7 @@ const ConsultationTimePatient = ({ route }) => {
           slot.rawTime,
           newBookingId,
           patientId,
-          bookingAmount // <-- Передаємо bookingAmount до Edge Function
+          bookingAmount
         );
 
         if (notificationSent) {
@@ -448,8 +513,7 @@ const ConsultationTimePatient = ({ route }) => {
     }
 
     setSelectedSlots([]);
-    fetchAvailableSlotsAndBookings(); // Оновити стан слотів після бронювання
-
+    fetchAvailableSlotsAndBookings();
     setBooking(false);
   };
 
@@ -567,6 +631,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
+    paddingTop: Platform.OS === "android"
+      ? (StatusBar.currentHeight || 0) + 10
+      : (StatusBar.currentHeight || 0) + 15,
   },
   loadingContainer: {
     flex: 1,
@@ -580,7 +647,6 @@ const styles = StyleSheet.create({
     color: '#555',
   },
   header: {
-    backgroundColor: '#FFFFFF',
     paddingTop: 50,
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -682,61 +748,59 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    elevation: 3,
-    justifyContent: 'center',
-    minHeight: 65,
-  },
-  timeSlotText: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 18,
+    elevation: 2,
   },
   timeSlotButtonAvailable: {
-    backgroundColor: 'rgba(240, 240, 240, 0.7)',
-    borderColor: 'rgba(224, 224, 224, 0.7)',
+    backgroundColor: '#E0F7FA', // Light blue/cyan
+    borderColor: '#0EB3EB',
   },
   timeSlotTextAvailable: {
-    color: '#757575',
+    color: '#0EB3EB',
+    fontWeight: '500',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  timeSlotButtonBookedByMe: {
+    backgroundColor: '#D1FAE5', // Light green
+    borderColor: '#06D6A0',
+  },
+  timeSlotTextBooked: {
+    color: '#06D6A0',
+    fontWeight: '500',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  timeSlotButtonBookedByOther: {
+    backgroundColor: '#FFE0B2', // Light orange
+    borderColor: '#FF9800',
+    opacity: 0.6,
+  },
+  timeSlotTextBookedByOther: {
+    color: '#FF9800',
+    fontWeight: '500',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  timeSlotButtonUnavailableByDoctor: {
+    backgroundColor: '#FBE9E7', // Light red
+    borderColor: '#FF7043',
+    opacity: 0.6,
+  },
+  timeSlotTextUnavailableByDoctor: {
+    color: '#FF7043',
+    fontWeight: '500',
+    fontSize: 13,
+    textAlign: 'center',
   },
   timeSlotButtonSelected: {
-    backgroundColor: '#0EB3EB',
-    borderColor: '#0A8BA6',
-    shadowColor: '#0EB3EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
+    backgroundColor: '#0EB3EB', // Blue
+    borderColor: '#0A84FF',
   },
   timeSlotTextSelected: {
     color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  timeSlotButtonBookedByOther: {
-    backgroundColor: 'rgba(52, 152, 219, 0.6)',
-    borderColor: 'rgba(41, 128, 185, 0.6)',
-  },
-  timeSlotButtonBookedByMe: {
-    backgroundColor: '#0EB3EB',
-    borderColor: '#0A8BA6',
-    shadowColor: '#0EB3EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
-  },
-  timeSlotTextBooked: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  timeSlotButtonUnavailableByDoctor: {
-    backgroundColor: 'rgba(247, 247, 247, 0.3)',
-    borderColor: 'rgba(224, 224, 224, 0.3)',
-    opacity: 0.4,
-  },
-  timeSlotTextUnavailableByDoctor: {
-    color: '#C0C0C0',
-    fontWeight: '500',
+    fontWeight: 'bold',
+    fontSize: 13,
+    textAlign: 'center',
   },
 });
 
