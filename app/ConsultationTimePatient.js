@@ -1,3 +1,5 @@
+import "react-native-url-polyfill/auto"; // Залишаємо для Supabase
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -20,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 3;
 
+// ЗМІНЕНО: Константа тривалості консультації залишається
 const CONSULTATION_DURATION_MINUTES = 45;
 const SUPABASE_NOTIFY_DOCTOR_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor';
 
@@ -130,86 +133,109 @@ const ConsultationTimePatient = ({ route }) => {
     getPatientSessionAndProfile();
   }, [t, navigation, doctorId]);
 
-  // generateSchedule без date-fns
+  // generateSchedule БЕЗ date-fns, ЗМІНЕНО ДЛЯ ГОДИННИХ СЛОТІВ
   const generateSchedule = useCallback(() => {
     console.count('generateSchedule call');
     const schedule = [];
-    const now = new Date();
+    const now = new Date(); // Поточний час пристрою (для фільтрації минулих слотів)
     const currentLocale = i18n.language;
 
-    // ВИПРАВЛЕНО: patientTimezone тепер не буде null тут, якщо викликається після його встановлення
-    // Однак, все одно краще мати запасний варіант
     const targetTimezone = patientTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     try {
+        // Просто перевірка, чи часова зона дійсна
         new Intl.DateTimeFormat('en-US', { timeZone: targetTimezone });
     } catch (e) {
         console.error(`Invalid timezone "${targetTimezone}" detected in generateSchedule. Falling back to system timezone.`, e);
         const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        // Запобігаємо нескінченній рекурсії, якщо системна TZ теж "не працює"
-        if (targetTimezone !== systemTimezone) {
-            return generateSchedule(systemTimezone); // Виклик з запасним варіантом (це теоретично може бути нескінченно, але дуже рідко)
+        if (targetTimezone !== systemTimezone) { // Якщо вже повернулися до системної, і вона теж не працює
+            return [];
         }
         return [];
     }
 
     console.log("Using target timezone for display:", targetTimezone);
 
-    for (let i = 0; i < 14; i++) {
-      const currentDay = new Date(now);
-      currentDay.setDate(now.getDate() + i);
-      currentDay.setHours(0, 0, 0, 0);
+    let todayYear, todayMonth, todayDay;
+    try {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            timeZone: targetTimezone,
+        });
+        const parts = formatter.formatToParts(now);
+        todayYear = parseInt(parts.find(p => p.type === 'year').value, 10);
+        todayMonth = parseInt(parts.find(p => p.type === 'month').value, 10) - 1;
+        todayDay = parseInt(parts.find(p => p.type === 'day').value, 10);
+    } catch (e) {
+        console.error("Error determining 'today' in target timezone:", e);
+        Alert.alert(t('error'), t('failed_to_determine_current_date_in_timezone'));
+        return [];
+    }
+
+    for (let i = 0; i < 14; i++) { // На 14 днів вперед
+      // Створюємо новий об'єкт Date, що представляє початок цього дня в UTC
+      const currentDay = new Date(Date.UTC(todayYear, todayMonth, todayDay + i, 0, 0, 0));
 
       const displayDateOptions = { weekday: 'long', day: 'numeric', month: 'long', timeZone: targetTimezone };
       const displayDate = new Intl.DateTimeFormat(currentLocale, displayDateOptions).format(currentDay);
 
-      const year = currentDay.getFullYear();
-      const month = String(currentDay.getMonth() + 1).padStart(2, '0');
-      const day = String(currentDay.getDate()).padStart(2, '0');
+      const year = currentDay.getUTCFullYear();
+      const month = String(currentDay.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(currentDay.getUTCDate()).padStart(2, '0');
       const dateStringForDB = `${year}-${month}-${day}`;
 
       const daySlots = [];
 
-      for (let hour = 9; hour < 18; hour++) {
-        for (let minute = 0; minute < 60; minute += CONSULTATION_DURATION_MINUTES) {
-          const startTime = new Date(currentDay);
-          startTime.setHours(hour, minute, 0, 0);
+      // ЗМІНЕНО: Цикл тепер генерує слоти тільки на початку кожної години
+      for (let hour = 0; hour < 24; hour++) {
+        const minute = 0; // Завжди починаємо з 00 хвилин для кожного часу
 
-          const endTime = new Date(startTime.getTime() + CONSULTATION_DURATION_MINUTES * 60 * 1000);
+        // Створюємо startTime на основі UTC-компонентів поточного дня та потрібної години/хвилини
+        const startTime = new Date(Date.UTC(year, currentDay.getUTCMonth(), currentDay.getUTCDate(), hour, minute, 0));
 
-          if (endTime.getTime() <= now.getTime()) {
-            continue;
-          }
+        // Розраховуємо час закінчення консультації
+        const endTime = new Date(startTime.getTime() + CONSULTATION_DURATION_MINUTES * 60 * 1000);
 
-          if (startTime.getHours() >= 18) continue;
-          if (endTime.getHours() >= 18 && endTime.getMinutes() > 0) continue;
-
-          const timeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: targetTimezone };
-          const displayStartTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(startTime);
-          const displayEndTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(endTime);
-          const displayTime = `${displayStartTime} - ${displayEndTime}`;
-
-          const rawTimeForDB = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}:${String(startTime.getSeconds()).padStart(2, '0')}`;
-
-          const slotId = `${dateStringForDB}-${rawTimeForDB}`;
-
-          daySlots.push({
-            time: displayTime,
-            id: slotId,
-            date: dateStringForDB,
-            rawTime: rawTimeForDB,
-            startTimeUtc: startTime.toISOString(),
-            endTimeUtc: endTime.toISOString(),
-          });
+        // Фільтруємо слоти, які вже минули (порівнюємо з поточним часом пристрою)
+        if (endTime.getTime() <= now.getTime()) { // Перевіряємо, чи endTime вже минув відносно поточного часу пристрою
+          continue;
         }
+
+        // Форматування часу для відображення
+        const timeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: targetTimezone };
+        const displayStartTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(startTime);
+        const displayEndTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(endTime);
+        const displayTime = `${displayStartTime} - ${displayEndTime}`;
+
+        // Форматування часу для бази даних
+        // Використовуємо hour/minute прямо, оскільки вони вже представляють час у "цільовому" контексті,
+        // а сама дата вже в UTC.
+        const rawTimeForDB = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+
+        const slotId = `${dateStringForDB}-${rawTimeForDB}`;
+
+        daySlots.push({
+          time: displayTime,
+          id: slotId,
+          date: dateStringForDB,
+          rawTime: rawTimeForDB,
+          startTimeUtc: startTime.toISOString(), // UTC ISO string
+          endTimeUtc: endTime.toISOString(),     // UTC ISO string
+        });
       }
-      schedule.push({
-        date: currentDay,
-        displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
-        slots: daySlots,
-      });
+      // Додаємо день до розкладу, лише якщо в ньому є доступні слоти
+      if (daySlots.length > 0) {
+        schedule.push({
+          date: currentDay,
+          displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
+          slots: daySlots,
+        });
+      }
     }
 
+    // Перевірка на дублікати (важливо для унікальності ID слотів)
     const allGeneratedSlotIds = schedule.flatMap(day => day.slots.map(slot => slot.id));
     const uniqueGeneratedSlotIds = new Set(allGeneratedSlotIds);
     if (allGeneratedSlotIds.length !== uniqueGeneratedSlotIds.size) {
@@ -219,7 +245,7 @@ const ConsultationTimePatient = ({ route }) => {
       console.log("All generated slot IDs are unique as expected.");
     }
 
-    console.log("Generated schedule for patient display:", schedule);
+    console.log("Generated schedule for patient display (hourly slots):", schedule);
     return schedule;
   }, [patientTimezone, i18n.language]);
 
@@ -238,7 +264,7 @@ const ConsultationTimePatient = ({ route }) => {
         .from('doctor_availability')
         .select('date, time_slot, doctor_id')
         .eq('doctor_id', doctorId)
-        .gte('date', new Date().toISOString().split('T')[0]);
+        .gte('date', new Date().toISOString().split('T')[0]); // Фільтруємо за поточною датою
 
       if (doctorAvailError) throw doctorAvailError;
 
@@ -461,7 +487,7 @@ const ConsultationTimePatient = ({ route }) => {
             doctor_id: doctorId,
             booking_date: slot.date,
             booking_time_slot: slot.rawTime,
-            // booking_end_time: bookingEndTimeFormatted,
+            // booking_end_time: bookingEndTimeFormatted, // Закоментовано, якщо не потрібно
             status: 'pending',
             amount: bookingAmount,
             consultation_duration_minutes: CONSULTATION_DURATION_MINUTES,
@@ -558,70 +584,75 @@ const ConsultationTimePatient = ({ route }) => {
       </View>
 
       <ScrollView style={styles.scrollViewContent}>
-        {Array.isArray(scheduleData) && scheduleData.map((dayData, dayIndex) => (
-          <View key={dayIndex} style={styles.dayCardOuter}>
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)']}
-              style={styles.dayContainerInner}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
-              <View style={styles.slotsContainer}>
-                {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
-                  const isAvailableByDoctor = doctorAvailableSlotsMap[slot.id];
-                  const isBookedByOther = allBookedSlotsMap[slot.id] && !myBookingsMap[slot.id];
-                  const isMyBooking = myBookingsMap[slot.id];
-                  const isSelectedForBooking = selectedSlots.some(s => s.id === slot.id);
+        {Array.isArray(scheduleData) && scheduleData.length > 0 ? (
+          scheduleData.map((dayData, dayIndex) => (
+            <View key={dayIndex} style={styles.dayCardOuter}>
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)']}
+                style={styles.dayContainerInner}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
+                <View style={styles.slotsContainer}>
+                  {Array.isArray(dayData.slots) && dayData.slots.map((slot) => {
+                    const isAvailableByDoctor = doctorAvailableSlotsMap[slot.id];
+                    const isBookedByOther = allBookedSlotsMap[slot.id] && !myBookingsMap[slot.id];
+                    const isMyBooking = myBookingsMap[slot.id];
+                    const isSelectedForBooking = selectedSlots.some(s => s.id === slot.id);
 
-                  let buttonStyle = [styles.timeSlotButton];
-                  let textStyle = [styles.timeSlotText];
-                  let isDisabled = true;
-                  let slotLabel = slot.time;
+                    let buttonStyle = [styles.timeSlotButton];
+                    let textStyle = [styles.timeSlotText];
+                    let isDisabled = true;
+                    let slotLabel = slot.time; // Use the already formatted time from generateSchedule
 
-                  if (isMyBooking) {
-                    buttonStyle.push(styles.timeSlotButtonBookedByMe);
-                    textStyle.push(styles.timeSlotTextBooked);
-                    isDisabled = false;
-                    slotLabel = `${slot.time}\n(${t('booked')})`;
-                  } else if (isBookedByOther) {
-                    buttonStyle.push(styles.timeSlotButtonBookedByOther);
-                    textStyle.push(styles.timeSlotTextBooked);
-                    isDisabled = true;
-                    slotLabel = `${slot.time}\n(${t('booked_by_other')})`;
-                  } else if (isAvailableByDoctor) {
-                    buttonStyle.push(styles.timeSlotButtonAvailable);
-                    textStyle.push(styles.timeSlotTextAvailable);
-                    isDisabled = false;
-                  } else {
-                    buttonStyle.push(styles.timeSlotButtonUnavailableByDoctor);
-                    textStyle.push(styles.timeSlotTextUnavailableByDoctor);
-                    isDisabled = true;
-                    slotLabel = `${slot.time}\n(${t('unavailable')})`;
-                  }
+                    if (isMyBooking) {
+                      buttonStyle.push(styles.timeSlotButtonBookedByMe);
+                      textStyle.push(styles.timeSlotTextBooked);
+                      isDisabled = false; // You can tap on your own booking
+                      slotLabel = `${slot.time}\n(${t('booked')})`;
+                    } else if (isBookedByOther) {
+                      buttonStyle.push(styles.timeSlotButtonBookedByOther);
+                      textStyle.push(styles.timeSlotTextBooked);
+                      isDisabled = true; // Cannot tap if booked by other
+                      slotLabel = `${slot.time}\n(${t('booked_by_other')})`;
+                    } else if (isAvailableByDoctor) {
+                      buttonStyle.push(styles.timeSlotButtonAvailable);
+                      textStyle.push(styles.timeSlotTextAvailable);
+                      isDisabled = false; // Can tap if available
+                    } else {
+                      buttonStyle.push(styles.timeSlotButtonUnavailableByDoctor);
+                      textStyle.push(styles.timeSlotTextUnavailableByDoctor);
+                      isDisabled = true; // Cannot tap if unavailable by doctor
+                      slotLabel = `${slot.time}\n(${t('unavailable')})`;
+                    }
 
-                  if (isSelectedForBooking && !isMyBooking) {
-                    buttonStyle.push(styles.timeSlotButtonSelected);
-                    textStyle.push(styles.timeSlotTextSelected);
-                  }
+                    if (isSelectedForBooking && !isMyBooking) {
+                      // If it's selected and not your own booking (which can't be "selected" for new booking)
+                      buttonStyle.push(styles.timeSlotButtonSelected);
+                      textStyle.push(styles.timeSlotTextSelected);
+                    }
 
-                  return (
-                    <TouchableOpacity
-                      key={slot.id}
-                      style={buttonStyle}
-                      onPress={() => handleSlotPress(slot)}
-                      disabled={isDisabled}
-                    >
-                      <Text style={textStyle}>
-                        {slotLabel}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </LinearGradient>
-          </View>
-        ))}
+                    return (
+                      <TouchableOpacity
+                        key={slot.id}
+                        style={buttonStyle}
+                        onPress={() => handleSlotPress(slot)}
+                        disabled={isDisabled}
+                      >
+                        <Text style={textStyle}>
+                          {slotLabel}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </LinearGradient>
+            </View>
+          ))
+        ) : (
+          !loading && <Text style={styles.noScheduleText}>{t('no_schedule_data_available')}</Text>
+        )}
       </ScrollView>
     </View>
   );
@@ -801,6 +832,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 13,
     textAlign: 'center',
+  },
+  noScheduleText: {
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 16,
+    color: '#555',
   },
 });
 

@@ -22,7 +22,8 @@ import { supabase } from '../../providers/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = (width - 60) / 3;
+// Змінено: ITEM_WIDTH тепер розраховується для одного стовпця
+const ITEM_WIDTH = width - 70; // Ширина екрану мінус загальний горизонтальний відступ (15*2 для scrollViewContent + 20*2 для dayContainerInner)
 const CONSULTATION_DURATION_MINUTES = 45; // Константа для тривалості консультації
 
 const ConsultationTime = ({ route }) => {
@@ -85,7 +86,7 @@ const ConsultationTime = ({ route }) => {
                console.warn(`No specific IANA mapping found for ${data.country_timezone}. Falling back to system timezone: ${tz}`);
             }
         }
-        console.log("Resolved doctor timezone:", tz);
+        console.log("DOCTOR APP: Resolved doctor timezone:", tz);
         setDoctorTimezone(tz);
         return tz;
       }
@@ -103,84 +104,101 @@ const ConsultationTime = ({ route }) => {
     }
   }, [doctorId]);
 
-  // Модифікована generateSchedule без date-fns
+  // Модифікована generateSchedule для коректної роботи з UTC для збереження
   const generateSchedule = useCallback((tz = null) => {
     const effectiveTimezone = tz || doctorTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-    console.log("Generating schedule with effective timezone:", effectiveTimezone);
+    console.log("DOCTOR APP: Generating schedule with effective timezone:", effectiveTimezone);
 
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: effectiveTimezone });
     } catch (e) {
-      console.error(`Invalid timezone "${effectiveTimezone}" detected in generateSchedule. Falling back to system timezone.`, e);
+      console.error(`DOCTOR APP: Invalid timezone "${effectiveTimezone}" detected in generateSchedule. Falling back to system timezone.`, e);
       const fallbackTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      console.log("Using final fallback timezone for display:", fallbackTimezone);
+      console.log("DOCTOR APP: Using final fallback timezone for display:", fallbackTimezone);
       return [];
     }
 
     const schedule = [];
     const now = new Date(); // Поточний час у локальній зоні пристрою
-    const currentLocale = i18n.language;
+    const currentLocale = i18n.language; // Використовуємо мову з i18n
 
     for (let i = 0; i < 14; i++) { // На 14 днів вперед
-      const currentDay = new Date(now);
-      currentDay.setDate(now.getDate() + i); // Переходимо на наступний день
-      currentDay.setHours(0, 0, 0, 0); // Обнуляємо час для початку дня (у локальній зоні)
+      const currentDayBase = new Date(now); // Копіюємо поточний час пристрою
+      currentDayBase.setDate(now.getDate() + i); // Переходимо на потрібний день
 
       // Створюємо дату для відображення в конкретній часовій зоні
       const displayDateOptions = { weekday: 'long', day: 'numeric', month: 'long', timeZone: effectiveTimezone };
-      const displayDate = new Intl.DateTimeFormat(currentLocale, displayDateOptions).format(currentDay);
-
-      // Дата для зберігання в DB у форматі YYYY-MM-DD
-      const year = currentDay.getFullYear();
-      const month = String(currentDay.getMonth() + 1).padStart(2, '0');
-      const day = String(currentDay.getDate()).padStart(2, '0');
-      const dateStringForDB = `${year}-${month}-${day}`;
+      const displayDate = new Intl.DateTimeFormat(currentLocale, displayDateOptions).format(currentDayBase);
 
       const daySlots = [];
 
-      for (let hour = 9; hour < 18; hour++) {
+      for (let hour = 0; hour < 24; hour++) { // Включаємо всі 24 години
         for (let minute = 0; minute < 60; minute += CONSULTATION_DURATION_MINUTES) {
-          // Створюємо об'єкт Date у локальному часі, а потім використовуємо для форматування з TZ
-          const startTime = new Date(currentDay);
-          startTime.setHours(hour, minute, 0, 0);
+          // Створюємо об'єкт Date у локальному часі пристрою лікаря
+          const startTimeLocal = new Date(currentDayBase);
+          startTimeLocal.setHours(hour, minute, 0, 0);
 
-          const endTime = new Date(startTime.getTime() + CONSULTATION_DURATION_MINUTES * 60 * 1000);
+          const endTimeLocal = new Date(startTimeLocal.getTime() + CONSULTATION_DURATION_MINUTES * 60 * 1000);
+
+          // Визначаємо кінець поточного календарного дня для перевірки
+          const endOfCurrentLocalDay = new Date(startTimeLocal);
+          endOfCurrentLocalDay.setHours(23, 59, 59, 999); // Встановлюємо на кінець дня (23:59:59.999)
 
           // Перевірка, чи слот не в минулому (порівнюємо з поточним часом пристрою)
-          // Важливо: для порівняння з 'now' ми використовуємо локальний час, оскільки саме на його основі JS оперує Date об'єктами
-          if (endTime.getTime() <= now.getTime()) {
+          // І перевірка, чи слот не перетинає опівніч (endTimeLocal не пізніше кінця поточного дня)
+          if (endTimeLocal.getTime() <= now.getTime() || endTimeLocal.getTime() > endOfCurrentLocalDay.getTime()) {
             continue;
           }
 
-          if (startTime.getHours() >= 18) continue; // Пропускаємо слоти, що починаються після 17:00
-          if (endTime.getHours() >= 18 && endTime.getMinutes() > 0) continue; // Пропускаємо слоти, що закінчуються після 18:00
-
-          // Форматуємо час для відображення у вибраній часовій зоні
+          // Форматуємо час для відображення у вибраній часовій зоні лікаря
           const timeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: effectiveTimezone };
-          const displayStartTime = new Intl.DateTimeFormat('uk-UA', timeFormatOptions).format(startTime);
-          const displayEndTime = new Intl.DateTimeFormat('uk-UA', timeFormatOptions).format(endTime);
+          const displayStartTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(startTimeLocal);
+          const displayEndTime = new Intl.DateTimeFormat(currentLocale, timeFormatOptions).format(endTimeLocal);
           const displayTime = `${displayStartTime} - ${displayEndTime}`;
 
-          // `rawTime` для Supabase: HH:MM:SS. Це час у локальному часі лікаря.
-          const rawTimeForDB = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}:00`;
+          // ----- ПОЧАТОК ВИПРАВЛЕНЬ ДЛЯ UTC ЗБЕРІГАННЯ -----
+          // Конвертуємо startTimeLocal (який зараз у локальному часі пристрою лікаря) у UTC
+          const utcStartTime = new Date(startTimeLocal.getTime() - startTimeLocal.getTimezoneOffset() * 60000);
 
-          const slotId = `${dateStringForDB}-${rawTimeForDB}`;
+          // `rawTimeForDB` для Supabase: HH:MM:SS (UTC).
+          const rawTimeForDB = `${String(utcStartTime.getUTCHours()).padStart(2, '0')}:${String(utcStartTime.getUTCMinutes()).padStart(2, '0')}:00`;
+
+          // `dateStringForDB` також має бути UTC датою
+          const utcYear = utcStartTime.getUTCFullYear();
+          const utcMonth = String(utcStartTime.getUTCMonth() + 1).padStart(2, '0');
+          const utcDay = String(utcStartTime.getUTCDate()).padStart(2, '0');
+          const dateStringForDB = `${utcYear}-${utcMonth}-${utcDay}`;
+          // ----- КІНЕЦЬ ВИПРАВЛЕНЬ ДЛЯ UTC ЗБЕРІГАННЯ -----
+
+          const slotId = `${dateStringForDB}-${rawTimeForDB}`; // slotId тепер базується на UTC
 
           daySlots.push({
-            time: displayTime,
-            id: slotId,
-            date: dateStringForDB,
-            rawTime: rawTimeForDB,
+            time: displayTime,          // Відображається в часовому поясі лікаря
+            id: slotId,                 // UTC-ідентифікатор для порівняння з БД
+            date: dateStringForDB,      // UTC-дата для БД
+            rawTime: rawTimeForDB,      // UTC-час для БД
           });
+          // ДОДАНО ДУЖЕ ДЕТАЛЬНИЙ ЛОГ для діагностики:
+          console.log(`
+            DOCTOR APP Slot Details:
+            - displayTime: ${displayTime}
+            - startTimeLocal: ${startTimeLocal.toISOString()} (Local ISO)
+            - endTimeLocal: ${endTimeLocal.toISOString()} (Local ISO)
+            - endOfCurrentLocalDay: ${endOfCurrentLocalDay.toISOString()} (Local ISO)
+            - utcStartTime: ${utcStartTime.toISOString()} (UTC ISO)
+            - utcDateStringForDB: ${dateStringForDB}
+            - utcTimeForDB: ${rawTimeForDB}
+            - slotId: ${slotId}
+          `);
         }
       }
       schedule.push({
-        date: currentDay, // Зберігаємо об'єкт Date для подальших маніпуляцій, якщо потрібно
+        date: currentDayBase, // Зберігаємо об'єкт Date (локальний) для внутрішніх потреб, якщо потрібно
         displayDate: displayDate.charAt(0).toUpperCase() + displayDate.slice(1),
         slots: daySlots,
       });
     }
-    console.log("Generated schedule for doctor display:", schedule);
+    console.log("DOCTOR APP: Generated schedule for doctor display completed.");
     return schedule;
   }, [doctorTimezone, i18n.language]);
 
@@ -192,13 +210,13 @@ const ConsultationTime = ({ route }) => {
     }
 
     if (!doctorId) {
-      console.warn("No doctorId provided to fetch schedule. Cannot fetch.");
+      console.warn("DOCTOR APP: No doctorId provided to fetch schedule. Cannot fetch.");
       setScheduleData(generateSchedule(timezone));
       setLoading(false);
       return;
     }
 
-    console.log("Attempting to fetch doctor schedule for doctorId:", doctorId);
+    console.log("DOCTOR APP: Attempting to fetch doctor schedule for doctorId:", doctorId);
     try {
       const { data, error } = await supabase
         .from('doctor_availability')
@@ -207,7 +225,7 @@ const ConsultationTime = ({ route }) => {
         .gte('date', new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 
       if (error) {
-        console.error("Error fetching doctor schedule:", error.message);
+        console.error("DOCTOR APP: Error fetching doctor schedule:", error.message);
         Alert.alert(t('error_title'), t('failed_to_load_schedule'));
         setScheduleData(generateSchedule(timezone));
         return;
@@ -218,17 +236,18 @@ const ConsultationTime = ({ route }) => {
         data.forEach(item => {
           const slotId = `${item.date}-${item.time_slot}`;
           fetchedSlots[slotId] = true;
+          console.log(`DOCTOR APP: Fetched DB slot - date: ${item.date}, time_slot: ${item.time_slot}, constructed slotId: ${slotId}`);
         });
       } else {
-        console.warn("Supabase returned non-array data, or data is null/undefined:", data);
+        console.warn("DOCTOR APP: Supabase returned non-array data, or data is null/undefined:", data);
       }
 
-      console.log("Fetched slots from DB (fetchedSlots object):", fetchedSlots);
+      console.log("DOCTOR APP: Fetched slots from DB (fetchedSlots object):", fetchedSlots);
       setDoctorAvailableSlots(fetchedSlots);
       setScheduleData(generateSchedule(timezone));
-      console.log("Doctor schedule fetched and states updated.");
+      console.log("DOCTOR APP: Doctor schedule fetched and states updated.");
     } catch (err) {
-      console.error("Catch error fetching doctor schedule:", err.message);
+      console.error("DOCTOR APP: Catch error fetching doctor schedule:", err.message);
       Alert.alert(t('error_title'), t('failed_to_load_schedule'));
       setScheduleData(generateSchedule(timezone));
     } finally {
@@ -246,10 +265,10 @@ const ConsultationTime = ({ route }) => {
       const wasSelected = newSlots[slot.id];
       if (wasSelected) {
         delete newSlots[slot.id];
-        console.log(`Slot ${slot.id} deselected.`);
+        console.log(`DOCTOR APP: Slot ${slot.id} deselected.`);
       } else {
         newSlots[slot.id] = true;
-        console.log(`Slot ${slot.id} selected.`);
+        console.log(`DOCTOR APP: Slot ${slot.id} selected.`);
       }
       return newSlots;
     });
@@ -261,7 +280,7 @@ const ConsultationTime = ({ route }) => {
       return;
     }
     setSaving(true);
-    console.log("Attempting to save doctor availability...");
+    console.log("DOCTOR APP: Attempting to save doctor availability...");
     try {
       const slotsToSave = [];
       if (Array.isArray(scheduleData)) {
@@ -280,10 +299,12 @@ const ConsultationTime = ({ route }) => {
         });
       }
 
-      console.log("Slots prepared for insertion:", slotsToSave);
+      console.log("DOCTOR APP: Slots prepared for insertion:", slotsToSave);
 
+      // Важливо: видаляємо тільки майбутні та поточні слоти, щоб уникнути конфліктів з минулими датами,
+      // які не відображаються, але можуть бути в БД.
       const todayDateString = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      console.log(`Deleting doctor's availability for doctor_id: ${doctorId} from date: ${todayDateString}`);
+      console.log(`DOCTOR APP: Deleting doctor's availability for doctor_id: ${doctorId} from date: ${todayDateString}`);
       const { error: deleteError } = await supabase
         .from('doctor_availability')
         .delete()
@@ -293,7 +314,7 @@ const ConsultationTime = ({ route }) => {
       if (deleteError) {
         throw deleteError;
       }
-      console.log("Old slots deleted successfully.");
+      console.log("DOCTOR APP: Old slots deleted successfully.");
 
       if (slotsToSave.length > 0) {
         const { error: insertError } = await supabase
@@ -303,18 +324,18 @@ const ConsultationTime = ({ route }) => {
         if (insertError) {
           throw insertError;
         }
-        console.log("New slots inserted successfully.");
+        console.log("DOCTOR APP: New slots inserted successfully.");
       } else {
-        console.log("No slots to insert (all were de-selected or none selected).");
+        console.log("DOCTOR APP: No slots to insert (all were de-selected or none selected).");
       }
 
       Alert.alert(t('success_title'), t('schedule_saved_successfully'));
     } catch (err) {
-      console.error("Error saving doctor availability:", err.message);
+      console.error("DOCTOR APP: Error saving doctor availability:", err.message);
       Alert.alert(t('error_title'), `${t('failed_to_save_schedule')}: ${err.message}`);
     } finally {
       setSaving(false);
-      console.log("Saving process finished. Re-fetching schedule...");
+      console.log("DOCTOR APP: Saving process finished. Re-fetching schedule...");
       fetchDoctorSchedule();
     }
   };
@@ -536,10 +557,10 @@ const styles = StyleSheet.create({
   slotsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-around',
+    justifyContent: 'center', // Центруємо слоти, якщо їх менше, ніж дозволяє ширина
   },
   timeSlotWrapper: {
-    width: ITEM_WIDTH,
+    width: ITEM_WIDTH, // Тепер кожен слот займає майже всю ширину
     marginBottom: 12,
     borderRadius: 10,
     overflow: 'hidden',
