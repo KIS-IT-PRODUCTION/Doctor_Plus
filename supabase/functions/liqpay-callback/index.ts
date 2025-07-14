@@ -1,438 +1,200 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Buffer } from 'https://esm.sh/buffer';
-import sha1 from 'https://esm.sh/js-sha1';
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const LIQPAY_PRIVATE_KEY = Deno.env.get('LIQPAY_PRIVATE_KEY') || '';
-
-console.log("LOG: DEBUG: ENV VARS Check (LiqPay Callback):");
-console.log("LOG: SUPABASE_URL is set:", !!SUPABASE_URL);
-console.log("LOG: SUPABASE_SERVICE_ROLE_KEY is set:", !!SUPABASE_SERVICE_ROLE_KEY);
-console.log("LOG: LIQPAY_PRIVATE_KEY is set:", !!LIQPAY_PRIVATE_KEY);
+import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
+import { createClient } from '@supabase/supabase-js';
+import { Expo } from 'expo-server-sdk';
+import { sha1 } from 'https://deno.land/x/sha1@v1.0.1/mod.ts'; // Перевірте https://deno.land/x/sha1 для останньої версії
+import { DateTime } from 'https://cdn.skypack.dev/luxon@3.4.4';
+const expo = new Expo();
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const LIQPAY_PRIVATE_KEY = Deno.env.get('LIQPAY_PRIVATE_KEY');
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !LIQPAY_PRIVATE_KEY) {
-  console.error("ERROR: ENVIRONMENT_ERROR: Один або кілька необхідних ключів (Supabase/LiqPay) не встановлені. Перевірте Supabase Secrets.");
-  throw new Error("Missing environment variables.");
+  throw new Error("Змінні середовища Supabase/LiqPay не налаштовані.");
 }
-
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    persistSession: false
-  }
-});
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Content-Type': 'application/json'
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+// --- Допоміжні функції для отримання даних користувачів ---
+async function getPatientData(patientId) {
+  if (!patientId) return {
+    token: null,
+    language: 'uk',
+    timezone: 'UTC',
+    fullName: 'Пацієнт'
+  };
+  try {
+    const { data, error } = await supabaseAdmin.from('profiles').select('notification_token, language, country_timezone, full_name').eq('user_id', patientId).single();
+    if (error && error.code !== 'PGRST116') throw error; // PGRST116 for "No rows found"
+    return {
+      token: data?.notification_token || null,
+      language: data?.language || 'uk',
+      timezone: data?.country_timezone || 'UTC',
+      fullName: data?.full_name || 'Пацієнт'
+    };
+  } catch (e) {
+    console.error(`Помилка отримання даних пацієнта ${patientId}:`, e.message);
+    return {
+      token: null,
+      language: 'uk',
+      timezone: 'UTC',
+      fullName: 'Пацієнт'
+    };
+  }
+}
+async function getDoctorData(doctorId) {
+  if (!doctorId) return {
+    token: null,
+    language: 'uk',
+    timezone: 'UTC',
+    fullName: 'Лікар'
+  };
+  try {
+    const profilePromise = supabaseAdmin.from('profile_doctor').select('notification_token, language, full_name').eq('user_id', doctorId).single();
+    const anketaPromise = supabaseAdmin.from('anketa_doctor').select('country_timezone').eq('user_id', doctorId).single();
+    const [profileResult, anketaResult] = await Promise.all([
+      profilePromise,
+      anketaPromise
+    ]);
+    // Перевірка помилок для обох результатів
+    if (profileResult.error && profileResult.error.code !== 'PGRST116') throw profileResult.error;
+    if (anketaResult.error && anketaResult.error.code !== 'PGRST116') throw anketaResult.error;
+    return {
+      token: profileResult.data?.notification_token || null,
+      language: profileResult.data?.language || 'uk',
+      timezone: anketaResult.data?.country_timezone || 'UTC',
+      fullName: profileResult.data?.full_name || 'Лікар'
+    };
+  } catch (e) {
+    console.error(`Помилка отримання даних лікаря ${doctorId}:`, e.message);
+    return {
+      token: null,
+      language: 'uk',
+      timezone: 'UTC',
+      fullName: 'Лікар'
+    };
+  }
+}
+// --- Переклади ---
+const translations = {
+  uk: {
+    payment_success_title: "Оплата підтверджена!",
+    payment_success_patient_body: (doctorName, date, time, amount, currency)=>`Ваша консультація з ${doctorName} на ${date} о ${time} (ваш час) успішно оплачена. Сума: ${amount} ${currency}.`,
+    payment_success_doctor_body: (patientName, date, time, amount, currency)=>`Пацієнт ${patientName} оплатив консультацію на ${date} о ${time} (ваш час). Сума: ${amount} ${currency}.`
+  },
+  en: {
+    payment_success_title: "Payment Confirmed!",
+    payment_success_patient_body: (doctorName, date, time, amount, currency)=>`Your consultation with ${doctorName} on ${date} at ${time} (your time) has been successfully paid. Amount: ${amount} ${currency}.`,
+    payment_success_doctor_body: (patientName, date, time, amount, currency)=>`Patient ${patientName} has paid for the consultation on ${date} at ${time} (your time). Amount: ${amount} ${currency}.`
+  }
 };
-
-async function sendPushNotification(expoPushToken: string, title: string, body: string, data: Record<string, any> = {}, soundFileName: string = 'default') {
-  if (!expoPushToken) {
-    console.warn("WARN: sendPushNotification: No Expo push token provided.");
-    return;
-  }
-  const message = {
-    to: expoPushToken,
-    sound: soundFileName, // <-- ВИКОРИСТОВУЄМО ТУТ ПЕРЕДАНЕ ЗНАЧЕННЯ
-    title,
-    body,
-    data,
-  };
-
-  try {
-    console.log(`LOG: sendPushNotification: Attempting to send to ${expoPushToken.substring(0, 20)}... with sound: ${soundFileName}`);
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(message),
-    });
-
-    const result = await response.json();
-    if (result.errors) {
-      console.error("ERROR: sendPushNotification: Error sending Expo push notification:", JSON.stringify(result.errors));
-    } else {
-      console.log("LOG: sendPushNotification: Expo push notification sent successfully:", JSON.stringify(result.data));
-    }
-  } catch (error) {
-    console.error("ERROR: sendPushNotification: Failed to send Expo push notification:", error);
-  }
+function getTranslation(lang, key, ...args) {
+  const selectedLangSet = translations[lang] || translations.uk;
+  const messageTemplate = selectedLangSet[key];
+  return typeof messageTemplate === 'function' ? messageTemplate(...args) : messageTemplate;
 }
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    console.log('LOG: LiqPay Callback: OPTIONS request received.');
-    return new Response('ok', {
-      headers: corsHeaders,
-      status: 204
-    });
-  }
-
-  if (req.method !== 'POST') {
-    console.warn('WARN: LiqPay Callback: Method Not Allowed. Received:', req.method);
-    return new Response(JSON.stringify({
-      error: 'Method Not Allowed'
-    }), {
-      status: 405,
-      headers: corsHeaders
-    });
-  }
-
-  try {
-    const formData = await req.formData();
-    const data = formData.get('data');
-    const signature = formData.get('signature');
-
-    console.log('LOG: LiqPay Callback: Received data (truncated):', data ? (data as string).substring(0, 100) + '...' : 'null');
-    console.log('LOG: LiqPay Callback: Received signature:', signature);
-
-    if (!data || !signature) {
-      console.error('ERROR: LiqPay Callback: Missing data or signature in callback.');
-      return new Response(JSON.stringify({
-        error: 'Missing data or signature'
-      }), {
-        status: 400,
-        headers: corsHeaders
-      });
-    }
-
-    const decodedData = Buffer.from(data as string, 'base64').toString('utf8');
-    let paymentInfo: any;
-    try {
-      paymentInfo = JSON.parse(decodedData);
-      console.log('LOG: LiqPay Callback: Decoded payment info:', JSON.stringify(paymentInfo));
-    } catch (jsonError) {
-      console.error('ERROR: LiqPay Callback: Failed to parse decoded data as JSON:', jsonError);
-      return new Response(JSON.stringify({
-        error: 'Invalid data format from LiqPay'
-      }), {
-        status: 400,
-        headers: corsHeaders
-      });
-    }
-
-    const expectedSignatureRaw = LIQPAY_PRIVATE_KEY + data + LIQPAY_PRIVATE_KEY;
-    const expectedSignature = Buffer.from(sha1(expectedSignatureRaw), 'hex').toString('base64');
-
-    if (signature !== expectedSignature) {
-      console.error('ERROR: LiqPay Callback: Invalid signature received!', {
-        received: signature,
-        expected: expectedSignature
-      });
-      return new Response(JSON.stringify({
-        error: 'Invalid signature'
-      }), {
-        status: 403,
-        headers: corsHeaders
-      });
-    }
-    console.log('LOG: LiqPay Callback: Signature verified successfully.');
-
-    const { order_id, status: paymentStatus, amount, currency } = paymentInfo;
-
-    const bookingId = order_id.startsWith('booking_') ? order_id.split('_')[1] : order_id;
-
-    console.log(`LOG: LiqPay Callback: Processing payment for order_id: ${order_id}, BookingId: ${bookingId}, Status: ${paymentStatus}`);
-
-    let finalPaymentStatusForDb = 'failed';
-    let notificationTitlePatient = "Оновлення оплати бронювання";
-    let notificationBodyPatient = `Статус оплати вашого бронювання №${bookingId} оновлено.`;
-    let notificationTitleDoctor = "Оновлення оплати бронювання";
-    let notificationBodyDoctor = `Статус оплати бронювання №${bookingId} оновлено.`;
-
-    let isBookingPaid = false;
-
-    const { data: booking, error: bookingError } = await supabaseAdmin
-        .from('patient_bookings')
-        .select(`
-            id,
-            booking_date,
-            booking_time_slot,
-            doctor_id,
-            patient_id,
-            meet_link,
-            patient_profile:profiles!inner(full_name, notification_token),
-            doctor_profile:profile_doctor!inner(full_name, notification_token)
-        `)
-        .eq('id', bookingId)
-        .single();
-
-    if (bookingError || !booking) {
-        console.error('ERROR: LiqPay Callback: Не вдалося знайти бронювання для сповіщень:', bookingError?.message);
-        return new Response(JSON.stringify({
-            error: `Booking with ID ${bookingId} not found.`,
-            details: bookingError?.message
-        }), {
-            status: 404,
-            headers: corsHeaders
-        });
-    }
-
-    // ЗМІНА ТУТ: Встановлюємо soundFileName на 'default'
-    const notificationSound = 'default'; 
-
-    if (paymentStatus === 'success' || paymentStatus === 'sandbox_success') {
-      finalPaymentStatusForDb = 'paid';
-      isBookingPaid = true;
-
-      notificationTitlePatient = "Оплата підтверджена!";
-      notificationBodyPatient = `Ваша консультація з ${booking.doctor_profile?.full_name || 'лікарем'} на ${booking.booking_date} о ${booking.booking_time_slot} успішно оплачена. Очікуйте додаткове сповіщення з посиланням на Meet від лікаря.`;
-
-      notificationTitleDoctor = "Нове підтверджене бронювання!";
-      notificationBodyDoctor = `Пацієнт ${booking.patient_profile?.full_name || 'пацієнт'} оплатив консультацію на ${booking.booking_date} о ${booking.booking_time_slot}. Будь ласка, створіть посилання на Google Meet та додайте його у деталі бронювання.`;
-
-    } else if (paymentStatus === 'failure' || paymentStatus === 'error' || paymentStatus === 'reversed' || paymentStatus === 'declined') {
-      finalPaymentStatusForDb = paymentStatus;
-      notificationTitlePatient = "Помилка оплати!";
-      notificationBodyPatient = `Оплата вашого бронювання №${bookingId} не пройшла. Статус: ${paymentStatus}.`;
-      notificationTitleDoctor = "Помилка оплати бронювання!";
-      notificationBodyDoctor = `Оплата бронювання №${bookingId} не проймати. Статус: ${paymentStatus}.`;
-    } else {
-      finalPaymentStatusForDb = paymentStatus;
-      notificationTitlePatient = "Оновлення статусу оплати";
-      notificationBodyPatient = `Оплата вашого бронювання №${bookingId} в статусі: ${paymentStatus}.`;
-      notificationTitleDoctor = "Оновлення статусу оплати бронювання";
-      notificationBodyDoctor = `Оплата бронювання №${bookingId} в статусі: ${paymentStatus}.`;
-    }
-
-    // Оновлення статусу бронювання в patient_bookings
-    const { data: updatedBookingData, error: updateBookingError } = await supabaseAdmin
-      .from('patient_bookings')
-      .update({
-        payment_status: finalPaymentStatusForDb,
-        is_paid: isBookingPaid,
-        liqpay_data: paymentInfo,
-      })
-      .eq('id', bookingId)
-      .select(`
-        id,
-        patient_id,
-        doctor_id,
-        booking_date,
-        booking_time_slot,
-        meet_link
-      `)
-      .single();
-
-    if (updateBookingError) {
-      console.error('ERROR: LiqPay Callback: Error updating booking status in patient_bookings:', updateBookingError.message);
-      return new Response(JSON.stringify({
-        error: 'Failed to update booking status in DB, but LiqPay callback received.',
-        details: updateBookingError.message
-      }), {
-        status: 200,
-        headers: corsHeaders
-      });
-    }
-    console.log(`LOG: LiqPay Callback: Booking ${bookingId} successfully updated to status: ${finalPaymentStatusForDb}, is_paid: ${isBookingPaid}, meet_link: ${updatedBookingData?.meet_link}.`);
-
-    // --- Логіка сповіщень ---
-
-    const notificationDataCommon = {
-      booking_id: bookingId,
-      amount: amount,
-      currency: currency,
-      is_paid: isBookingPaid,
-      payment_status: finalPaymentStatusForDb,
-      doctor_name: booking.doctor_profile.full_name,
-      patient_name: booking.patient_profile.full_name,
-      booking_date: booking.booking_date,
-      booking_time_slot: booking.booking_time_slot,
-      payment_date: new Date().toISOString(),
-      meet_link: updatedBookingData?.meet_link,
-    };
-
-    // Оновлення/створення сповіщення пацієнта
-    const { data: existingPatientNotification, error: fetchPatientNotificationError } = await supabaseAdmin
-      .from('patient_notifications')
-      .select('id, data')
-      .eq('data->>booking_id', bookingId)
-      .eq('patient_id', booking.patient_id)
-      .single();
-
-    if (fetchPatientNotificationError && fetchPatientNotificationError.code !== 'PGRST116') {
-      console.warn('WARN: LiqPay Callback: Error fetching existing patient_notification for booking_id:', bookingId, fetchPatientNotificationError.message);
-    } else {
-      if (existingPatientNotification) {
-        const updatedNotificationData = {
-          ...existingPatientNotification.data,
-          ...notificationDataCommon,
-        };
-        const { error: updateNotificationError } = await supabaseAdmin
-          .from('patient_notifications')
-          .update({
-            data: updatedNotificationData,
-            is_read: false,
-            title: notificationTitlePatient,
-            body: notificationBodyPatient
-          })
-          .eq('id', existingPatientNotification.id);
-
-        if (updateNotificationError) {
-          console.error('ERROR: LiqPay Callback: Помилка оновлення patient_notifications data:', updateNotificationError.message);
-        } else {
-          console.log(`LOG: LiqPay Callback: patient_notification для бронювання ${bookingId} оновлено.`);
-        }
-      } else {
-        console.log(`LOG: LiqPay Callback: Existing patient_notification for booking ${bookingId} not found. Creating a new one.`);
-        const { error: insertNewPatientNotificationError } = await supabaseAdmin
-          .from('patient_notifications')
-          .insert({
-            patient_id: booking.patient_id,
-            title: notificationTitlePatient,
-            body: notificationBodyPatient,
-            notification_type: isBookingPaid ? 'payment_success' : 'payment_update',
-            data: { ...notificationDataCommon, type: isBookingPaid ? 'payment_success' : 'payment_update' },
-            is_read: false,
-          });
-        if (insertNewPatientNotificationError) {
-          console.error('ERROR: LiqPay Callback: Помилка створення нового patient_notification:', insertNewPatientNotificationError.message);
-        } else {
-          console.log('LOG: LiqPay Callback: Нове patient_notification успішно створено.');
-        }
-      }
-    }
-
-    // Надсилання push-сповіщення пацієнту
-    if (booking.patient_profile?.notification_token) {
-        console.log(`LOG: LiqPay Callback: Patient token found for user ${booking.patient_id}. Sending patient notification.`);
-        await sendPushNotification(
-            booking.patient_profile.notification_token,
-            notificationTitlePatient,
-            notificationBodyPatient,
-            {
-                type: isBookingPaid ? 'payment_success' : 'payment_update',
-                booking_id: bookingId,
-                amount: amount,
-                currency: currency,
-                is_paid: isBookingPaid,
-                payment_status: finalPaymentStatusForDb,
-                doctor_name: booking.doctor_profile.full_name,
-                booking_date: booking.booking_date,
-                booking_time_slot: booking.booking_time_slot,
-                meet_link: updatedBookingData?.meet_link,
-            },
-            notificationSound // <-- ВИКОРИСТОВУЄМО ТУТ 'default'
-        );
-    } else {
-        console.warn('WARN: LiqPay Callback: Patient Expo token not found for patient_id:', booking.patient_id);
-    }
-
-    // Оновлення/створення сповіщення лікаря
-    const { data: existingDoctorNotification, error: fetchDoctorNotificationError } = await supabaseAdmin
-      .from('doctor_notifications')
-      .select('id, data')
-      .eq('data->>booking_id', bookingId)
-      .eq('doctor_id', booking.doctor_id)
-      .single();
-
-    if (fetchDoctorNotificationError && fetchDoctorNotificationError.code !== 'PGRST116') {
-      console.warn('WARN: LiqPay Callback: Error fetching existing doctor_notification for booking_id:', bookingId, fetchDoctorNotificationError.message);
-    } else {
-      const doctorNotificationDataCommonWithExplicitType = {
-        type: isBookingPaid ? 'payment_received' : 'payment_update_doctor',
-        booking_id: bookingId,
-        amount: amount,
-        currency: currency,
-        is_paid: isBookingPaid,
-        payment_status: finalPaymentStatusForDb,
-        patient_name: booking.patient_profile.full_name,
-        booking_date: booking.booking_date,
-        booking_time_slot: booking.booking_time_slot,
-        payment_date: new Date().toISOString(),
-        meet_link: updatedBookingData?.meet_link,
-      };
-
-      if (existingDoctorNotification) {
-        const updatedDoctorNotificationData = {
-          ...existingDoctorNotification.data,
-          ...doctorNotificationDataCommonWithExplicitType,
-        };
-        const { error: updateDoctorNotificationError } = await supabaseAdmin
-          .from('doctor_notifications')
-          .update({
-            data: updatedDoctorNotificationData,
-            is_read: false,
-            title: notificationTitleDoctor,
-            body: notificationBodyDoctor
-          })
-          .eq('id', existingDoctorNotification.id);
-
-        if (updateDoctorNotificationError) {
-          console.error('ERROR: LiqPay Callback: Помилка оновлення doctor_notifications data:', updateDoctorNotificationError.message);
-        } else {
-          console.log(`LOG: LiqPay Callback: doctor_notification для бронювання ${bookingId} оновлено.`);
-        }
-      } else {
-        console.log(`LOG: LiqPay Callback: Existing doctor_notification for booking ${bookingId} not found. Creating a new one.`);
-        const { error: insertNewDoctorNotificationError } = await supabaseAdmin.from('doctor_notifications').insert({
-          doctor_id: booking.doctor_id,
-          title: notificationTitleDoctor,
-          body: notificationBodyDoctor,
-          notification_type: isBookingPaid ? 'payment_received' : 'payment_update_doctor',
-          data: doctorNotificationDataCommonWithExplicitType,
-          is_read: false,
-        });
-        if (insertNewDoctorNotificationError) {
-          console.error('ERROR: LiqPay Callback: Помилка створення нового doctor_notification:', insertNewDoctorNotificationError.message);
-        } else {
-          console.log('LOG: LiqPay Callback: Нове doctor_notification успішно створено.');
-        }
-      }
-    }
-
-    // Надсилання push-сповіщення лікарю
-    if (booking.doctor_profile?.notification_token) {
-        console.log(`LOG: LiqPay Callback: Doctor token found for user ${booking.doctor_id}. Sending doctor notification.`);
-        await sendPushNotification(
-            booking.doctor_profile.notification_token,
-            notificationTitleDoctor,
-            notificationBodyDoctor,
-            {
-                type: isBookingPaid ? 'payment_received' : 'payment_update_doctor',
-                booking_id: bookingId,
-                amount: amount,
-                currency: currency,
-                is_paid: isBookingPaid,
-                payment_status: finalPaymentStatusForDb,
-                patient_name: booking.patient_profile.full_name,
-                booking_date: booking.booking_date,
-                booking_time_slot: booking.booking_time_slot,
-                meet_link: updatedBookingData?.meet_link,
-            },
-            notificationSound // <-- ВИКОРИСТОВУЄМО ТУТ 'default'
-        );
-    } else {
-        console.warn('WARN: LiqPay Callback: Doctor Expo token not found for doctor_id:', booking.doctor_id);
-    }
-
-    return new Response(JSON.stringify({
-      success: true,
-      paymentStatus: finalPaymentStatusForDb
-    }), {
-      status: 200,
-      headers: corsHeaders
-    });
-
-  } catch (error) {
-    let errorMessage = "An unknown error occurred in the LiqPay Callback.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    }
-    console.error("ERROR: LiqPay Callback: Uncaught error (global catch block):", errorMessage, error);
-    return new Response(JSON.stringify({
-      error: `Server error: ${errorMessage}`
-    }), {
-      status: 200,
-      headers: corsHeaders
-    });
-  }
+serve(async (req)=>{
+  // Створюємо заголовки так, як це працює у вашому середовищі
+  const corsHeaders = new Headers({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Content-Type': 'application/json'
+  });
+  if (req.method === 'OPTIONS') return new Response('ok', {
+    headers: corsHeaders
+  });
+  try {
+    const formData = await req.formData();
+    // formData.get() може повертати `string | File | null`. Для LiqPay `data` це завжди string.
+    const data = formData.get('data')?.toString();
+    const signature = formData.get('signature')?.toString();
+    if (!data || !signature) throw new Error('Відсутні дані або підпис від LiqPay');
+    // Deno-native спосіб декодування base64 до рядка
+    // Використовуємо atob та TextDecoder
+    const decodedData = new TextDecoder().decode(Uint8Array.from(atob(data), (c)=>c.charCodeAt(0)));
+    const paymentInfo = JSON.parse(decodedData);
+    // Deno-native спосіб обчислення SHA-1 та кодування в base64
+    const dataToHash = LIQPAY_PRIVATE_KEY + data + LIQPAY_PRIVATE_KEY;
+    const rawHashBytes = sha1(new TextEncoder().encode(dataToHash)); // sha1 повертає Uint8Array
+    const binaryString = String.fromCharCode(...rawHashBytes); // Конвертуємо Uint8Array в бінарний рядок
+    const expectedSignature = btoa(binaryString); // Base64 кодуємо бінарний рядок
+    if (signature !== expectedSignature) throw new Error('Неправильний підпис від LiqPay');
+    const { order_id, status: paymentStatus, amount, currency } = paymentInfo;
+    const bookingId = order_id.startsWith('booking_') ? order_id.split('_')[1] : order_id;
+    const { data: booking, error: bookingError } = await supabaseAdmin.from('patient_bookings').select('doctor_id, patient_id, booking_date, booking_time_slot').eq('id', bookingId).single();
+    if (bookingError) throw new Error(`Бронювання з ID ${bookingId} не знайдено.`);
+    const { doctor_id, patient_id, booking_date, booking_time_slot } = booking;
+    const isBookingPaid = paymentStatus === 'success' || paymentStatus === 'sandbox_success';
+    await supabaseAdmin.from('patient_bookings').update({
+      payment_status: paymentStatus,
+      is_paid: isBookingPaid,
+      liqpay_data: paymentInfo
+    }).eq('id', bookingId);
+    if (isBookingPaid) {
+      const messagesToSend = [];
+      const [patientData, doctorData] = await Promise.all([
+        getPatientData(patient_id),
+        getDoctorData(doctor_id)
+      ]);
+      const utcDateTime = DateTime.fromISO(`${booking_date}T${booking_time_slot}`, {
+        zone: 'utc'
+      });
+      if (!utcDateTime.isValid) throw new Error('Неправильний формат дати/часу.');
+      // --- Сповіщення для ПАЦІЄНТА з його локальним часом ---
+      if (patientData.token) {
+        const localDateTime = utcDateTime.setZone(patientData.timezone);
+        const formattedDate = localDateTime.toLocaleString(DateTime.DATE_FULL, {
+          locale: patientData.language
+        });
+        const formattedTime = localDateTime.toFormat('HH:mm');
+        const title = getTranslation(patientData.language, 'payment_success_title');
+        const body = getTranslation(patientData.language, 'payment_success_patient_body', doctorData.fullName, formattedDate, formattedTime, amount, currency);
+        messagesToSend.push({
+          to: patientData.token,
+          title,
+          body,
+          sound: 'default',
+          data: {
+            type: 'payment_update',
+            booking_id: bookingId
+          }
+        });
+      }
+      // --- Сповіщення для ЛІКАРЯ з його локальним часом ---
+      if (doctorData.token) {
+        const localDateTime = utcDateTime.setZone(doctorData.timezone);
+        const formattedDate = localDateTime.toLocaleString(DateTime.DATE_FULL, {
+          locale: doctorData.language
+        });
+        const formattedTime = localDateTime.toFormat('HH:mm');
+        const title = getTranslation(doctorData.language, 'payment_success_title');
+        const body = getTranslation(doctorData.language, 'payment_success_doctor_body', patientData.fullName, formattedDate, formattedTime, amount, currency);
+        messagesToSend.push({
+          to: doctorData.token,
+          title,
+          body,
+          sound: 'default',
+          data: {
+            type: 'payment_update',
+            booking_id: bookingId
+          }
+        });
+      }
+      if (messagesToSend.length > 0) {
+        await expo.sendPushNotificationsAsync(messagesToSend);
+        console.log(`Успішно надіслано ${messagesToSend.length} сповіщення.`);
+      }
+    }
+    return new Response(JSON.stringify({
+      success: true,
+      paymentStatus
+    }), {
+      status: 200,
+      headers: corsHeaders
+    });
+  } catch (error) {
+    console.error("Помилка в liqpay-callback:", error.message);
+    return new Response(JSON.stringify({
+      error: `Server error: ${error.message}`
+    }), {
+      status: 500,
+      headers: corsHeaders
+    });
+  }
 });
-badge

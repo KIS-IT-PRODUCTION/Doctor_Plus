@@ -1,10 +1,8 @@
-// ConsultationTime.js - FINAL VERSION with 45-min slots on the hour
-
 import "react-native-url-polyfill/auto";
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
-  Alert, ActivityIndicator, Platform, StatusBar, Animated, Easing,
+  Alert, ActivityIndicator, Platform, StatusBar, SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +12,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { DateTime } from 'luxon';
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = width - 70;
 const CONSULTATION_DURATION_MINUTES = 45;
 
 const ConsultationTime = ({ route }) => {
@@ -27,17 +24,6 @@ const ConsultationTime = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [doctorTimezone, setDoctorTimezone] = useState(null);
-
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const startRotation = () => {
-      Animated.timing(rotateAnim, {
-        toValue: 1, duration: 2000, easing: Easing.linear, useNativeDriver: true,
-      }).start(() => startRotation());
-    };
-    startRotation();
-  }, [rotateAnim]);
 
   const fetchDoctorTimezone = useCallback(async () => {
     const systemTimezone = DateTime.local().zoneName;
@@ -66,7 +52,6 @@ const ConsultationTime = ({ route }) => {
 
   const generateSchedule = useCallback((tz) => {
     if (!tz) return [];
-
     const schedule = [];
     const now = DateTime.local();
     const startOfToday = now.startOf('day');
@@ -74,40 +59,24 @@ const ConsultationTime = ({ route }) => {
     for (let i = 0; i < 14; i++) {
       const currentDay = startOfToday.plus({ days: i });
       const displayDate = currentDay.setZone(tz).toLocaleString(DateTime.DATE_FULL);
-
       const daySlots = [];
-      // FIX: Loop through hours only, minutes are always 00
+
       for (let hour = 0; hour < 24; hour++) {
-        // Create a DateTime object in the DOCTOR'S timezone, starting at 00 minutes
         const startTimeInDoctorTZ = currentDay.set({ hour, minute: 0, second: 0, millisecond: 0 }).setZone(tz, { keepLocalTime: true });
 
-        if (!startTimeInDoctorTZ.isValid) continue;
-        if (startTimeInDoctorTZ < now) continue;
+        if (!startTimeInDoctorTZ.isValid || startTimeInDoctorTZ < now) continue;
 
-        // FIX: End time is always 45 minutes after the start
         const endTimeInDoctorTZ = startTimeInDoctorTZ.plus({ minutes: CONSULTATION_DURATION_MINUTES });
-
-        // Convert to UTC for database storage
         const utcTime = startTimeInDoctorTZ.toUTC();
         const dateStringForDB = utcTime.toFormat('yyyy-MM-dd');
         const rawTimeForDB = utcTime.toFormat('HH:mm:ss');
         const slotId = `${dateStringForDB}-${rawTimeForDB}`;
-        
-        // FIX: Display format is now HH:mm - HH:mm
         const displayTime = `${startTimeInDoctorTZ.toFormat('HH:mm')} - ${endTimeInDoctorTZ.toFormat('HH:mm')}`;
 
-        daySlots.push({
-          time: displayTime,
-          id: slotId,
-          date: dateStringForDB,
-          rawTime: rawTimeForDB,
-        });
+        daySlots.push({ time: displayTime, id: slotId, date: dateStringForDB, rawTime: rawTimeForDB });
       }
       if (daySlots.length > 0) {
-        schedule.push({
-          displayDate: displayDate,
-          slots: daySlots,
-        });
+        schedule.push({ displayDate: displayDate, slots: daySlots });
       }
     }
     return schedule;
@@ -118,7 +87,6 @@ const ConsultationTime = ({ route }) => {
     try {
       const timezone = await fetchDoctorTimezone();
       if (!timezone) throw new Error("Timezone could not be determined.");
-
       if (!doctorId) {
         setScheduleData(generateSchedule(timezone));
         return;
@@ -145,39 +113,33 @@ const ConsultationTime = ({ route }) => {
     } catch (err) {
       console.error("Error fetching doctor schedule:", err.message);
       Alert.alert(t('error_title'), t('failed_to_load_schedule'));
-      setScheduleData([]);
     } finally {
       setLoading(false);
     }
   }, [doctorId, t, generateSchedule, fetchDoctorTimezone]);
   
-  useEffect(() => {
-    fetchDoctorSchedule();
-  }, [fetchDoctorSchedule]);
+  useEffect(() => { fetchDoctorSchedule() }, [fetchDoctorSchedule]);
 
   const handleSlotPress = (slot) => {
     setDoctorAvailableSlots(prevSlots => {
       const newSlots = { ...prevSlots };
-      if (newSlots[slot.id]) delete newSlots[slot.id];
-      else newSlots[slot.id] = true;
+      if (newSlots[slot.id]) {
+        delete newSlots[slot.id];
+      } else {
+        newSlots[slot.id] = true;
+      }
       return newSlots;
     });
   };
 
   const saveDoctorAvailability = async () => {
-    if (!doctorId) {
-      Alert.alert(t('error_title'), t('doctor_id_missing'));
-      return;
-    }
+    if (!doctorId) return Alert.alert(t('error_title'), t('doctor_id_missing'));
     setSaving(true);
     try {
       const slotsToInsert = Object.keys(doctorAvailableSlots).map(slotId => {
-        const lastHyphenIndex = slotId.lastIndexOf('-');
-        if (lastHyphenIndex === -1) return null;
-        const date = slotId.substring(0, lastHyphenIndex);
-        const time = slotId.substring(lastHyphenIndex + 1);
+        const [date, time] = slotId.split(/-(?=[^-]*$)/);
         return { doctor_id: doctorId, date, time_slot: time };
-      }).filter(Boolean);
+      });
 
       const todayDateStringUTC = DateTime.utc().toFormat('yyyy-MM-dd');
       
@@ -200,93 +162,201 @@ const ConsultationTime = ({ route }) => {
   };
 
   const handleBackPress = () => navigation.goBack();
-  const rotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <LinearGradient colors={['#F7F8FA', '#E8F2F8']} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0EB3EB" />
         <Text style={styles.loadingText}>{t('loading_schedule')}</Text>
-      </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.saveButton} onPress={saveDoctorAvailability} disabled={saving}>
-          <LinearGradient
-            colors={['#0EB3EB', '#0A8BA6']} style={styles.saveButtonGradient}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          >
-            {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.saveButtonText}>{t('save_schedule')}</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+    <LinearGradient colors={['#F7F8FA', '#E8F2F8']} style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('my_schedule')}</Text>
+          <View style={{ width: 48 }} /> 
+        </View>
 
-      <ScrollView style={styles.scrollViewContent}>
-        {scheduleData.map((dayData, dayIndex) => (
-          <View key={dayIndex} style={styles.dayCardOuter}>
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)']}
-              style={styles.dayContainerInner} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            >
-              <Animated.View style={[styles.iconContainer, { transform: [{ rotate }] }]}>
-                <Ionicons name="time-outline" size={32} color="#0EB3EB" />
-              </Animated.View>
+        <ScrollView contentContainerStyle={styles.scrollViewContent}>
+          {scheduleData.map((dayData, dayIndex) => (
+            <View key={dayIndex} style={styles.dayCard}>
               <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
               <View style={styles.slotsContainer}>
                 {dayData.slots.map((slot) => {
                   const isSlotSelected = doctorAvailableSlots[slot.id];
                   return (
-                    <TouchableOpacity key={slot.id} onPress={() => handleSlotPress(slot)} style={styles.timeSlotWrapper}>
-                      {isSlotSelected ? (
-                        <LinearGradient
-                          colors={['#0EB3EB', '#0A8BA6']} style={styles.timeSlotButtonSelected}
-                          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                        >
-                          <Text style={styles.timeSlotTextSelected}>{slot.time}</Text>
-                        </LinearGradient>
-                      ) : (
-                        <View style={styles.timeSlotButtonUnavailable}>
-                          <Text style={styles.timeSlotTextUnavailable}>{slot.time}</Text>
-                        </View>
-                      )}
+                    <TouchableOpacity 
+                      key={slot.id} 
+                      style={[
+                          styles.timeSlotButton,
+                          isSlotSelected ? styles.selectedSlot : styles.availableSlot,
+                      ]}
+                      onPress={() => handleSlotPress(slot)} 
+                    >
+                      <Text style={[
+                          styles.timeSlotText,
+                          isSlotSelected ? styles.selectedText : styles.availableText,
+                      ]}>
+                          {slot.time}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
+            </View>
+          ))}
+        </ScrollView>
+        
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={saveDoctorAvailability} disabled={saving}>
+            <LinearGradient
+                colors={['#0EB3EB', '#0A8BC2']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.saveButton}
+            >
+              {saving ? <ActivityIndicator color="#FFFFFF" /> : 
+              <Text style={styles.saveButtonText}>{t('save_schedule')}</Text>}
             </LinearGradient>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
+// Схожі стилі, адаптовані для екрану лікаря
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA', paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 10) : 50, },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7FA' },
-  loadingText: { marginTop: 10, fontSize: 16, color: '#555' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 15, paddingHorizontal: 20 },
-  backButton: { backgroundColor: "rgba(14, 179, 235, 0.2)", borderRadius: 25, width: 48, height: 48, justifyContent: "center", alignItems: "center" },
-  saveButton: { borderRadius: 12, overflow: 'hidden' },
-  saveButtonGradient: { paddingVertical: 12, paddingHorizontal: 18, justifyContent: 'center', alignItems: 'center' },
-  saveButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
-  scrollViewContent: { paddingHorizontal: 15, paddingBottom: 30 },
-  dayCardOuter: { marginTop: 20, borderRadius: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, overflow: 'hidden' },
-  dayContainerInner: { borderRadius: 18, padding: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)', alignItems: 'center' },
-  iconContainer: { marginBottom: 10 },
-  dayHeader: { fontSize: 19, fontWeight: 'bold', color: '#222', marginBottom: 15, textAlign: 'center' },
-  slotsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  timeSlotWrapper: { width: ITEM_WIDTH, marginBottom: 12, borderRadius: 10, overflow: 'hidden' },
-  timeSlotButtonUnavailable: { backgroundColor: 'rgba(240, 240, 240, 0.7)', borderColor: 'rgba(224, 224, 224, 0.7)', borderWidth: 1, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  timeSlotButtonSelected: { borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  timeSlotTextUnavailable: { color: '#888888', fontSize: 14, fontWeight: '600' },
-  timeSlotTextSelected: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  container: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#555',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  backButton: {
+    backgroundColor: "rgba(14, 179, 235, 0.15)",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  scrollViewContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120, // Залишаємо місце для кнопки
+  },
+  dayCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  dayHeader: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#34495e',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  slotsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  timeSlotButton: {
+    width: '31%', // Триколонкова сітка
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    minHeight: 60,
+  },
+  timeSlotText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Стилі для двох станів: доступний (не обраний) і обраний
+  availableSlot: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#B3E5FC',
+  },
+  availableText: {
+    color: '#0288D1',
+  },
+  selectedSlot: {
+    backgroundColor: '#0EB3EB',
+    borderColor: '#0A8BC2',
+    transform: [{ scale: 1.05 }],
+  },
+  selectedText: {
+    color: '#FFFFFF',
+  },
+  // Футер з кнопкою
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    backgroundColor: 'rgba(247, 248, 250, 0.8)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  saveButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
 
 export default ConsultationTime;

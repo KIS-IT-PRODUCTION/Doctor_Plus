@@ -1,9 +1,9 @@
 {
   "imports": {
-    "https://deno.land/std@0.177.0/http/server.ts": "https://deno.land/std@0.177.0/http/server.ts",
-    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2",
-    "https://esm.sh/buffer": "https://esm.sh/buffer",
-    "https://esm.sh/js-sha1": "https://esm.sh/js-sha1",
-    "https://deno.land/x/djwt@v2.8/mod.ts": "https://deno.land/x/djwt@v2.8/mod.ts"
+    "https://deno.land/std@0.224.0/": "https://deno.land/std@0.224.0/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.43.2",
+    "expo-server-sdk": "https://esm.sh/expo-server-sdk@3.10.0",
+    "https://deno.land/x/sha1@v1.0.1/": "https://deno.land/x/sha1@v1.0.1/",
+    "https://cdn.skypack.dev/luxon@3.4.4": "https://cdn.skypack.dev/luxon@3.4.4"
   }
 }

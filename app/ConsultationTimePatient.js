@@ -1,10 +1,8 @@
-// ConsultationTimePatient.js - FINAL VERSION
-
 import "react-native-url-polyfill/auto";
 import React from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
-  Alert, ActivityIndicator, Platform, StatusBar,
+  Alert, ActivityIndicator, Platform, StatusBar, SafeAreaView
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,8 +12,34 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { DateTime } from 'luxon';
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = (width - 60) / 3;
 const CONSULTATION_DURATION_MINUTES = 45;
+
+const sendNotificationToDoctor = async (bookingData, patientName) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error("User is not authenticated.");
+    }
+    const payload = { booking: bookingData, patient_name: patientName };
+    const headers = new Headers();
+    headers.append('Content-Type', 'application/json');
+    headers.append('Authorization', `Bearer ${session.access_token}`);
+    const response = await fetch('https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Edge Function error: ${response.status} ${errorText}`);
+    }
+    console.log("Successfully triggered doctor notification.");
+    return true;
+  } catch (error) {
+    console.error("Error in sendNotificationToDoctor:", error.message);
+    return false;
+  }
+};
 
 const ConsultationTimePatient = ({ route }) => {
   const navigation = useNavigation();
@@ -23,7 +47,7 @@ const ConsultationTimePatient = ({ route }) => {
   const { doctorId } = route.params;
 
   const [patientId, setPatientId] = React.useState(null);
-  const [patientProfile, setPatientProfile] = React.useState(null); // FIX: Додано стан для профілю
+  const [patientProfile, setPatientProfile] = React.useState(null);
   const [patientTimezone, setPatientTimezone] = React.useState(null);
   const [scheduleData, setScheduleData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -79,7 +103,6 @@ const ConsultationTimePatient = ({ route }) => {
             supabase.from('anketa_doctor').select('consultation_cost').eq('user_id', doctorId).single()
         ]);
         
-        // FIX: Зберігаємо профіль пацієнта
         if(patientProfileRes.data) setPatientProfile(patientProfileRes.data);
 
         let ptZone = patientProfileRes.data?.country_timezone;
@@ -105,10 +128,7 @@ const ConsultationTimePatient = ({ route }) => {
   React.useEffect(() => { fetchScheduleAndProfile() }, [fetchScheduleAndProfile]);
 
   const handleSlotPress = (slot) => {
-    if (slot.isBooked && !slot.isMyBooking) {
-      Alert.alert(t('booked'), t('slot_already_booked_by_other'));
-      return;
-    }
+    // Ця функція не буде викликана для заброньованих слотів через 'disabled'
     setSelectedSlot(prev => (prev?.id === slot.id ? null : slot));
   };
   
@@ -118,10 +138,9 @@ const ConsultationTimePatient = ({ route }) => {
     try {
         const { dbDate, dbTime } = selectedSlot;
         
-        // 1. Створюємо бронювання
         const { data: newBooking, error: insertError } = await supabase.from('patient_bookings').insert({
             patient_id: patientId, doctor_id: doctorId, booking_date: dbDate,
-            booking_time_slot: dbTime, status: 'pending', // Статус 'pending', доки лікар не підтвердить
+            booking_time_slot: dbTime, status: 'pending',
             patient_timezone: patientTimezone, consultation_duration_minutes: CONSULTATION_DURATION_MINUTES,
             amount: doctorConsultationCost,
         }).select().single();
@@ -131,20 +150,7 @@ const ConsultationTimePatient = ({ route }) => {
           throw insertError;
         }
 
-        // 2. FIX: Викликаємо Edge Function для сповіщення лікаря
-        const { data: doctorProfile } = await supabase.from('anketa_doctor').select('language').eq('user_id', doctorId).single();
-        const { data: { session } } = await supabase.auth.getSession();
-        const payload = {
-            booking: newBooking,
-            patient_name: patientProfile.full_name,
-            doctor_language: doctorProfile?.language || 'uk',
-        };
-        const response = await fetch('https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/notify-doctor', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-            body: JSON.stringify(payload)
-        });
-        if (!response.ok) console.error("Failed to trigger doctor notification:", await response.text());
+        await sendNotificationToDoctor(newBooking, patientProfile.full_name);
 
         Alert.alert(t('success_title'), `${t('you_have_successfully_booked_the_slot_for')} ${selectedSlot.time}`);
         setSelectedSlot(null);
@@ -174,122 +180,229 @@ const ConsultationTimePatient = ({ route }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0EB3EB" />
-        <Text style={styles.loadingText}>{t('loading_schedule')}</Text>
-      </View>
+        <LinearGradient colors={['#F7F8FA', '#E8F2F8']} style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0EB3EB" />
+            <Text style={styles.loadingText}>{t('loading_schedule')}</Text>
+        </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <Ionicons name="arrow-back" size={24} color="black" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('book_consultation')}</Text>
-          {/* This empty view acts as a spacer to help center the title */}
-          <View style={{ width: 48 }} /> 
-        </View>
-        <TouchableOpacity
-          style={[styles.bookButton, !selectedSlot && styles.bookButtonDisabled]}
-          onPress={bookSelectedSlots}
-          disabled={booking || !selectedSlot}
-        >
-          {booking ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.bookButtonText}>{t('book_now')}</Text>}
-        </TouchableOpacity>
-      </View>
+    <LinearGradient colors={['#F7F8FA', '#E8F2F8']} style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+            <View style={styles.header}>
+                <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+                    <Ionicons name="arrow-back" size={24} color="#333" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>{t('book_consultation')}</Text>
+                <View style={{ width: 48 }} /> 
+            </View>
 
-      <ScrollView style={styles.scrollViewContent}>
-        {scheduleData.length > 0 ? scheduleData.map((dayData, dayIndex) => (
-          <View key={dayIndex} style={styles.dayCardOuter}>
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)']}
-              style={styles.dayContainerInner}
-            >
-              <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
-              <View style={styles.slotsContainer}>
-                {dayData.slots.map((slot) => {
-                  const isSelected = selectedSlot?.id === slot.id;
-                  let buttonStyle = [styles.timeSlotButton];
-                  let textStyle = [styles.timeSlotText];
-                  let slotLabel = slot.time;
+            <ScrollView contentContainerStyle={styles.scrollViewContent}>
+                {scheduleData.length > 0 ? scheduleData.map((dayData, dayIndex) => (
+                <View key={dayIndex} style={styles.dayCard}>
+                    <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
+                    <View style={styles.slotsContainer}>
+                        {dayData.slots.map((slot) => {
+                        const isSelected = selectedSlot?.id === slot.id;
+                        const isBooked = slot.isBooked;
+                        const isMyBooking = slot.isMyBooking;
 
-                  if (slot.isMyBooking) {
-                    buttonStyle.push(styles.timeSlotButtonBookedByMe);
-                    textStyle.push(styles.timeSlotTextBooked);
-                    slotLabel = `${slot.time}\n(${t('booked')})`;
-                  } else if (slot.isBooked) {
-                    buttonStyle.push(styles.timeSlotButtonBookedByOther);
-                    textStyle.push(styles.timeSlotTextBookedByOther);
-                  } else {
-                    buttonStyle.push(styles.timeSlotButtonAvailable);
-                    textStyle.push(styles.timeSlotTextAvailable);
-                  }
+                        return (
+                            <TouchableOpacity 
+                                key={slot.id} 
+                                style={[
+                                    styles.timeSlotButton,
+                                    isMyBooking ? styles.myBookingSlot : 
+                                    isBooked ? styles.bookedSlot : 
+                                    styles.availableSlot,
+                                    isSelected && styles.selectedSlot
+                                ]}
+                                onPress={() => handleSlotPress(slot)} 
+                                // ### ЗМІНА ТУТ ###
+                                // Тепер будь-який заброньований слот (навіть свій) буде неактивним.
+                                disabled={isBooked}
+                            >
+                                <Text style={[
+                                    styles.timeSlotText,
+                                    isBooked ? styles.bookedText :
+                                    styles.availableText,
+                                    isMyBooking && styles.myBookingText, // Стиль для свого бронювання
+                                    isSelected && styles.selectedText
+                                ]}>
+                                    {isMyBooking ? `${slot.time}\n(${t('booked')})` : slot.time}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                        })}
+                    </View>
+                </View>
+                )) : !loading && <Text style={styles.noScheduleText}>{t('no_schedule_data_available')}</Text>}
+            </ScrollView>
 
-                  if (isSelected) {
-                    buttonStyle.push(styles.timeSlotButtonSelected);
-                    textStyle.push(styles.timeSlotTextSelected);
-                  }
-
-                  return (
-                    <TouchableOpacity
-                      key={slot.id}
-                      style={buttonStyle}
-                      onPress={() => handleSlotPress(slot)}
-                      disabled={slot.isBooked && !slot.isMyBooking}
+            <View style={styles.footer}>
+                <TouchableOpacity onPress={bookSelectedSlots} disabled={booking || !selectedSlot}>
+                    <LinearGradient
+                        colors={!selectedSlot ? ['#B0B0B0', '#909090'] : ['#0EB3EB', '#0A8BC2']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.bookButton}
                     >
-                      <Text style={textStyle}>{slotLabel}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </LinearGradient>
-          </View>
-        )) : !loading && <Text style={styles.noScheduleText}>{t('no_schedule_data_available')}</Text>}
-      </ScrollView>
-    </View>
+                        {booking ? <ActivityIndicator color="#FFFFFF" /> : 
+                        <Text style={styles.bookButtonText}>{t('book_now')}</Text>}
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA', paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 50 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7FA' },
-  loadingText: { marginTop: 10, fontSize: 16, color: '#555' },
-  header: { paddingVertical: 15, paddingHorizontal: 20, alignItems: 'center' },
-  headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 15 },
-  backButton: { backgroundColor: "rgba(14, 179, 235, 0.2)", borderRadius: 25, width: 48, height: 48, justifyContent: "center", alignItems: "center" },
-  // FIX: Styles for centering the title
-  headerTitle: {
+  container: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-    textAlign: 'center', // Ensure text is centered within its container
+  },
+  safeArea: {
+    flex: 1,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bookButton: { backgroundColor: '#0EB3EB', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, width: '80%', alignItems: 'center', shadowColor: '#0EB3EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 8 },
-  bookButtonDisabled: { backgroundColor: '#A0A0A0' },
-  bookButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
-  scrollViewContent: { paddingHorizontal: 15, paddingBottom: 30 },
-  dayCardOuter: { marginTop: 20, borderRadius: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, overflow: 'hidden' },
-  dayContainerInner: { borderRadius: 18, padding: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
-  dayHeader: { fontSize: 19, fontWeight: 'bold', color: '#222', marginBottom: 15, textAlign: 'center' },
-  slotsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
-  // FIX: Adjusted slot button width to better fit the new time format
-  timeSlotButton: { width: '100%', borderRadius: 10, paddingVertical: 14, alignItems: 'center', borderWidth: 1, minHeight: 60, justifyContent: 'center', marginBottom: 10 },
-  timeSlotText: { fontWeight: '500', fontSize: 14, textAlign: 'center' },
-  timeSlotButtonAvailable: { backgroundColor: '#E0F7FA', borderColor: '#0EB3EB' },
-  timeSlotTextAvailable: { color: '#007B8B' },
-  timeSlotButtonBookedByMe: { backgroundColor: '#D1FAE5', borderColor: '#06D6A0' },
-  timeSlotTextBooked: { color: '#059669' },
-  timeSlotButtonBookedByOther: { backgroundColor: '#EEEEEE', borderColor: '#BDBDBD' },
-  timeSlotTextBookedByOther: { color: '#757575', textDecorationLine: 'line-through' },
-  timeSlotButtonSelected: { backgroundColor: '#0EB3EB', borderColor: '#0A84FF' },
-  timeSlotTextSelected: { color: '#FFFFFF', fontWeight: 'bold' },
-  noScheduleText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#555' },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#555',
+    fontFamily: 'System',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  backButton: {
+    backgroundColor: "rgba(14, 179, 235, 0.15)",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  scrollViewContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120, // Залишаємо місце для кнопки
+  },
+  dayCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  dayHeader: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#34495e',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  slotsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  timeSlotButton: {
+    width: '31%',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    minHeight: 60, // Мінімальна висота для слотів з двома рядками
+  },
+  timeSlotText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  availableSlot: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#B3E5FC',
+  },
+  availableText: {
+    color: '#0288D1',
+  },
+  bookedSlot: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E0E0E0',
+  },
+  bookedText: {
+    color: '#9E9E9E',
+    textDecorationLine: 'line-through',
+  },
+  myBookingSlot: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#A5D6A7',
+  },
+  myBookingText: {
+    color: '#388E3C',
+  },
+  selectedSlot: {
+    backgroundColor: '#0EB3EB',
+    borderColor: '#0A8BC2',
+    transform: [{ scale: 1.05 }],
+  },
+  selectedText: {
+    color: '#FFFFFF',
+  },
+  noScheduleText: {
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 16,
+    color: '#7f8c8d',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    backgroundColor: 'rgba(247, 248, 250, 0.8)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  bookButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: "#0EB3EB",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  bookButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
 
 export default ConsultationTimePatient;

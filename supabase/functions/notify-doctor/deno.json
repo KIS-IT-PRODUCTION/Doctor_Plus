@@ -1,28 +1,6 @@
 {
-  "compilerOptions": {
-    "lib": ["deno.ns", "esnext"], 
-    "strict": true                
-  },
   "imports": {
-  },
-  "lint": {
-    "rules": {
-      "exclude": ["no-explicit-any"] 
-    }
-  },
-  "tasks": {
-    "start-notify-doctor": "deno run --allow-net --allow-env supabase/functions/notify-doctor/index.ts"
-  },
-  "exclude": [
-    "node_modules",
-    "dist"          
-  ],
-  "fmt": {
-    "options": {
-      "useTabs": false,
-      "lineWidth": 80,
-      "indentWidth": 2,
-      "singleQuote": true
-    }
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "expo-server-sdk": "npm:expo-server-sdk@^3.7.0"
   }
 }

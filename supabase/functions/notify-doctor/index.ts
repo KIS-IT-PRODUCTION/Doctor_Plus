@@ -1,232 +1,145 @@
-// supabase/functions/notify-doctor/index.ts
-
-// Імпорти:
-// serve з Deno standard library для запуску HTTP-сервера.
-// type Request з Deno standard library для явного типування вхідного запиту.
-// createClient з Supabase JS library для взаємодії з Supabase.
-import { serve, type ConnInfo } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'; // Використовуємо esm.sh для сумісності Deno
-import { Expo } from 'https://esm.sh/expo-server-sdk@3.7.0'; // Додано імпорт Expo для кращої явності
-
-const expo = new Expo(); // Ініціалізація Expo SDK
-
-// Отримання змінних оточення Supabase.
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL'); // Прибираємо || '' для кращої перевірки в if
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'); // Прибираємо || ''
-
+import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
+import { createClient } from '@supabase/supabase-js';
+import { Expo } from 'https://esm.sh/expo-server-sdk@3.7.0';
+import { DateTime } from 'https://cdn.skypack.dev/luxon@3.4.4';
+const expo = new Expo();
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("ENVIRONMENT_ERROR: SUPABASE_URL або SUPABASE_SERVICE_ROLE_KEY не встановлені. Переконайтеся, що змінні оточення правильно налаштовані для цієї Edge Function.");
-  throw new Error("Supabase environment variables (URL or Service Role Key) are not set.");
+  throw new Error("Змінні середовища Supabase не налаштовані.");
 }
-
-const supabaseAdmin = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      persistSession: false
-    }
-  }
-);
-
-serve(async (req: Request) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Content-Type': 'application/json', // Завжди повертаємо JSON
+// Допоміжна функція для отримання даних сповіщень лікаря
+async function getDoctorNotificationData(supabaseClient, doctorId) {
+  if (!doctorId) return {
+    token: null,
+    language: 'uk',
+    timezone: 'UTC'
   };
-
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders, status: 204 }); // 204 No Content for preflight
-  }
-
-  if (req.method !== 'POST') {
-    console.warn(`Invalid request method: ${req.method}. Only POST is allowed.`);
-    return new Response(JSON.stringify({ error: 'Method Not Allowed. Only POST requests are accepted.' }), { status: 405, headers: corsHeaders });
-  }
-
   try {
-    let requestBody: any;
-    try {
-      requestBody = await req.json();
-    } catch (jsonError: any) {
-      console.error('Failed to parse request body as JSON:', jsonError.message);
-      return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${jsonError.message}` }), { status: 400, headers: corsHeaders });
-    }
-
-    // ДОДАНО: лог повного тіла запиту на початку для діагностики
-    console.log('Edge Function: Received raw request body:', JSON.stringify(requestBody, null, 2));
-
-    const { doctor_id, patient_name, booking_date, booking_time_slot, booking_id, patient_id } = requestBody; // Використовуємо requestBody напряму
-
-    console.log('Edge Function: Parsed data from request body:', { doctor_id, patient_name, booking_date, booking_time_slot, booking_id, patient_id });
-
-    // Валідація вхідних даних.
-    if (!doctor_id || !patient_name || !booking_date || !booking_time_slot || !booking_id || !patient_id) {
-        const missingFields: string[] = [];
-        if (!doctor_id) missingFields.push('doctor_id');
-        if (!patient_name) missingFields.push('patient_name');
-        if (!booking_date) missingFields.push('booking_date');
-        if (!booking_time_slot) missingFields.push('booking_time_slot');
-        if (!booking_id) missingFields.push('booking_id');
-        if (!patient_id) missingFields.push('patient_id');
-
-        console.error(`Edge Function: Missing required fields in request body: ${missingFields.join(', ')}`);
-        return new Response(JSON.stringify({ error: `Missing required fields: ${missingFields.join(', ')}` }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400, // Bad Request
-        });
-    }
-
-    // Перевірка на дійсність UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(doctor_id) || !uuidRegex.test(booking_id) || !uuidRegex.test(patient_id)) {
-        console.warn(`Invalid UUID format for one of the IDs: doctor_id(${doctor_id}), booking_id(${booking_id}), patient_id(${patient_id})`);
-        return new Response(
-            JSON.stringify({ error: 'Invalid UUID format for doctor_id, booking_id, or patient_id.' }),
-            { status: 400, headers: corsHeaders }
-        );
-    }
-
-    // Запит до таблиці 'profile_doctor' для отримання 'notification_token'.
-    const { data: doctorData, error: doctorError } = await supabaseAdmin
-      .from('profile_doctor')
-      .select('notification_token')
-      .eq('user_id', doctor_id)
-      .single();
-
-    if (doctorError) {
-        console.error(`Edge Function: Supabase query error fetching notification_token for doctor ID ${doctor_id}:`, doctorError.message);
-        return new Response(JSON.stringify({ error: 'Doctor not found or database error' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404, // Not Found
-        });
-    }
-    if (!doctorData || !doctorData.notification_token) {
-        console.warn(`Edge Function: Notification token is NULL or empty for doctor ID ${doctor_id}. Cannot send push notification.`);
-        // У цьому випадку ми можемо продовжити, оскільки сповіщення буде збережено в БД
-        // але push-сповіщення не буде відправлено.
-        // Залежно від вашої логіки, це може бути 200 OK або 202 Accepted.
-        return new Response(JSON.stringify({ success: true, message: 'Doctor found, but no valid push token. Notification saved to DB only.', notificationRecordId: null }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-        });
-    }
-
-    const pushToken = doctorData.notification_token;
-    console.log('Edge Function: Found pushToken for doctor:', pushToken);
-
-    const notificationTitle = `Нове бронювання від ${patient_name}`;
-    const notificationBody = `Пацієнт ${patient_name} забронював консультацію на ${booking_date} о ${booking_time_slot}.`;
-
-    const notificationDataForDB = { // Змінено назву змінної, щоб уникнути плутанини
-      type: 'new_booking',
-      doctor_id: doctor_id, // Використовуємо doctor_id з БД
-      patient_name: patient_name,
-      booking_date: booking_date,
-      booking_time_slot: booking_time_slot,
-      booking_id: booking_id,
-      patient_id: patient_id,
-      status: 'pending' // Початковий статус бронювання
+    // ВИПРАВЛЕНО: Запит тепер до правильної таблиці 'profile_doctor'
+    const { data: profile, error } = await supabaseClient.from('profile_doctor').select('notification_token, language, country_timezone').eq('user_id', doctorId).single();
+    if (error) throw error;
+    // Повертаємо дані або значення за замовчуванням, якщо щось не знайдено
+    return {
+      token: profile.notification_token || null,
+      language: profile.language || 'uk',
+      timezone: profile.country_timezone || 'UTC'
     };
-
-    // Зберігаємо сповіщення в таблиці 'doctor_notifications'.
-    console.log("Edge Function: Inserting notification record into doctor_notifications...");
-    const { data: notificationRecord, error: insertError } = await supabaseAdmin
-      .from('doctor_notifications')
-      .insert([
-        {
-          doctor_id: doctor_id,
-          title: notificationTitle,
-          body: notificationBody,
-          data: notificationDataForDB, // Використовуємо дані для БД
-          is_read: false // Якщо це поле залишається в doctor_notifications
-        }
-      ])
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("Edge Function: Error inserting notification record into doctor_notifications:", insertError.message, insertError.details);
-      if (insertError.code === '23503') { // Foreign Key Violation (може статися, якщо doctor_id не існує)
-        return new Response(
-            JSON.stringify({ error: `Doctor (ID: ${doctor_id}) does not exist in public.profile_doctor or FK constraint failed. Cannot save notification.` }),
-            { status: 404, headers: corsHeaders }
-        );
-      }
-      return new Response(JSON.stringify({ error: `Failed to save notification record: ${insertError.message}` }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
+  } catch (e) {
+    console.error(`Помилка отримання даних лікаря ${doctorId}:`, e.message);
+    return {
+      token: null,
+      language: 'uk',
+      timezone: 'UTC'
+    };
+  }
+}
+// Словник для перекладів
+const translations = {
+  newBookingTitle: {
+    uk: `Нове бронювання! 🗓️`,
+    en: `New Booking! 🗓️`
+  },
+  newBookingBody: {
+    uk: (patientName, date, time)=>`Пацієнт ${patientName} забронював консультацію на ${date} о ${time} (ваш місцевий час).`,
+    en: (patientName, date, time)=>`Patient ${patientName} has booked a consultation on ${date} at ${time} (your local time).`
+  }
+};
+const getTranslation = (key, lang, ...args)=>{
+  const selectedLang = lang === 'en' ? 'en' : 'uk';
+  const translation = translations[key]?.[selectedLang];
+  return typeof translation === 'function' ? translation(...args) : translation;
+};
+// Основна логіка Edge Function
+serve(async (req)=>{
+  const responseHeaders = new Headers({
+    'Access-Control-Allow-Origin': '*',
+    'Access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+    'Content-Type': 'application/json'
+  });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: responseHeaders
+    });
+  }
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  try {
+    const { booking, patient_name } = await req.json();
+    if (!booking || !booking.id || !booking.doctor_id || !patient_name) {
+      return new Response(JSON.stringify({
+        error: "Неповні дані для сповіщення."
+      }), {
+        status: 400,
+        headers: responseHeaders
       });
-    } else {
-      console.log("Edge Function: Notification record inserted successfully with ID:", notificationRecord?.id);
     }
-
-    // Надсилання пуш-сповіщення через Expo Push API.
-    const messageForExpo = { // Змінено назву змінної
-      to: pushToken,
-      sound: 'default',
-      title: notificationTitle,
-      body: notificationBody,
-      data: { ...notificationDataForDB, db_id: notificationRecord?.id }, // Додаємо ID запису з БД
-    };
-
-    console.log("Edge Function: Sending push notification to Expo API with payload:", JSON.stringify(messageForExpo, null, 2));
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messageForExpo), // Використовуємо дані для Expo
+    const { doctor_id, booking_date, booking_time_slot, id: booking_id, consultation_duration_minutes } = booking;
+    const duration = consultation_duration_minutes || 45;
+    const { token: doctorPushToken, language: doctorLanguage, timezone: doctorTimezone } = await getDoctorNotificationData(supabaseAdmin, doctor_id);
+    const utcDateTime = DateTime.fromISO(`${booking_date}T${booking_time_slot}`, {
+      zone: 'utc'
     });
-
-    let responseData;
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Edge Function: Expo Push API returned non-OK status ${response.status}:`, errorText);
-        try {
-            responseData = JSON.parse(errorText);
-        } catch (e) {
-            responseData = { message: errorText, originalStatus: response.status };
+    const doctorLocalDateTime = utcDateTime.setZone(doctorTimezone);
+    let formattedDate = booking_date;
+    let formattedTime = booking_time_slot;
+    if (doctorLocalDateTime.isValid) {
+      formattedDate = doctorLocalDateTime.toLocaleString(DateTime.DATE_FULL, {
+        locale: doctorLanguage
+      });
+      const endTime = doctorLocalDateTime.plus({
+        minutes: duration
+      });
+      formattedTime = `${doctorLocalDateTime.toFormat('HH:mm')} - ${endTime.toFormat('HH:mm')}`;
+    }
+    const title = getTranslation('newBookingTitle', doctorLanguage);
+    const body = getTranslation('newBookingBody', doctorLanguage, patient_name, formattedDate, formattedTime);
+    const { data: notification, error: insertError } = await supabaseAdmin.from('doctor_notifications').insert({
+      doctor_id: doctor_id,
+      booking_id: booking_id,
+      title: title,
+      body: body,
+      notification_type: 'new_booking',
+      is_read: false,
+      data: {
+        ...booking,
+        type: 'new_booking',
+        status: 'pending',
+        patient_name
+      }
+    }).select().single();
+    if (insertError) throw new Error(`Не вдалося зберегти сповіщення: ${insertError.message}`);
+    if (doctorPushToken && Expo.isExpoPushToken(doctorPushToken)) {
+      const { count: badgeCount } = await supabaseAdmin.from('doctor_notifications').select('*', {
+        count: 'exact',
+        head: true
+      }).eq('doctor_id', doctor_id).eq('is_read', false);
+      await expo.sendPushNotificationsAsync([
+        {
+          to: doctorPushToken,
+          sound: 'default',
+          title,
+          body,
+          badge: badgeCount ?? 1,
+          data: {
+            db_id: notification.id,
+            ...notification.data
+          }
         }
-        return new Response(JSON.stringify({ error: 'Failed to send push notification via Expo API', details: responseData }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
-        });
+      ]);
     }
-
-    responseData = await response.json();
-    console.log("Edge Function: Expo Push API successful response:", responseData);
-
-    if (responseData.errors && responseData.errors.length > 0) {
-        console.error("Edge Function: Expo Push API reported errors in response data:", responseData.errors);
-        return new Response(JSON.stringify({ error: 'Failed to send push notification (Expo API errors)', details: responseData.errors }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
-        });
-    }
-
-    return new Response(JSON.stringify({ success: true, response: responseData, notificationRecordId: notificationRecord?.id }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify({
+      success: true
+    }), {
       status: 200,
+      headers: responseHeaders
     });
-
-  } catch (error: unknown) {
-    let errorMessage = "An unknown error occurred in the Edge Function.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
-      errorMessage = error.message;
-    }
-
-    console.error("Edge Function: Uncaught error in try-catch block:", errorMessage, error);
-    return new Response(JSON.stringify({ error: `Server error: ${errorMessage}` }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  } catch (err) {
+    console.error('Помилка в Edge Function:', err.message);
+    return new Response(JSON.stringify({
+      error: err.message
+    }), {
       status: 500,
+      headers: responseHeaders
     });
   }
 });

@@ -14,7 +14,7 @@ import {
   TouchableWithoutFeedback,
   Alert,
   RefreshControl,
-  StatusBar // Імпортуємо StatusBar
+  StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
@@ -22,32 +22,24 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
-import * as Notifications from 'expo-notifications'; // Для push-сповіщень
-import * as Device from 'expo-device'; // Для push-сповіщень
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
-// Ваші SVG компоненти
+// Імпортуємо ваші компоненти
 import Icon from "../assets/icon.svg";
 import People from "../assets/Main/people.svg";
-// Компонент TabBar, який ви не надали, але він використовується
-// Припускаємо, що він імпортується з окремого файлу
-import TabBar from "../components/TopBar.js"; // Замініть на правильний шлях, якщо він інший
+import TabBar from "../components/TopBar.js";
 
 
-// Отримання розмірів екрану
 const { width, height } = Dimensions.get("window");
 
-// Функції для масштабування розмірів
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) =>
   size + (scale(size) - size) * factor;
 
-// Визначаємо containerWidth для адаптивності
 const containerWidth = width * 0.9;
 
-// --- ОНОВЛЕНИЙ МАСИВ ВСІХ СПЕЦІАЛІЗАЦІЙ ---
-// Тепер nameKey для всіх спеціалізацій має префікс "categories."
-// Це забезпечить коректне звернення до перекладів у файлах локалізації
 const allDoctorSpecializations = [
   { value: "general_practitioner", nameKey: "general_practitioner" },
   { value: "pediatrician", nameKey: "pediatrician" },
@@ -58,60 +50,61 @@ const allDoctorSpecializations = [
   { value: "psychiatrist", nameKey: "psychiatrist" },
   { value: "dentist", nameKey: "dentist" },
   { value: "ophthalmologist", nameKey: "ophthalmologist" },
-  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
   { value: "gastroenterologist", nameKey: "gastroenterologist" },
   { value: "endocrinologist", nameKey: "endocrinologist" },
   { value: "oncologist", nameKey: "oncologist" },
   { value: "allergist", nameKey: "allergist" },
   { value: "physiotherapist", nameKey: "physiotherapist" },
-  { value: "traumatologist", nameKey: "traumatologist" }, // Додано
-  { value: "gynecologist", nameKey: "gynecologist" },       // Додано
-  { value: "urologist", nameKey: "urologist" },             // Додано
-  { value: "pulmonologist", nameKey: "pulmonologist" },     // Додано
-  { value: "nephrologist", nameKey: "nephrologist" },       // Додано
-  { value: "rheumatologist", nameKey: "rheumatologist" },   // Додано
-  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" }, // Додано
-  { value: "psychologist", nameKey: "psychologist" },       // Додано
-  { value: "nutritionist", nameKey: "nutritionist" },       // Додано
-  { value: "radiologist", nameKey: "radiologist" },         // Додано
-  { value: "anesthesiologist", nameKey: "anesthesiologist" }, // Додано
-  { value: "oncologist_radiation", nameKey: "oncologist_radiation" }, // Додано
-  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" }, // Додано
-  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" }, // Додано
-  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" }, // Додано
-  { value: "immunologist", nameKey: "immunologist" }, // Додано
-  { value: "genetics_specialist", nameKey: "genetics_specialist" }, // Додано
-  { value: "geriatrician", nameKey: "geriatrician" }, // Додано
-  { value: "toxicologist", nameKey: "toxicologist" }, // Додано
-  { value: "forensic_expert", nameKey: "forensic_expert" }, // Додано
-  { value: "epidemiologist", nameKey: "epidemiologist" }, // Додано
-  { value: "pathologist", nameKey: "pathologist" }, // Додано
-  { value: "rehabilitologist", nameKey: "rehabilitologist" }, // Додано
-  { value: "manual_therapist", nameKey: "manual_therapist" }, // Додано
-  { value: "chiropractor", nameKey: "chiropractor" }, // Додано
-  { value: "reflexologist", nameKey: "reflexologist" }, // Додано
-  { value: "massage_therapist", nameKey: "massage_therapist" }, // Додано
-  { value: "dietitian", nameKey: "dietitian" }, // Додано
-  { value: "sexologist", nameKey: "sexologist" }, // Додано
-  { value: "phlebologist", nameKey: "phlebologist" }, // Додано
-  { value: "mammologist", nameKey: "mammologist" }, // Додано
-  { value: "proctologist", nameKey: "proctologist" }, // Додано
-  { value: "andrologist", nameKey: "andrologist" }, // Додано
-  { value: "reproductive_specialist", nameKey: "reproductive_specialist" }, // Додано
-  { value: "transfusiologist", nameKey: "transfusiologist" }, // Додано
-  { value: "balneologist", nameKey: "balneologist" }, // Додано
-  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" }, // Додано
-  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" }, // Додано
-  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" }, // Додано
-  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" }, // Додано
-  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" }, // Додано
-  { value: "neonatologist", nameKey: "neonatologist" }, // Додано
-  { value: "speech_therapist", nameKey: "speech_therapist" }, // Додано
-  { value: "ergotherapist", nameKey: "ergotherapist" }, // Додано
-  { value: "osteopath", nameKey: "osteopath" }, // Додано
-  { value: "homeopath", nameKey: "homeopath" }, // Додано
-  { value: "acupuncturist", nameKey: "acupuncturist" }, // Додано
+  { value: "traumatologist", nameKey: "traumatologist" },
+  { value: "gynecologist", nameKey: "gynecologist" },
+  { value: "urologist", nameKey: "urologist" },
+  { value: "pulmonologist", nameKey: "pulmonologist" },
+  { value: "nephrologist", nameKey: "nephrologist" },
+  { value: "rheumatologist", nameKey: "rheumatologist" },
+  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" },
+  { value: "psychologist", nameKey: "psychologist" },
+  { value: "nutritionist", nameKey: "nutritionist" },
+  { value: "radiologist", nameKey: "radiologist" },
+  { value: "anesthesiologist", nameKey: "anesthesiologist" },
+  { value: "oncologist_radiation", nameKey: "oncologist_radiation" },
+  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" },
+  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" },
+  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" },
+  { value: "immunologist", nameKey: "immunologist" },
+  { value: "genetics_specialist", nameKey: "genetics_specialist" },
+  { value: "geriatrician", nameKey: "geriatrician" },
+  { value: "toxicologist", nameKey: "toxicologist" },
+  { value: "forensic_expert", nameKey: "forensic_expert" },
+  { value: "epidemiologist", nameKey: "epidemiologist" },
+  { value: "pathologist", nameKey: "pathologist" },
+  { value: "rehabilitologist", nameKey: "rehabilitologist" },
+  { value: "manual_therapist", nameKey: "manual_therapist" },
+  { value: "chiropractor", nameKey: "chiropractor" },
+  { value: "reflexologist", nameKey: "reflexologist" },
+  { value: "massage_therapist", nameKey: "massage_therapist" },
+  { value: "dietitian", nameKey: "dietitian" },
+  { value: "sexologist", nameKey: "sexologist" },
+  { value: "phlebologist", nameKey: "phlebologist" },
+  { value: "mammologist", nameKey: "mammologist" },
+  { value: "proctologist", nameKey: "proctologist" },
+  { value: "andrologist", nameKey: "andrologist" },
+  { value: "reproductive_specialist", nameKey: "reproductive_specialist" },
+  { value: "transfusiologist", nameKey: "transfusiologist" },
+  { value: "balneologist", nameKey: "balneologist" },
+  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" },
+  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" },
+  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" },
+  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" },
+  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" },
+  { value: "neonatologist", nameKey: "neonatologist" },
+  { value: "speech_therapist", nameKey: "speech_therapist" },
+  { value: "ergotherapist", nameKey: "ergotherapist" },
+  { value: "osteopath", nameKey: "osteopath" },
+  { value: "homeopath", nameKey: "homeopath" },
+  { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
+
 const Patsient_Home = () => {
   const navigation = useNavigation();
   const { session, loading: authLoading } = useAuth();
@@ -133,6 +126,44 @@ const Patsient_Home = () => {
 
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+
+  // ### НОВИЙ КОД ДЛЯ ЗАВАНТАЖЕННЯ МОВИ ###
+  // Цей useEffect завантажує збережену мову користувача при запуску
+  useEffect(() => {
+    const loadUserLanguage = async () => {
+      if (session?.user) {
+        try {
+          // 1. Робимо запит до профілю, щоб отримати збережену мову
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('language')
+            .eq('user_id', session.user.id)
+            .single();
+
+          // Ігноруємо помилку, якщо рядок просто не знайдено (новий користувач)
+          if (error && error.code !== 'PGRST116') {
+            throw error;
+          }
+
+          // 2. Якщо мова знайдена в профілі, встановлюємо її для всього додатку
+          if (data && data.language) {
+            await i18n.changeLanguage(data.language);
+            console.log(`Language loaded from profile and set to: ${data.language}`);
+          } else {
+            console.log("No language preference found in profile, using default.");
+          }
+        } catch (err) {
+          console.error("Failed to load user language from profile:", err.message);
+          // Якщо сталася помилка, нічого не робимо, залишаємо мову за замовчуванням
+        }
+      }
+    };
+
+    // Викликаємо функцію, коли сесія користувача готова
+    if (!authLoading) {
+      loadUserLanguage();
+    }
+  }, [session, authLoading, i18n]); // Залежності, що запускають цей ефект
 
 
   const fetchUnreadMessagesCount = useCallback(async () => {
@@ -310,12 +341,10 @@ const Patsient_Home = () => {
     };
   }, []);
 
-  // Оновлена функція fetchAvailableSpecializations
   const fetchAvailableSpecializations = useCallback(async () => {
     setLoadingSpecializations(true);
     setSpecializationsError(null);
     try {
-      // Замість запиту до Supabase, просто використовуємо весь локальний масив
       setAvailableSpecializations(allDoctorSpecializations);
     } catch (err) {
       console.error("Unexpected error fetching specializations:", err);
@@ -337,34 +366,25 @@ const Patsient_Home = () => {
       Alert.alert(t("error_title"), t("pleaseEnterText"));
       return;
     }
-
     if (authLoading) {
       Alert.alert(t("loadingUserData"));
       return;
     }
-
     if (!session?.user) {
       Alert.alert(t("error_title"), t("notAuthorized"));
       navigation.navigate("LoginScreen");
       return;
     }
-
     setIsSaving(true);
     try {
       const { data, error } = await supabase.from("user_notes").insert([
-        {
-          user_id: session.user.id,
-          note_text: personalInfoText.trim(),
-        },
+        { user_id: session.user.id, note_text: personalInfoText.trim() },
       ]);
-
       if (error) {
-        console.error("Error saving information:", error);
-        Alert.alert(t("error_title"), t("saveError", { error: error.message }));
-      } else {
-        Alert.alert(t("saveSuccessTitle"), t("saveSuccessMessage"));
-        setPersonalInfoText("");
+        throw error;
       }
+      Alert.alert(t("saveSuccessTitle"), t("saveSuccessMessage"));
+      setPersonalInfoText("");
     } catch (err) {
       console.error("General error saving information:", err);
       Alert.alert(t("error_title"), t("unknownError"));
@@ -378,22 +398,13 @@ const Patsient_Home = () => {
       t("logout_confirm_title"),
       t("logout_confirm_message"),
       [
-        {
-          text: t("no"),
-          style: "cancel",
-        },
-        {
-          text: t("yes"),
+        { text: t("no"), style: "cancel" },
+        { text: t("yes"),
           onPress: async () => {
             const { error } = await supabase.auth.signOut();
             if (error) {
-              console.error("Error signing out:", error.message);
-              Alert.alert(
-                t("error_title"),
-                t("signOutError", { error: error.message })
-              );
+              Alert.alert(t("error_title"), t("signOutError", { error: error.message }));
             } else {
-              Alert.alert(t("signOutSuccessTitle"), t("signOutSuccessMessage"));
               navigation.navigate("HomeScreen");
             }
           },
@@ -412,7 +423,7 @@ const Patsient_Home = () => {
   };
 
   const handleLanguageSelect = async (langCode) => {
-    i18n.changeLanguage(langCode);
+    await i18n.changeLanguage(langCode);
     setDisplayedLanguageCode(langCode.toUpperCase());
     closeLanguageModal();
 
@@ -422,19 +433,13 @@ const Patsient_Home = () => {
           .from('profiles')
           .update({ language: langCode })
           .eq('user_id', session.user.id);
-
         if (error) {
-          console.error("Error updating user language in Supabase:", error.message);
-          Alert.alert(t("error_title"), t("failed_to_save_language", { error: error.message }));
-        } else {
-          console.log(`User ${session.user.id} language updated to: ${langCode}`);
+          throw error;
         }
       } catch (err) {
-        console.error("Unexpected error updating user language:", err);
-        Alert.alert(t("error_title"), t("unknown_error_saving_language"));
+        console.error("Error updating user language in Supabase:", err.message);
+        Alert.alert(t("error_title"), t("failed_to_save_language"));
       }
-    } else {
-      console.warn("No active session, skipping language save to Supabase.");
     }
   };
 
@@ -446,15 +451,9 @@ const Patsient_Home = () => {
     setSpecializationModalVisible(false);
   };
 
-  // Оновлена функція handleSpecializationSelect
   const handleSpecializationSelect = (specializationItem) => {
-    // Додаємо лог для перевірки, що саме приходить:
-    console.log("Selected Specialization Item:", specializationItem);
-
-    // Перевіряємо, чи об'єкт specializationItem існує і має властивість 'value'
     if (specializationItem && specializationItem.value) {
       closeSpecializationModal();
-      // Передаємо specializationItem.value, як і очікує ChooseSpecial
       navigation.navigate("ChooseSpecial", { specialization: specializationItem.value });
     } else {
       console.error("Error: Selected specialization item is undefined or missing 'value'.", specializationItem);
@@ -469,10 +468,12 @@ const Patsient_Home = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchUnreadMessagesCount();
+    if (session?.user) {
+        await fetchUnreadMessagesCount();
+    }
     await fetchAvailableSpecializations();
     setRefreshing(false);
-  }, [fetchUnreadMessagesCount, fetchAvailableSpecializations]);
+  }, [session, fetchUnreadMessagesCount, fetchAvailableSpecializations]);
 
   return (
     <View style={styles.fullScreenContainer}>
@@ -576,11 +577,7 @@ const Patsient_Home = () => {
       >
         <TouchableWithoutFeedback onPress={closeLanguageModal}>
           <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback
-              onPress={() => {
-                // Keep empty to prevent closing modal when pressing inside
-              }}
-            >
+            <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.languageModalContent}>
                 <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
                 {languagesForModal.map((item) => (
@@ -588,9 +585,7 @@ const Patsient_Home = () => {
                     key={item.code}
                     style={[
                       styles.languageOption,
-                      {
-                        borderBottomWidth: item.code === "en" ? 0 : 1,
-                      },
+                      { borderBottomWidth: item.code === "en" ? 0 : 1 },
                     ]}
                     onPress={() => handleLanguageSelect(item.code)}
                   >
@@ -613,11 +608,7 @@ const Patsient_Home = () => {
       >
         <TouchableWithoutFeedback onPress={closeSpecializationModal}>
           <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback
-              onPress={() => {
-                // Keep empty to prevent closing modal
-              }}
-            >
+            <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.specializationModalContent}>
                 <View style={styles.specializationModalHeader}>
                   <Text style={styles.specializationModalTitle} numberOfLines={1} adjustsFontSizeToFit>
@@ -826,7 +817,7 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(50),
   },
   specializationText: {
-    fontSize: moderateScale(18), // Збільшено, як і раніше
+    fontSize: moderateScale(18),
     fontFamily: "Mont-Bold",
     color: "white",
     textAlign: 'center',
@@ -868,7 +859,6 @@ const styles = StyleSheet.create({
     color: "#212121",
     fontFamily: "Mont-Regular",
   },
-
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -914,7 +904,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexWrap: 'wrap',
   },
-
   specializationModalContent: {
     backgroundColor: "white",
     borderRadius: moderateScale(20),
@@ -941,9 +930,8 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(20),
     width: "100%",
   },
-  // Оновлений стиль для заголовка модального вікна спеціалізацій
   specializationModalTitle: {
-    fontSize: moderateScale(18), // Зменшено базовий розмір для кращого вмісту
+    fontSize: moderateScale(18),
     fontFamily: "Mont-Bold",
     color: "#0EB3EB",
     textAlign: "center",
@@ -1046,5 +1034,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
 export default Patsient_Home;
