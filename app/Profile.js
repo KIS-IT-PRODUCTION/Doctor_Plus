@@ -11,7 +11,7 @@ import {
   SafeAreaView,
   Platform,
   Dimensions,
-  Modal, // Додано Modal
+  Modal, StatusBar
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -704,6 +704,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 50,
   },
   container: {
     flex: 1,
@@ -771,7 +772,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === "android" ? moderateScale(30) : 0,
     paddingVertical: moderateScale(10),
     paddingHorizontal: moderateScale(20),
     borderBottomWidth: 1,

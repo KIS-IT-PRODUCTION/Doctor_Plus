@@ -742,7 +742,7 @@ const ChooseSpecial = () => {
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.rightIcon}>
           {/* Повернення відображення логотипу */}
-          <Icon width={moderateScale(40)} height={moderateScale(40)} />
+          <Icon width={moderateScale(50)} height={moderateScale(50)} />
         </View>
       </View>
 
@@ -868,7 +868,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
-    paddingTop: Platform.OS === "android" ? 30 : 0,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
