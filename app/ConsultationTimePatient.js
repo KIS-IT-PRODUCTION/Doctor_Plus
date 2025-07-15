@@ -264,8 +264,8 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
-  },
+paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
+},
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -282,7 +282,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 10,
     paddingBottom: 10,
   },
   backButton: {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -11,15 +11,15 @@ import {
   Platform,
   UIManager,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Icon from "../../assets/icon.svg";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
-// Переконайтеся, що шлях до TopBar_doctor.js є правильним
 import TabBar_doctor from "../../components/TopBar_doctor"; 
+import { supabase } from "../../providers/supabaseClient"; // Імпортуємо клієнт Supabase
 
-// Для анімації LayoutAnimation на Android
 if (
   Platform.OS === "android" &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -27,16 +27,17 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Компонент одного запитання з відповіддю (AccordionItem)
+// Оптимізований компонент одного запитання
 const AccordionItem = ({ title, content, isExpanded, onToggleExpand }) => {
-  const rotateAnimation = new Animated.Value(isExpanded ? 1 : 0);
+  const rotateAnimation = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
 
-  // Анімація обертання стрілки
-  Animated.timing(rotateAnimation, {
-    toValue: isExpanded ? 1 : 0,
-    duration: 300,
-    useNativeDriver: true,
-  }).start();
+  useEffect(() => {
+    Animated.timing(rotateAnimation, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [isExpanded, rotateAnimation]);
 
   const arrowTransform = rotateAnimation.interpolate({
     inputRange: [0, 1],
@@ -51,7 +52,7 @@ const AccordionItem = ({ title, content, isExpanded, onToggleExpand }) => {
           <Ionicons name="chevron-down-outline" size={20} color="#000" />
         </Animated.View>
       </TouchableOpacity>
-      {isExpanded && ( // Залежить від isExpanded
+      {isExpanded && (
         <View style={styles.accordionContent}>
           <Text style={styles.accordionText}>{content}</Text>
         </View>
@@ -62,79 +63,86 @@ const AccordionItem = ({ title, content, isExpanded, onToggleExpand }) => {
 
 export default function Faq_doctor() {
   const navigation = useNavigation();
-  const { t } = useTranslation();
-  // Встановлюємо початкову активну вкладку для цього екрану
-  const [activeTab, setActiveTab] = useState("Questions_doctor"); 
+  const { t, i18n } = useTranslation();
+  const [activeTab, setActiveTab] = useState("Questions_doctor");
   const [expandedItemId, setExpandedItemId] = useState(null);
+
+  // Стани для завантаження даних
+  const [faqData, setFaqData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Функція для завантаження даних з Supabase
+  const fetchFaqs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('faqs')
+        .select('id, question_uk, answer_uk, question_en, answer_en')
+        .order('id', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      setFaqData(data || []);
+    } catch (err) {
+      setError(err.message);
+      console.error("Error fetching FAQs:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      // При фокусі на екрані "Questions_doctor" встановлюємо його як активну вкладку
       setActiveTab("Questions_doctor");
-    }, [])
+      fetchFaqs();
+    }, [fetchFaqs])
   );
 
-  // Функція для обробки натискань на вкладки TabBar_doctor
-  const handleTabPress = (tabName) => {
-    setActiveTab(tabName);
-    // Використовуйте navigation.navigate для переходу між екранами.
-    // Назви екранів повинні відповідати тим, що ви визначили у вашому навігаторі.
-    switch (tabName) {
-      case "Home_doctor":
-        navigation.navigate("Home_doctor"); // Припустимо, у вас є екран "Home_doctor"
-        break;
-      case "Records_doctor":
-        navigation.navigate("Records_doctor"); // Припустимо, у вас є екран "Records_doctor"
-        break;
-      case "Chat_doctor":
-        navigation.navigate("Chat_doctor"); // Припустимо, у вас є екран "Chat_doctor"
-        break;
-      case "Headphones_doctor":
-        navigation.navigate("Support_doctor"); // Припустимо, у вас є екран "Support_doctor"
-        break;
-      case "Stars_doctor": // Можливо, "Reviews_doctor" або схоже
-        navigation.navigate("Rewiew_app"); // Припустимо, у вас є екран "Rewiew_app"
-        break;
-      case "Questions_doctor": // Цей екран FAQ
-        // Якщо ми вже на цьому екрані, не потрібно навігувати знову
-        break;
-      case "Profile_doctor":
-        navigation.navigate("Profile_doctor"); // Припустимо, у вас є екран "Profile_doctor"
-        break;
-      default:
-        break;
-    }
-  };
-
-  const faqData = [
-    { id: "q1", title: t("faq_screen.q1_title"), content: t("faq_screen.q1_answer") },
-    { id: "q2", title: t("faq_screen.q2_title"), content: t("faq_screen.q2_answer") },
-    { id: "q3", title: t("faq_screen.q3_title"), content: t("faq_screen.q3_answer") },
-    { id: "q4", title: t("faq_screen.q4_title"), content: t("faq_screen.q4_answer") },
-    { id: "q5", title: t("faq_screen.q5_title"), content: t("faq_screen.q5_answer") },
-    { id: "q6", title: t("faq_screen.q6_title"), content: t("faq_screen.q6_answer") },
-    { id: "q7", title: t("faq_screen.q7_title"), content: t("faq_screen.q7_answer") },
-    { id: "q8", title: t("faq_screen.q8_title"), content: t("faq_screen.q8_answer") },
-    { id: "q9", title: t("faq_screen.q9_title"), content: t("faq_screen.q9_answer") },
-  ];
+  // Форматуємо дані відповідно до поточної мови
+  const formattedFaqData = useMemo(() => {
+    const currentLang = i18n.language;
+    return faqData.map(item => ({
+      id: item.id,
+      title: currentLang === 'en' ? item.question_en : item.question_uk,
+      content: currentLang === 'en' ? item.answer_en : item.answer_uk,
+    }));
+  }, [faqData, i18n.language]);
 
   const handleToggleExpand = useCallback((id) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedItemId((prevId) => (prevId === id ? null : id));
   }, []);
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t("faq_screen.header_title")}</Text>
-        <View>
-          <Icon width={50} height={50} />
-        </View>
-      </View>
+  // Функція для навігації через TabBar
+  const handleTabPress = (tabName) => {
+    setActiveTab(tabName);
+    navigation.navigate(tabName);
+  };
 
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centeredContainer}>
+          <ActivityIndicator size="large" color="#0EB3EB" />
+        </View>
+      );
+    }
+    if (error) {
+      return (
+        <View style={styles.centeredContainer}>
+          <Text style={styles.errorText}>Помилка завантаження: {error}</Text>
+          <TouchableOpacity onPress={fetchFaqs} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Спробувати ще</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return (
       <ScrollView contentContainerStyle={styles.faqList}>
-        {faqData.map((item) => (
+        {formattedFaqData.map((item) => (
           <AccordionItem
             key={item.id}
             title={item.title}
@@ -142,11 +150,24 @@ export default function Faq_doctor() {
             isExpanded={expandedItemId === item.id}
             onToggleExpand={() => handleToggleExpand(item.id)}
           />
-        ))}    
-
+        ))}
       </ScrollView>
-      <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} /></SafeAreaView>
+    );
+  };
 
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{t("faq_screen.header_title")}</Text>
+        <View>
+          <Icon width={50} height={50} />
+        </View>
+      </View>
+
+      {renderContent()}
+
+      <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
+    </SafeAreaView>
   );
 }
 
@@ -154,13 +175,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "white",
-    paddingTop: Platform.OS === "android"
-      ? StatusBar.currentHeight
-        ? StatusBar.currentHeight + 5
-        : 10
-      : Platform.OS === "ios"
-      ? (StatusBar.currentHeight || 0) + 5
-      : 10,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
   },
   header: {
     flexDirection: "row",
@@ -177,7 +192,7 @@ const styles = StyleSheet.create({
   faqList: {
     paddingVertical: 20,
     paddingHorizontal: 15,
-    paddingBottom: 100, // Додаємо відступ для TabBar_doctor, щоб він не перекривав вміст
+    paddingBottom: 100,
   },
   accordionCard: {
     backgroundColor: "#FFFFFF",
@@ -185,14 +200,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 10,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.22,
     shadowRadius: 2.22,
     elevation: 3,
-    overflow: "hidden", // Важливо для коректного відображення згортання
+    overflow: "hidden",
   },
   accordionHeader: {
     flexDirection: "row",
@@ -201,7 +213,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   accordionTitle: {
-    flex: 1, // Дозволяє заголовку займати доступний простір
+    flex: 1,
     fontSize: 16,
     fontFamily: "Mont-SemiBold",
     color: "#333",
@@ -217,5 +229,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Mont-Regular",
     color: "#555",
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontFamily: 'Mont-Regular',
+    color: 'red',
+    marginBottom: 15,
+  },
+  retryButton: {
+    backgroundColor: '#0EB3EB',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontFamily: 'Mont-SemiBold',
+    color: 'white',
   },
 });

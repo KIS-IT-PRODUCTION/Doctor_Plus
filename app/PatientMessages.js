@@ -89,28 +89,32 @@ export default function PatientMessages() {
     try {
       const { data: notificationData, error: notificationError } = await supabase
         .from('patient_notifications')
-        .select(`id, title, body, created_at, is_read, notification_type, data`)
+        .select(`id, title, body, created_at, is_read, notification_type, data, booking_id`) // Додаємо booking_id сюди напряму
         .eq('patient_id', currentPatientId)
         .order('created_at', { ascending: false });
 
       if (notificationError) throw notificationError;
 
       const bookingIds = notificationData
-        .filter(msg => msg.data?.booking_id && msg.notification_type !== 'admin_announcement')
-        .map(msg => msg.data.booking_id);
+        .filter(msg => msg.booking_id && msg.notification_type !== 'admin_announcement') // Використовуємо msg.booking_id
+        .map(msg => msg.booking_id);
 
       let bookingDetails = {};
       if (bookingIds.length > 0) {
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('patient_bookings')
-          .select('id, doctor_id, status, has_feedback_patient, consultation_conducted, booking_date, booking_time_slot')
+          .select('id, doctor_id, status, has_feedback_patient, consultation_conducted, booking_date, booking_time_slot, is_paid, meet_link') // Додаємо is_paid та meet_link з bookings
           .in('id', bookingIds);
         if (bookingsError) console.error("PatientMessages: Error fetching booking details:", bookingsError.message);
         else bookingsData.forEach(booking => bookingDetails[booking.id] = booking);
       }
 
-      const formattedMessages = notificationData.map(msg => {
-        const bookingInfo = bookingDetails[msg.data?.booking_id] || {};
+      // --- КЛЮЧОВА ЗМІНА: ФІЛЬТРАЦІЯ ПОВІДОМЛЕНЬ ---
+      const processedMessages = new Map(); // Використовуємо Map для зберігання унікальних повідомлень за booking_id
+
+      for (const msg of notificationData) {
+        const bookingInfo = bookingDetails[msg.booking_id] || {};
+        
         let formattedDate = '', formattedTime = '';
         try {
           const createdAtDate = parseISO(msg.created_at);
@@ -122,20 +126,54 @@ export default function PatientMessages() {
           formattedTime = fallbackDate.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
         }
 
-        return {
+        const currentMessage = {
           id: msg.id, title: msg.title, body: msg.body, created_at: msg.created_at,
           date: formattedDate, time: formattedTime, is_read: msg.is_read, type: msg.notification_type,
-          rawData: msg.data || {}, is_paid: msg.data?.is_paid || false,
-          booking_id: msg.data?.booking_id || null, amount: msg.data?.amount || 0,
-          meet_link: msg.data?.meet_link || null, booking_status: bookingInfo.status || null,
+          rawData: msg.data || {}, 
+          // Важливо: is_paid та meet_link тепер беремо з bookingDetails, якщо доступно
+          is_paid: bookingInfo.is_paid || msg.data?.is_paid || false,
+          booking_id: msg.booking_id || null, // Використовуємо booking_id з основного запису
+          amount: msg.data?.amount || 0,
+          meet_link: bookingInfo.meet_link || msg.data?.meet_link || null, // meet_link з bookingInfo має пріоритет
+          booking_status: bookingInfo.status || null,
           has_feedback_patient: bookingInfo.has_feedback_patient === true,
           consultation_conducted: bookingInfo.consultation_conducted === true,
-          booking_date: bookingInfo.booking_date, booking_time_slot: bookingInfo.booking_time_slot,
+          booking_date: bookingInfo.booking_date, 
+          booking_time_slot: bookingInfo.booking_time_slot,
         };
-      });
 
-      setMessages(formattedMessages);
-      const unreadCount = formattedMessages.filter(msg => !msg.is_read).length;
+        // Логіка фільтрації:
+        // Якщо це сповіщення про "payment_update" і оплата підтверджена
+        if (currentMessage.type === 'payment_update' && currentMessage.is_paid) {
+            // Ми віддаємо перевагу цьому повідомленню для даного бронювання
+            processedMessages.set(currentMessage.booking_id, currentMessage);
+            // І переконаємося, що старі "booking_confirmed" повідомлення для цього booking_id не відображаються
+        } else if (currentMessage.type === 'booking_confirmed') {
+            // Якщо це підтвердження бронювання, і для цього booking_id вже є оплачене сповіщення,
+            // то ми не додаємо це підтвердження бронювання
+            if (!processedMessages.has(currentMessage.booking_id)) {
+                processedMessages.set(currentMessage.booking_id, currentMessage);
+            }
+        } else {
+            // Для інших типів повідомлень або якщо немає booking_id, просто додаємо їх
+            // або якщо це новіше повідомлення за датою створення
+            if (!processedMessages.has(currentMessage.booking_id) || 
+                (currentMessage.booking_id && new Date(currentMessage.created_at) > new Date(processedMessages.get(currentMessage.booking_id).created_at))) {
+                processedMessages.set(currentMessage.booking_id, currentMessage);
+            }
+        }
+        // Адмін-повідомлення завжди додаються, оскільки вони не прив'язані до booking_id
+        if (currentMessage.type === 'admin_announcement') {
+            // Для адмін-повідомлень використовуємо їхній власний ID, щоб вони не перезаписували інші
+            processedMessages.set(currentMessage.id, currentMessage); 
+        }
+      }
+
+      // Перетворюємо Map назад у масив і сортуємо за датою створення
+      const finalMessages = Array.from(processedMessages.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      setMessages(finalMessages);
+      const unreadCount = finalMessages.filter(msg => !msg.is_read).length;
       await updateAppBadge(unreadCount);
     } catch (error) {
       Alert.alert(t('error'), `${t('failed_to_load_messages')}: ${error.message}`);
@@ -174,7 +212,6 @@ export default function PatientMessages() {
     }
   }, [t, updateAppBadge]);
 
-  // ### ФУНКЦІЯ З ВИПРАВЛЕННЯМ ###
   const handleLiqPayPayment = useCallback(async (bookingId, amount, description, doctorName) => {
     if (!bookingId || !amount || !description || !currentPatientId) {
       Alert.alert(t('error'), t('liqpay_missing_params'));
@@ -187,14 +224,13 @@ export default function PatientMessages() {
       }
       const userAccessToken = session.access_token;
 
-      // Створюємо заголовки явно, щоб уникнути помилки "is not a constructor"
       const headers = new Headers();
       headers.append('Content-Type', 'application/json');
       headers.append('Authorization', `Bearer ${userAccessToken}`);
 
       const response = await fetch(LIQPAY_INIT_FUNCTION_URL, {
         method: 'POST',
-        headers: headers, // Передаємо створений об'єкт
+        headers: headers,
         body: JSON.stringify({
           amount, bookingId, description, patientId: currentPatientId,
           doctorName: doctorName, server_url: LIQPAY_CALLBACK_FUNCTION_URL,

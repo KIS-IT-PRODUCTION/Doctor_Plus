@@ -1542,7 +1542,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
-    marginLeft: 10,
     textAlign: "center",
     flex: 1,
   },

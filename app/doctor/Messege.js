@@ -81,29 +81,11 @@ export default function Message() {
           .from("doctor_notifications")
           .select("*, booking_id")
           .eq("doctor_id", doctorUserId)
-          .not("data->>type", "eq", "admin_announcement")
           .order("created_at", { ascending: false });
 
         if (doctorError) throw doctorError;
 
-        const { data: adminNotifications, error: adminError } = await supabase
-          .from("doctor_notifications")
-          .select("*, booking_id")
-          .eq("data->>type", "admin_announcement")
-          .order("created_at", { ascending: false });
-
-        if (adminError)
-          console.warn("Error fetching admin notifications:", adminError.message);
-
-        const combinedNotifications = [
-          ...(doctorNotifications || []),
-          ...(adminNotifications || []),
-        ];
-        combinedNotifications.sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-
-        const formattedMessages = combinedNotifications.map((notif) => {
+        const formattedMessages = doctorNotifications.map((notif) => {
           const rawData = notif.data || {};
           const messageType = rawData.type || notif.type || "general";
           let messageStatus = "N/A";
@@ -209,22 +191,16 @@ export default function Message() {
     }, [currentDoctorUserId, fetchMessagesFromSupabase])
   );
 
-  // -- ВИПРАВЛЕНИЙ БЛОК --
-  // Цей useEffect тепер просто викликає оновлення даних при отриманні сповіщення
   useEffect(() => {
-    // Цей слухач спрацьовує, коли сповіщення отримано, а додаток відкритий
     notificationReceivedListener.current =
-      Notifications.addNotificationReceivedListener((notification) => {
-        console.log("Отримано нове сповіщення, оновлюю список...");
+      Notifications.addNotificationReceivedListener(() => {
         if (currentDoctorUserId) {
           fetchMessagesFromSupabase(currentDoctorUserId, true);
         }
       });
 
-    // Цей слухач спрацьовує, коли користувач натискає на сповіщення
     notificationResponseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log("Користувач натиснув на сповіщення, оновлюю список...");
+      Notifications.addNotificationResponseReceivedListener(() => {
         if (currentDoctorUserId) {
           fetchMessagesFromSupabase(currentDoctorUserId, true);
         }
@@ -240,48 +216,24 @@ export default function Message() {
           notificationResponseListener.current
         );
     };
-  }, [currentDoctorUserId, fetchMessagesFromSupabase]); // Оновлені залежності
+  }, [currentDoctorUserId, fetchMessagesFromSupabase]);
 
-  const markAsReadAndStatus = useCallback(
-    async (messageId, newStatus = null) => {
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) => {
-          if (msg.id === messageId) {
-            const updatedRawData = { ...msg.rawData };
-            if (newStatus) updatedRawData.status = newStatus;
-            return { ...msg, is_read: true, rawData: updatedRawData };
-          }
-          return msg;
-        })
-      );
-      try {
-        const { data: currentNotification, error: fetchError } = await supabase
-          .from("doctor_notifications")
-          .select("data, is_read")
-          .eq("id", messageId)
-          .single();
-        if (fetchError) throw fetchError;
-        const existingRawData = currentNotification.data || {};
-        const updatedDataForDB = { ...existingRawData };
-        const updateObject = {};
-        if (newStatus) updatedDataForDB.status = newStatus;
-        updateObject.data = updatedDataForDB;
-        updateObject.is_read = true;
-        await supabase
-          .from("doctor_notifications")
-          .update(updateObject)
-          .eq("id", messageId);
-      } catch (error) {
-        console.error(
-          "Error marking notification as read or updating status:",
-          error.message
-        );
-      }
-    },
-    [t]
-  );
+  const markAsRead = useCallback(async (messageId) => {
+    setMessages((prevMessages) =>
+      prevMessages.map((msg) =>
+        msg.id === messageId ? { ...msg, is_read: true } : msg
+      )
+    );
+    try {
+      await supabase
+        .from("doctor_notifications")
+        .update({ is_read: true })
+        .eq("id", messageId);
+    } catch (error) {
+      console.error("Помилка позначення повідомлення як прочитаного:", error.message);
+    }
+  }, []);
   
-  // Решта вашого коду залишається без змін...
   const updateBookingStatusAndNotify = useCallback(
     async (message, newStatus) => {
       let bookingId = message?.booking_id || message?.rawData?.booking_id || message?.rawData?.id;
@@ -395,16 +347,24 @@ export default function Message() {
             ? t("booking_confirmed_successfully_message")
             : t("booking_rejected_successfully_message")
         );
-        if (message.db_id) await markAsReadAndStatus(message.db_id, newStatus);
+        
+        // Оновлення стану повідомлення в UI та Supabase
+        const updatedRawData = { ...message.rawData, status: newStatus, patient_id: patientId, booking_date: bookingDate, booking_time_slot: bookingTimeSlot, consultation_duration_minutes: consultationDurationMinutes };
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === message.id ? { ...msg, is_read: true, rawData: updatedRawData } : msg
+          )
+        );
+        await supabase.from('doctor_notifications').update({ is_read: true, data: updatedRawData }).eq('id', message.id);
+
       } catch (error) {
         console.error("Error processing booking update:", error.message);
         Alert.alert(t("error"), `${t("failed_to_process_booking")}: ${error.message}`);
       }
     },
-    [t, currentDoctorUserId, doctorFullName, markAsReadAndStatus]
+    [t, currentDoctorUserId, doctorFullName, setMessages]
   );
   
-  // ... і решта ваших функцій та JSX, які залишаються без змін ...
   const handleConfirmBooking = useCallback((message) => {
     Alert.alert(
       t("confirm_booking_title"),
@@ -510,6 +470,7 @@ export default function Message() {
 
       Alert.alert(t("success"), t("meet_link_sent_successfully"));
       
+      // Оновлення стану повідомлення в UI та Supabase
       const updatedData = { ...message.rawData, meet_link: meetLink, patient_id: patientId, booking_id: bookingId };
       setMessages((prev) =>
         prev.map((msg) =>
@@ -521,7 +482,7 @@ export default function Message() {
     } catch (error) {
       Alert.alert(t("error"), `${t("failed_to_send_meet_link")}: ${error.message}`);
     }
-  }, [t, doctorFullName]);
+  }, [t, doctorFullName, setMessages]);
 
   const handleModalSubmit = useCallback(async ({ consultationConducted, consultationStartedOnTime, doctorFeedback }) => {
     if (!selectedMessageForCompletion) return;
@@ -587,12 +548,17 @@ export default function Message() {
         );
         const responseText = await response.text();
         if (!response.ok) throw new Error(`Edge Function error: ${responseText}`);
+        
+        // Оновлення стану повідомлення в UI та Supabase
         const updatedRawData = {
             ...message.rawData,
             status_meet: true, 
             consultation_conducted: consultationConducted,
             consultation_started_on_time: consultationStartedOnTime,
             doctor_feedback: doctorFeedback,
+            patient_id: patientId, // Ensure patient_id is included for consistency
+            booking_date: bookingDate,
+            booking_time_slot: bookingTimeSlot,
         };
 
         const { error: updateError } = await supabase
@@ -620,7 +586,7 @@ export default function Message() {
         setIsModalVisible(false);
         setSelectedMessageForCompletion(null);
     }
-  }, [t, doctorFullName, selectedMessageForCompletion]);
+  }, [t, doctorFullName, selectedMessageForCompletion, setMessages]);
 
   if (loading && !refreshing) {
     return (
@@ -630,6 +596,7 @@ export default function Message() {
       </View>
     );
   }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f0f2f5" />
@@ -789,21 +756,21 @@ export default function Message() {
                     </TouchableOpacity>
                   )}
                   
-                  {isPastConsultation && !isConsultationCompleted && isPaymentSuccessful && (
-                    <TouchableOpacity
-                      onPress={() => handleCompleteConsultation(message)}
-                      style={styles.completeConsultationButton}
-                    >
-                      <LinearGradient
-                        colors={["#FFC107", "#FFA000"]}
-                        style={styles.completeConsultationButtonGradient}
-                      >
-                        <Text style={styles.completeConsultationButtonText}>
-                          {t("complete_consultation")}
-                        </Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  )}
+                 {isPastConsultation && !isConsultationCompleted && isPaymentSuccessful && message.rawData.meet_link && (
+  <TouchableOpacity
+    onPress={() => handleCompleteConsultation(message)}
+    style={styles.completeConsultationButton}
+  >
+    <LinearGradient
+      colors={["#FFC107", "#FFA000"]}
+      style={styles.completeConsultationButtonGradient}
+    >
+      <Text style={styles.completeConsultationButtonText}>
+        {t("complete_consultation")}
+      </Text>
+    </LinearGradient>
+  </TouchableOpacity>
+)}
                   
                   {isConsultationCompleted && (
                     <View style={styles.consultationCompletedIndicator}>
@@ -829,6 +796,17 @@ export default function Message() {
                         {t("admin_announcement_label")}
                       </Text>
                     </View>
+                  )}
+                  
+                  {isAdminAnnouncement && !message.is_read && (
+                    <TouchableOpacity
+                      onPress={() => markAsRead(message.id)}
+                      style={styles.markAsReadButton}
+                    >
+                      <Text style={styles.markAsReadButtonText}>
+                        {t("mark_as_read")}
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </LinearGradient>
               </View>
@@ -886,4 +864,17 @@ const styles = StyleSheet.create({
   consultationCompletedText: { fontFamily: "Mont-SemiBold", fontSize: moderateScale(15), color: '#2E7D32', marginLeft: moderateScale(8), },
   adminMessageIndicator: { flexDirection: 'row', alignItems: 'center', marginTop: verticalScale(10), paddingVertical: verticalScale(5), paddingHorizontal: moderateScale(10), backgroundColor: 'rgba(33, 150, 243, 0.1)', borderRadius: moderateScale(8), alignSelf: 'flex-start', },
   adminMessageText: { fontFamily: "Mont-SemiBold", fontSize: moderateScale(13), color: '#2196F3', marginLeft: moderateScale(5), },
+  markAsReadButton: {
+    marginTop: verticalScale(12),
+    alignSelf: 'flex-end',
+    paddingVertical: verticalScale(6),
+    paddingHorizontal: moderateScale(12),
+    backgroundColor: 'rgba(14, 179, 235, 0.1)',
+    borderRadius: moderateScale(20),
+  },
+  markAsReadButtonText: {
+    fontFamily: "Mont-SemiBold",
+    fontSize: moderateScale(13),
+    color: '#0A8BC2',
+  },
 });

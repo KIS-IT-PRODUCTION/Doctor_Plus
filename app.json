@@ -11,11 +11,7 @@
     "splash": {
       "image": "./assets/icon2.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "tabletImage": "./assets/icon2.png",
-      "tabletBackgroundColor": "#ffffff",
-      "darkModeImage": "./assets/icon2.png",
-      "darkModeBackgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff"
     },
     "extra": {
       "supabaseUrl": "https://yslchkbmupuyxgidnzrb.supabase.co",
@@ -31,22 +27,19 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates."
-      },
-      "splash": {
-        "image": "./assets/icon2.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#ffffff",
-        "tabletImage": "./assets/icon2.png",
-        "tabletBackgroundColor": "#ffffff",
-        "darkModeImage": "./assets/icon2.png",
-        "darkModeBackgroundColor": "#ffffff"
       }
     },
+    
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon2.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+       "splash": {
+      "image": "./assets/icon2.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
       "edgeToEdgeEnabled": true,
       "package": "com.kis_production.DOCTOR",
       "googleServicesFile": "./google-services.json",
@@ -81,7 +74,7 @@
       "favicon": "./assets/icon.png"
     },
     "notification": {
-      "icon": "./assets/icon2.png",
+      "icon": "./assets/notification-icon.png",
       "iosDisplayInForeground": true
     },
     "plugins": [

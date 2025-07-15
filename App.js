@@ -1,5 +1,5 @@
+import 'core-js/actual/structured-clone';
 import "react-native-url-polyfill/auto";
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Text,

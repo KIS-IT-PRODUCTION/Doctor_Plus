@@ -115,7 +115,7 @@
   "doctor_not_found": "Профіль лікаря не знайдено.",
   "back_to_home": "На головну",
   "more_about_doctor": "Детальніше про лікаря",
-  "choose_consultation_time": "Виберіть час консультації",
+  "choose_consultation_time": "Мій розклад",
   "doctor_id_missing_for_consultation": "Ідентифікатор лікаря відсутній. Неможливо перейти до бронювання консультації.",
 
   "home": "Головна",
@@ -126,7 +126,6 @@
   "find_doctor": "Знайти лікаря",
   "search_placeholder": "Пошук...",
   "loading_authentication": "Завантаження автентифікації...",
-
   "error_general_fetch_failed": "Під час завантаження профілю сталася загальна помилка.",
   "error_general_save_failed": "Під час збереження профілю сталася загальна помилка.",
   "error_empty_fullname": "Будь ласка, введіть ваше повне ім'я.",
@@ -908,6 +907,9 @@
     "failed_to_submit_feedback": "Не вдалося відправити відгук",
     "feedback_submitted_successfully": "Відгук успішно надіслано!"
   },
+  "you_have_successfully_booked_the_slot_for": "Ви успішно записалися на консультацію",
+  "are_you_sure_you_want_to_book_for": "Ви впевнені, що хочете записатися на консультацію?",
+  "admin_announcement_label": "Оголошення адміністратора",
   "submit": "Відправити",
   "leave_feedback_button": "Залишити відгук",
   "feedback_left": "Відгук залишено",

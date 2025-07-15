@@ -115,7 +115,7 @@
   "doctor_not_found": "Doctor profile not found.",
   "back_to_home": "Back to home",
   "more_about_doctor": "More about the doctor",
-  "choose_consultation_time": "Choose consultation time",
+  "choose_consultation_time": "My schedule",
   "doctor_id_missing_for_consultation": "Doctor ID is missing. Cannot proceed to consultation booking.",
 
   "home": "Home",
@@ -824,7 +824,7 @@
 
   "confirm": "Accept",
   "reject_booking_title": "Reject booking?",
-
+ "admin_announcement_label": "Admin Announcement",
   "booking_status_confirmed": "Booking Confirmed",
   "booking_status_rejected": "Booking Rejected",
   "booking_status_pending": "Pending Confirmation",
@@ -856,5 +856,7 @@
   "patient_role": "Patient",
   "doctor_role": "Doctor",
   "i_agree_with": "I agree with ",
-  "privacy_policy": "Privacy Policy"
+  "privacy_policy": "Privacy Policy",
+  "you_have_successfully_booked_the_slot_for": "You have successfully booked the slot for",
+  "are_you_sure_you_want_to_book_for": "Are you sure you want to book for"
 }

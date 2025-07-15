@@ -21,6 +21,7 @@
     "@react-navigation/native-stack": "^7.3.13",
     "@supabase/supabase-js": "^2.49.4",
     "base64-arraybuffer": "^1.0.2",
+    "core-js": "^3.44.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "expo": "~53.0.9",

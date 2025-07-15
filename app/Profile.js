@@ -495,7 +495,7 @@ const Profile = ({ route }) => {
           onPress={handleChooseConsultationTime}
         >
           <Text style={styles.actionButtonText}>
-            {t("choose_consultation_time")}
+            {t("book_consultation")}
           </Text>
         </TouchableOpacity>
 

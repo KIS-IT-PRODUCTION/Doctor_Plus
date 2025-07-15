@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../../providers/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DateTime } from 'luxon';
+import Icon from "../../assets/icon.svg";
 
 const { width } = Dimensions.get('window');
 const CONSULTATION_DURATION_MINUTES = 45;
@@ -175,13 +176,15 @@ const ConsultationTime = ({ route }) => {
   return (
     <LinearGradient colors={['#F7F8FA', '#E8F2F8']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('my_schedule')}</Text>
-          <View style={{ width: 48 }} /> 
-        </View>
+         <View style={styles.header}>
+                <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+                  <Ionicons name="arrow-back" size={24} color="#000" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>{t("choose_consultation_time")}</Text>
+                <View>
+                  <Icon width={50} height={50} />
+                </View>
+              </View>
 
         <ScrollView contentContainerStyle={styles.scrollViewContent}>
           {scheduleData.map((dayData, dayIndex) => (
