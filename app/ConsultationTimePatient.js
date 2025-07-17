@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../providers/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DateTime } from 'luxon';
+import Constants from 'expo-constants'; // Імпортуємо Constants
 
 const { width } = Dimensions.get('window');
 const CONSULTATION_DURATION_MINUTES = 45;
@@ -219,9 +220,7 @@ const ConsultationTimePatient = ({ route }) => {
                                     isSelected && styles.selectedSlot
                                 ]}
                                 onPress={() => handleSlotPress(slot)} 
-                                // ### ЗМІНА ТУТ ###
-                                // Тепер будь-який заброньований слот (навіть свій) буде неактивним.
-                                disabled={isBooked}
+                                disabled={isBooked} // Будь-який заброньований слот буде неактивним
                             >
                                 <Text style={[
                                     styles.timeSlotText,
@@ -264,8 +263,8 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
-},
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -299,7 +298,9 @@ paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
   },
   scrollViewContent: {
     paddingHorizontal: 20,
-    paddingBottom: 120, // Залишаємо місце для кнопки
+    // Збільшуємо paddingBottom для прокручуваної області
+    // Щоб вміст не перекривався футером
+    paddingBottom: Platform.OS === 'android' ? 120 + Constants.statusBarHeight : 120, // Додано Constants.statusBarHeight
   },
   dayCard: {
     backgroundColor: '#FFFFFF',
@@ -332,7 +333,7 @@ paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    minHeight: 60, // Мінімальна висота для слотів з двома рядками
+    minHeight: 60,
   },
   timeSlotText: {
     fontSize: 13,
@@ -381,7 +382,8 @@ paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
     left: 0,
     right: 0,
     padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    // Використовуємо SafeAreaView для коректного відступу знизу
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20 + (Constants.statusBarHeight || 0), // Додано Constants.statusBarHeight
     backgroundColor: 'rgba(247, 248, 250, 0.8)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',

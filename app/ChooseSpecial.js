@@ -883,12 +883,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-    flex: 1,
-    textAlign: "center",
-    fontFamily: "Mont-Bold",
+   fontFamily: "Mont-SemiBold", fontSize: moderateScale(20), color: "#333" 
   },
   rightIcon: {
     width: 50,

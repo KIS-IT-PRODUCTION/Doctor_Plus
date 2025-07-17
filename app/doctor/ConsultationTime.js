@@ -11,14 +11,18 @@ import { supabase } from '../../providers/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DateTime } from 'luxon';
 import Icon from "../../assets/icon.svg";
-
-const { width } = Dimensions.get('window');
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // <-- Імпортуємо useSafeAreaInsets
+const { width, height } = Dimensions.get("window");
+const scale = (size) => (width / 375) * size;
+const verticalScale = (size) => (height / 812) * size;
+const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 const CONSULTATION_DURATION_MINUTES = 45;
 
 const ConsultationTime = ({ route }) => {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const doctorId = route.params?.doctorId;
+  const insets = useSafeAreaInsets(); // <-- Отримуємо insets
 
   const [doctorAvailableSlots, setDoctorAvailableSlots] = useState({});
   const [scheduleData, setScheduleData] = useState([]);
@@ -186,7 +190,10 @@ const ConsultationTime = ({ route }) => {
                 </View>
               </View>
 
-        <ScrollView contentContainerStyle={styles.scrollViewContent}>
+        <ScrollView contentContainerStyle={[
+          styles.scrollViewContent,
+          { paddingBottom: styles.footer.paddingBottom + styles.saveButton.paddingVertical * 2 + insets.bottom } // Динамічний paddingBottom
+        ]}>
           {scheduleData.map((dayData, dayIndex) => (
             <View key={dayIndex} style={styles.dayCard}>
               <Text style={styles.dayHeader}>{dayData.displayDate}</Text>
@@ -216,7 +223,7 @@ const ConsultationTime = ({ route }) => {
           ))}
         </ScrollView>
         
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}> 
           <TouchableOpacity onPress={saveDoctorAvailability} disabled={saving}>
             <LinearGradient
                 colors={['#0EB3EB', '#0A8BC2']}
@@ -270,13 +277,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
+fontFamily: "Mont-SemiBold", fontSize: moderateScale(20), color: "#333" 
   },
   scrollViewContent: {
     paddingHorizontal: 20,
-    paddingBottom: 120, // Залишаємо місце для кнопки
+    // paddingBottom тепер обчислюється динамічно в JSX
   },
   dayCard: {
     backgroundColor: '#FFFFFF',
@@ -339,14 +344,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    // paddingBottom буде обчислюватися динамічно в JSX з insets.bottom
     backgroundColor: 'rgba(247, 248, 250, 0.8)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
   },
   saveButton: {
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 16, // Використовуємо це значення для розрахунку paddingBottom
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: "#0EB3EB",

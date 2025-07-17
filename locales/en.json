@@ -263,7 +263,8 @@
     "no_messages": "No messages yet.",
     "waiting_for_updates": "Notifications from the doctor regarding your appointments will appear here."
   },
-
+"writeReview.success": "Success!",
+"writeReview.submitSuccess": "Your review has been successfully submitted!",
   "faq_screen": {
     "header_title": "Frequently Asked Questions",
     "q1_title": "Do I need to pay anything in the app?",

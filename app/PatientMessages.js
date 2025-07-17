@@ -87,30 +87,47 @@ export default function PatientMessages() {
     }
     setLoading(true);
     try {
+      // 1. Отримуємо всі повідомлення
       const { data: notificationData, error: notificationError } = await supabase
         .from('patient_notifications')
-        .select(`id, title, body, created_at, is_read, notification_type, data, booking_id`) // Додаємо booking_id сюди напряму
+        .select(`id, title, body, created_at, is_read, notification_type, data, booking_id`)
         .eq('patient_id', currentPatientId)
         .order('created_at', { ascending: false });
 
       if (notificationError) throw notificationError;
 
+      // 2. Визначаємо, які повідомлення непрочитані, щоб позначити їх
+      const unreadMessageIds = notificationData.filter(msg => !msg.is_read).map(msg => msg.id);
+
+      // 3. Позначаємо всі непрочитані повідомлення як прочитані в базі даних
+      if (unreadMessageIds.length > 0) {
+        const { error: markAsReadError } = await supabase
+          .from('patient_notifications')
+          .update({ is_read: true })
+          .in('id', unreadMessageIds);
+        
+        if (markAsReadError) {
+          console.error("PatientMessages: Error marking messages as read:", markAsReadError.message);
+          // Не зупиняємо процес, бо повідомлення все одно потрібно відобразити
+        }
+      }
+
+      // 4. Отримуємо деталі бронювань (логіка без змін)
       const bookingIds = notificationData
-        .filter(msg => msg.booking_id && msg.notification_type !== 'admin_announcement') // Використовуємо msg.booking_id
+        .filter(msg => msg.booking_id && msg.notification_type !== 'admin_announcement')
         .map(msg => msg.booking_id);
 
       let bookingDetails = {};
       if (bookingIds.length > 0) {
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('patient_bookings')
-          .select('id, doctor_id, status, has_feedback_patient, consultation_conducted, booking_date, booking_time_slot, is_paid, meet_link') // Додаємо is_paid та meet_link з bookings
+          .select('id, doctor_id, status, has_feedback_patient, consultation_conducted, booking_date, booking_time_slot, is_paid, meet_link')
           .in('id', bookingIds);
         if (bookingsError) console.error("PatientMessages: Error fetching booking details:", bookingsError.message);
         else bookingsData.forEach(booking => bookingDetails[booking.id] = booking);
       }
 
-      // --- КЛЮЧОВА ЗМІНА: ФІЛЬТРАЦІЯ ПОВІДОМЛЕНЬ ---
-      const processedMessages = new Map(); // Використовуємо Map для зберігання унікальних повідомлень за booking_id
+      const finalProcessedMessages = new Map();
 
       for (const msg of notificationData) {
         const bookingInfo = bookingDetails[msg.booking_id] || {};
@@ -128,13 +145,14 @@ export default function PatientMessages() {
 
         const currentMessage = {
           id: msg.id, title: msg.title, body: msg.body, created_at: msg.created_at,
-          date: formattedDate, time: formattedTime, is_read: msg.is_read, type: msg.notification_type,
+          date: formattedDate, time: formattedTime,
+          is_read: true, // Всі повідомлення, що завантажуються на цей екран, вважаються прочитаними
+          type: msg.notification_type,
           rawData: msg.data || {}, 
-          // Важливо: is_paid та meet_link тепер беремо з bookingDetails, якщо доступно
           is_paid: bookingInfo.is_paid || msg.data?.is_paid || false,
-          booking_id: msg.booking_id || null, // Використовуємо booking_id з основного запису
+          booking_id: msg.booking_id || null,
           amount: msg.data?.amount || 0,
-          meet_link: bookingInfo.meet_link || msg.data?.meet_link || null, // meet_link з bookingInfo має пріоритет
+          meet_link: bookingInfo.meet_link || msg.data?.meet_link || null,
           booking_status: bookingInfo.status || null,
           has_feedback_patient: bookingInfo.has_feedback_patient === true,
           consultation_conducted: bookingInfo.consultation_conducted === true,
@@ -142,39 +160,49 @@ export default function PatientMessages() {
           booking_time_slot: bookingInfo.booking_time_slot,
         };
 
-        // Логіка фільтрації:
-        // Якщо це сповіщення про "payment_update" і оплата підтверджена
-        if (currentMessage.type === 'payment_update' && currentMessage.is_paid) {
-            // Ми віддаємо перевагу цьому повідомленню для даного бронювання
-            processedMessages.set(currentMessage.booking_id, currentMessage);
-            // І переконаємося, що старі "booking_confirmed" повідомлення для цього booking_id не відображаються
-        } else if (currentMessage.type === 'booking_confirmed') {
-            // Якщо це підтвердження бронювання, і для цього booking_id вже є оплачене сповіщення,
-            // то ми не додаємо це підтвердження бронювання
-            if (!processedMessages.has(currentMessage.booking_id)) {
-                processedMessages.set(currentMessage.booking_id, currentMessage);
-            }
-        } else {
-            // Для інших типів повідомлень або якщо немає booking_id, просто додаємо їх
-            // або якщо це новіше повідомлення за датою створення
-            if (!processedMessages.has(currentMessage.booking_id) || 
-                (currentMessage.booking_id && new Date(currentMessage.created_at) > new Date(processedMessages.get(currentMessage.booking_id).created_at))) {
-                processedMessages.set(currentMessage.booking_id, currentMessage);
-            }
-        }
-        // Адмін-повідомлення завжди додаються, оскільки вони не прив'язані до booking_id
+        // Логіка фільтрації, яка була раніше, без змін
         if (currentMessage.type === 'admin_announcement') {
-            // Для адмін-повідомлень використовуємо їхній власний ID, щоб вони не перезаписували інші
-            processedMessages.set(currentMessage.id, currentMessage); 
+            finalProcessedMessages.set(`admin_${currentMessage.id}`, currentMessage); 
+        } else if (currentMessage.booking_id) {
+            const existingMessage = finalProcessedMessages.get(currentMessage.booking_id);
+
+            if (!existingMessage) {
+                finalProcessedMessages.set(currentMessage.booking_id, currentMessage);
+            } else {
+                let shouldReplace = false;
+
+                if (currentMessage.type === 'payment_update') {
+                    if (existingMessage.type !== 'payment_update' || currentMessage.is_paid > existingMessage.is_paid) {
+                        shouldReplace = true;
+                    }
+                } 
+                else if (currentMessage.type === 'booking_rejected') {
+                    if (existingMessage.type !== 'booking_rejected') {
+                        shouldReplace = true;
+                    }
+                }
+                else if (currentMessage.type === 'booking_confirmed') {
+                    if (existingMessage.type !== 'payment_update' && existingMessage.type !== 'booking_rejected') {
+                        if (new Date(currentMessage.created_at) > new Date(existingMessage.created_at)) {
+                            shouldReplace = true;
+                        }
+                    }
+                }
+                if (existingMessage.is_paid && !currentMessage.is_paid) {
+                    shouldReplace = false;
+                }
+
+                if (shouldReplace) {
+                    finalProcessedMessages.set(currentMessage.booking_id, currentMessage);
+                }
+            }
         }
       }
 
-      // Перетворюємо Map назад у масив і сортуємо за датою створення
-      const finalMessages = Array.from(processedMessages.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const finalMessages = Array.from(finalProcessedMessages.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
       setMessages(finalMessages);
-      const unreadCount = finalMessages.filter(msg => !msg.is_read).length;
-      await updateAppBadge(unreadCount);
+      await updateAppBadge(0); // Встановлюємо бейдж в 0, бо всі повідомлення тепер прочитані
     } catch (error) {
       Alert.alert(t('error'), `${t('failed_to_load_messages')}: ${error.message}`);
     } finally {
@@ -192,11 +220,13 @@ export default function PatientMessages() {
     fetchMessagesFromSupabase();
   }, [fetchMessagesFromSupabase]);
 
+  // Функція markSingleAsRead тепер не потрібна для автоматичного прочитання
+  // але залишаємо її, якщо є ручні кнопки "Прочитати" на картці повідомлення.
   const markSingleAsRead = useCallback(async (messageId) => {
     if (!messageId) return;
     setMessages(prev => {
       const updated = prev.map(msg => msg.id === messageId ? { ...msg, is_read: true } : msg);
-      updateAppBadge(updated.filter(m => !m.is_read).length);
+      updateAppBadge(updated.filter(m => !m.is_read).length); // Оновлюємо бейдж, якщо є інші непрочитані
       return updated;
     });
     try {
@@ -204,6 +234,7 @@ export default function PatientMessages() {
       if (error) throw error;
     } catch (error) {
       Alert.alert(t('error'), `${t('failed_to_mark_as_read')}: ${error.message}`);
+      // Відкат стану, якщо сталася помилка
       setMessages(prev => {
         const reverted = prev.map(msg => msg.id === messageId ? { ...msg, is_read: false } : msg);
         updateAppBadge(reverted.filter(m => !m.is_read).length);
@@ -249,13 +280,26 @@ export default function PatientMessages() {
       const formBody = `data=${encodeURIComponent(data)}&signature=${encodeURIComponent(signature)}`;
       const fullUrl = `${liqPayUrl}?${formBody}`;
       const supported = await Linking.canOpenURL(fullUrl);
-      if (supported) await Linking.openURL(fullUrl);
-      else throw new Error(`${t('cannot_open_url')}: ${fullUrl}`);
+      if (supported) {
+          await Linking.openURL(fullUrl);
+          // Після відкриття LiqPay, оновлюємо стан, щоб повідомлення про підтвердження бронювання
+          // відображалося як прочитане або приховане, поки не прийде payment_update.
+          setMessages(prevMessages => prevMessages.map(msg =>
+              (msg.booking_id === bookingId && msg.type === 'booking_confirmed' && !msg.is_read)
+                  ? { ...msg, is_read: true } // Позначаємо як прочитане, щоб зникло з лічильника
+                  : msg
+          ));
+          // Оновлюємо лічильник бейджів після зміни стану
+          updateAppBadge(messages.filter(m => !(m.booking_id === bookingId && m.type === 'booking_confirmed')).filter(m => !m.is_read).length);
+
+      } else {
+          throw new Error(`${t('cannot_open_url')}: ${fullUrl}`);
+      }
     } catch (error) {
       console.error('Error initializing LiqPay payment:', error);
       Alert.alert(t('error'), `${t('liqpay_payment_init_failed')}: ${error.message}`);
     }
-  }, [currentPatientId, t]);
+  }, [currentPatientId, t, messages, updateAppBadge]);
 
   const handleJoinMeet = useCallback(async (meetLink) => {
     if (!meetLink) return Alert.alert(t('error'), t('meet_link_missing'));
@@ -268,6 +312,8 @@ export default function PatientMessages() {
   }, [t]);
 
   const handleDeepLink = useCallback(({ url }) => {
+    // Надаємо невелику затримку, щоб бекенд встиг оновити статус оплати
+    // і потім оновлюємо повідомлення, які автоматично позначаться прочитаними
     setTimeout(() => fetchMessagesFromSupabase(), 1000);
   }, [fetchMessagesFromSupabase]);
 
@@ -294,13 +340,13 @@ export default function PatientMessages() {
           if (rpcError) console.error(`Error updating points:`, rpcError.message);
         }
       }
-      setMessages(prev => prev.map(msg => msg.booking_id === bookingId ? { ...msg, has_feedback_patient: true } : msg));
-      const relatedMessage = messages.find(msg => msg.booking_id === bookingId);
-      if (relatedMessage && !relatedMessage.is_read) markSingleAsRead(relatedMessage.id);
+      // Оновлюємо стан локально, щоб відобразити зміни без повторного запиту
+      setMessages(prev => prev.map(msg => msg.booking_id === bookingId ? { ...msg, has_feedback_patient: true, is_read: true } : msg)); // Позначаємо прочитаним після фідбеку
+      updateAppBadge(messages.filter(m => !(m.booking_id === bookingId)).filter(m => !m.is_read).length); // Оновлюємо бейдж
     } catch (error) {
       Alert.alert(t('error'), `${t('failed_to_submit_feedback')}: ${error.message}`);
     }
-  }, [t, messages, markSingleAsRead]);
+  }, [t, messages, updateAppBadge]); // markSingleAsRead is no longer directly called here
 
   useEffect(() => {
     if (!currentPatientId) return;
@@ -358,7 +404,8 @@ export default function PatientMessages() {
               return (
                 <View key={message.id} style={styles.messageGroup}>
                   <View style={styles.dateAndTimestamp}><Text style={styles.dateText}>{message.date}</Text><Text style={styles.timestampText}>{message.time}</Text></View>
-                  <TouchableOpacity activeOpacity={0.8} onPress={() => !message.is_read && markSingleAsRead(message.id)} style={cardStyle}>
+                  {/* Забираємо onPress звідси, оскільки повідомлення вже прочитані при завантаженні */}
+                  <TouchableOpacity activeOpacity={1} style={cardStyle}>
                     <Text style={styles.cardTitle}>{message.title}</Text>
                     <Text style={styles.cardText}>{message.body}</Text>
                     {isAdminAnnouncement && (
@@ -378,8 +425,9 @@ export default function PatientMessages() {
                       </>
                     )}
                     <View style={styles.messageActionsRow}>
-                      {message.is_read && <Text style={styles.readStatusText}>{t('read')}</Text>}
-                      {!message.is_read && <TouchableOpacity style={styles.markAsReadButton} onPress={() => markSingleAsRead(message.id)}><Text style={styles.markAsReadButtonText}>{t('mark_as_read')}</Text></TouchableOpacity>}
+                      {/* Цей рядок тепер показує, що повідомлення прочитане, оскільки воно автоматично позначено так. */}
+                      <Text style={styles.readStatusText}>{t('read')}</Text>
+                      {/* Кнопка "Позначити як прочитане" більше не потрібна, якщо повідомлення автоматично прочитані. */}
                     </View>
                   </TouchableOpacity>
                 </View>

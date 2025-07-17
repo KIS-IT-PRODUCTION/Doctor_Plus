@@ -1,29 +1,34 @@
+import "react-native-url-polyfill/auto";
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
-  StyleSheet,
-  View,
-  TextInput,
-  TouchableOpacity,
   Text,
-  ScrollView,
-  SafeAreaView,
-  Dimensions,
-  Platform,
+  View,
   ActivityIndicator,
-  Modal,
+  StyleSheet,
+  Platform,
+  Dimensions,
+  TouchableOpacity,
   TouchableWithoutFeedback,
   Alert,
+  ScrollView,
+  SafeAreaView,
+  StatusBar,
+  TextInput,
   RefreshControl,
-  StatusBar
+  Modal, // Make sure Modal is imported
 } from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+// useSafeAreaInsets is not used in this specific file, so it can be removed
+// if not used by TabBar or other child components directly.
+// import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 // Імпортуємо ваші компоненти
 import Icon from "../assets/icon.svg";
@@ -109,6 +114,8 @@ const Patsient_Home = () => {
   const navigation = useNavigation();
   const { session, loading: authLoading } = useAuth();
   const { t, i18n } = useTranslation();
+  // Removed useSafeAreaInsets as it's not strictly needed for this layout.
+  // The TabBar component should handle its own safe area.
 
   const [personalInfoText, setPersonalInfoText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -126,49 +133,41 @@ const Patsient_Home = () => {
 
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [showSignOutButton, setShowSignOutButton] = useState(false);
 
-  // ### НОВИЙ КОД ДЛЯ ЗАВАНТАЖЕННЯ МОВИ ###
-  // Цей useEffect завантажує збережену мову користувача при запуску
+  const logoTouchAreaRef = useRef(null); // Ref для області логотипу
+
   useEffect(() => {
     const loadUserLanguage = async () => {
       if (session?.user) {
         try {
-          // 1. Робимо запит до профілю, щоб отримати збережену мову
           const { data, error } = await supabase
             .from('profiles')
             .select('language')
             .eq('user_id', session.user.id)
             .single();
 
-          // Ігноруємо помилку, якщо рядок просто не знайдено (новий користувач)
           if (error && error.code !== 'PGRST116') {
             throw error;
           }
 
-          // 2. Якщо мова знайдена в профілі, встановлюємо її для всього додатку
           if (data && data.language) {
             await i18n.changeLanguage(data.language);
-            console.log(`Language loaded from profile and set to: ${data.language}`);
-          } else {
-            console.log("No language preference found in profile, using default.");
           }
         } catch (err) {
           console.error("Failed to load user language from profile:", err.message);
-          // Якщо сталася помилка, нічого не робимо, залишаємо мову за замовчуванням
         }
       }
     };
 
-    // Викликаємо функцію, коли сесія користувача готова
     if (!authLoading) {
       loadUserLanguage();
     }
-  }, [session, authLoading, i18n]); // Залежності, що запускають цей ефект
+  }, [session, authLoading, i18n]);
 
 
   const fetchUnreadMessagesCount = useCallback(async () => {
     if (!session?.user) {
-      console.log("No user session found, cannot fetch unread messages.");
       setUnreadMessagesCount(0);
       return;
     }
@@ -185,7 +184,6 @@ const Patsient_Home = () => {
         setUnreadMessagesCount(0);
       } else {
         setUnreadMessagesCount(count);
-        console.log("Unread messages count fetched:", count);
       }
     } catch (err) {
       console.error("Unexpected error fetching unread messages count:", err);
@@ -195,46 +193,36 @@ const Patsient_Home = () => {
 
 
   const registerForPushNotificationsAsync = useCallback(async (userId) => {
-    console.log("--- START registerForPushNotificationsAsync ---");
-    console.log("Input userId:", userId);
     let token = null;
 
     if (!userId) {
-      console.error("DEBUG: userId is null or undefined at the start of registerForPushNotificationsAsync. Aborting.");
       Alert.alert(t("error"), t("user_id_not_available_for_notifications"));
       return null;
     }
 
     if (Platform.OS === "android") {
       try {
-        console.log("DEBUG: Setting up notification channel for Android...");
         await Notifications.setNotificationChannelAsync("default", {
           name: "default",
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#FF231F7C",
         });
-        console.log("DEBUG: Android notification channel set successfully.");
       } catch (e) {
-        console.error("DEBUG ERROR: Failed to set notification channel for Android:", e);
+        console.error("Failed to set notification channel for Android:", e);
       }
     }
 
     if (Device.isDevice) {
-      console.log("DEBUG: Running on a physical device. Proceeding with permissions check.");
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
-      console.log("DEBUG: Existing notification permissions status:", existingStatus);
 
       if (existingStatus !== "granted") {
-        console.log("DEBUG: Permissions not granted yet. Requesting permissions...");
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
-        console.log("DEBUG: New permission request status:", finalStatus);
       }
 
       if (finalStatus !== "granted") {
-        console.error("DEBUG ERROR: Final notification permissions status is NOT granted:", finalStatus);
         Alert.alert(
           t("error"),
           t("failed_to_get_push_token_permissions")
@@ -242,25 +230,18 @@ const Patsient_Home = () => {
         console.error("Failed to get push token for push notification: Permissions not granted!");
         return null;
       }
-      console.log("DEBUG: Notification permissions GRANTED. Attempting to get Expo Push Token.");
 
       try {
         const expoProjectId = Constants.expoConfig?.extra?.eas?.projectId;
         if (!expoProjectId) {
-            console.error("DEBUG ERROR: Expo Project ID is not defined in app.json extra.eas.projectId.");
             Alert.alert(t("error"), t("expo_project_id_missing"));
             return null;
         }
-        console.log("DEBUG: Using Expo Project ID for token generation:", expoProjectId);
         token = (
           await Notifications.getExpoPushTokenAsync({
             projectId: expoProjectId,
           })
         ).data;
-        console.log("SUCCESS: Expo Push Token obtained:", token);
-        if (!token) {
-          console.warn("DEBUG WARNING: Expo Push Token is UNDEFINED or NULL after getExpoPushTokenAsync.");
-        }
       } catch (e) {
         let errorMessage = 'Unknown error';
         if (e instanceof Error) {
@@ -270,37 +251,23 @@ const Patsient_Home = () => {
         } else if (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string') {
           errorMessage = e.message;
         }
-        console.error("DEBUG ERROR: Error getting Expo push token. Details:", e, "Message:", errorMessage);
         Alert.alert(t("error"), `${t("error_getting_push_token")}: ${errorMessage}. ${t("check_connection")}`);
         return null;
       }
     } else {
-      console.log("DEBUG: Not a physical device. Skipping push notification registration.");
-      console.log("Must use physical device for Push Notifications");
       return null;
     }
 
-    console.log("DEBUG: Attempting to save token to Supabase.");
-    console.log("DEBUG: Token to be saved:", token, "for userId:", userId);
-
     if (token && userId) {
-      console.log(`DEBUG: Saving token '${token}' for user_id '${userId}' to 'profiles' table.`);
       const { data: updateData, error } = await supabase
         .from('profiles')
         .update({ notification_token: token })
         .eq('user_id', userId);
 
       if (error) {
-        console.error("DEBUG ERROR: Помилка збереження push-токену в Supabase:", error.message, "Details:", error);
         Alert.alert(t('error'), `${t('failed_to_save_notification_token')}: ${error.message}`);
-      } else {
-        console.log("SUCCESS: Expo Push Token збережено в Supabase для користувача:", userId);
-        console.log("DEBUG: Supabase update data:", updateData);
       }
-    } else {
-      console.warn("DEBUG WARNING: Відсутній токен або ID користувача, push-токен не збережено. Token:", token, "UserId:", userId);
     }
-    console.log("--- END registerForPushNotificationsAsync ---");
     return token;
   }, [t]);
 
@@ -320,7 +287,6 @@ const Patsient_Home = () => {
 
   useEffect(() => {
     if (!authLoading && session?.user) {
-      console.log("Attempting to register for push notifications for user:", session.user.id);
       registerForPushNotificationsAsync(session.user.id);
       fetchUnreadMessagesCount();
     }
@@ -394,6 +360,7 @@ const Patsient_Home = () => {
   };
 
   const handleSignOut = async () => {
+    setShowSignOutButton(false); // Ховаємо кнопку одразу після натискання
     Alert.alert(
       t("logout_confirm_title"),
       t("logout_confirm_message"),
@@ -415,6 +382,7 @@ const Patsient_Home = () => {
   };
 
   const openLanguageModal = () => {
+    setShowSignOutButton(false); // Ховаємо кнопку, якщо відкривається модальне вікно
     setLanguageModalVisible(true);
   };
 
@@ -444,6 +412,7 @@ const Patsient_Home = () => {
   };
 
   const openSpecializationModal = () => {
+    setShowSignOutButton(false); // Ховаємо кнопку, якщо відкривається модальне вікно
     setSpecializationModalVisible(true);
   };
 
@@ -468,6 +437,7 @@ const Patsient_Home = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setShowSignOutButton(false); // Ховаємо кнопку при оновленні
     if (session?.user) {
         await fetchUnreadMessagesCount();
     }
@@ -475,99 +445,142 @@ const Patsient_Home = () => {
     setRefreshing(false);
   }, [session, fetchUnreadMessagesCount, fetchAvailableSpecializations]);
 
+
+  // Функція для обробки натискань поза кнопкою "Вийти"
+  const handlePressOutside = useCallback((event) => {
+    // Якщо кнопка "Вийти" видима, перевіряємо, чи клік був поза її областю
+    if (showSignOutButton && logoTouchAreaRef.current) {
+      logoTouchAreaRef.current.measure((fx, fy, width, height, px, py) => {
+        const { pageX, pageY } = event.nativeEvent;
+
+        // Розширюємо межі логотипу, щоб включити область видимості кнопки "Вийти"
+        // approximate height of logo + margin + button's height
+        const signOutButtonHeight = verticalScale(8) * 2 + moderateScale(24); // padding * 2 + icon size
+        const combinedAreaHeight = moderateScale(50) + verticalScale(5) + signOutButtonHeight;
+
+        const isInsideCombinedArea =
+          pageX >= px &&
+          pageX <= px + width && // assuming button width matches logoTouchArea width
+          pageY >= py &&
+          pageY <= py + combinedAreaHeight;
+
+        if (!isInsideCombinedArea) {
+          setShowSignOutButton(false);
+        }
+      });
+    }
+  }, [showSignOutButton]);
+
+
   return (
-    <View style={styles.fullScreenContainer}>
-      <SafeAreaView style={styles.safeAreaContent}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContentContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={["#0EB3EB"]}
-              tintColor="#0EB3EB"
-            />
-          }
-        >
-          <View style={styles.container}>
-            <View style={styles.header}>
-              <View style={styles.logoContainer}>
-                <Icon width={moderateScale(50)} height={moderateScale(50)} />
-              </View>
-              <TouchableOpacity
-                style={styles.languageButton}
-                onPress={openLanguageModal}
-              >
-                <View style={styles.languageButtonContent}>
-                  <Text style={styles.languageText}>
-                    {displayedLanguageCode}
-                  </Text>
-                  <Ionicons name="globe-outline" size={moderateScale(16)} color="white" />
+    // Обгортаємо весь вміст екрану в єдиний кореневий View.
+    // TouchableWithoutFeedback буде першим і єдиним дочірнім елементом цього View.
+    <View style={styles.rootContainer}> 
+      <TouchableWithoutFeedback onPress={handlePressOutside} accessible={false}>
+        <View style={styles.fullScreenContainer}> 
+          <SafeAreaView style={styles.safeAreaContent}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContentContainer}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={["#0EB3EB"]}
+                  tintColor="#0EB3EB"
+                />
+              }
+            >
+              <View style={styles.container}>
+                <View style={styles.header}>
+                  <TouchableOpacity
+                    onPress={() => setShowSignOutButton(!showSignOutButton)}
+                    style={styles.logoTouchArea}
+                    ref={logoTouchAreaRef} // Attach ref here
+                    activeOpacity={1} // Prevents extra opacity change on press
+                  >
+                    <View style={styles.logoContainer}>
+                      <Icon width={moderateScale(50)} height={moderateScale(50)} />
+                    </View>
+                    {showSignOutButton && (
+                      <TouchableOpacity
+                        style={styles.signOutButtonAbsolute}
+                        onPress={handleSignOut}
+                      >
+                        <Ionicons name="log-out-outline" size={moderateScale(24)} color="white" />
+                        <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.languageButton}
+                    onPress={openLanguageModal}
+                  >
+                    <View style={styles.languageButtonContent}>
+                      <Text style={styles.languageText}>
+                        {displayedLanguageCode}
+                      </Text>
+                      <Ionicons name="globe-outline" size={moderateScale(16)} color="white" />
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.notificationButton}
+                    onPress={() => navigation.navigate("PatientMessages")}
+                  >
+                    <Ionicons
+                      name="notifications-outline"
+                      size={moderateScale(24)}
+                      color="white"
+                    />
+                    {unreadMessagesCount > 0 && (
+                      <View style={styles.notificationBadge}>
+                        <Text style={styles.notificationNumber}>{unreadMessagesCount}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.notificationButton}
-                onPress={() => navigation.navigate("PatientMessages")}
-              >
-                <Ionicons
-                  name="notifications-outline"
-                  size={moderateScale(24)}
-                  color="white"
-                />
-                {unreadMessagesCount > 0 && (
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationNumber}>{unreadMessagesCount}</Text>
+
+                <View style={styles.mainContent}>
+                  <TouchableOpacity
+                    style={styles.specializationButton}
+                    onPress={openSpecializationModal}
+                  >
+                    <Text style={styles.specializationText} numberOfLines={1} adjustsFontSizeToFit>
+                      {t("chooseDoctorSpecialization")}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.doctorsImageContainer}>
+                    <People style={styles.peopleImage} />
                   </View>
-                )}
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.mainContent}>
-              <TouchableOpacity
-                style={styles.signOutButton}
-                onPress={handleSignOut}
-              >
-                <Ionicons name="log-out-outline" size={moderateScale(24)} color="white" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.specializationButton}
-                onPress={openSpecializationModal}
-              >
-                <Text style={styles.specializationText} numberOfLines={1} adjustsFontSizeToFit>
-                  {t("chooseDoctorSpecialization")}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={styles.doctorsImageContainer}>
-                <People style={styles.peopleImage} />
+                  <TouchableOpacity
+                    style={styles.searchContainer}
+                    onPress={() => navigation.navigate("Search")}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="search"
+                      size={moderateScale(20)}
+                      color="#BDBDBD"
+                      style={styles.searchIcon}
+                    />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder={t("search_placeholder")}
+                      placeholderTextColor="#BDBDBD"
+                      editable={false}
+                      pointerEvents="none"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
+            </ScrollView>
+          </SafeAreaView>
 
-              <TouchableOpacity
-                style={styles.searchContainer}
-                onPress={() => navigation.navigate("Search")}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="search"
-                  size={moderateScale(20)}
-                  color="#BDBDBD"
-                  style={styles.searchIcon}
-                />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder={t("search_placeholder")}
-                  placeholderTextColor="#BDBDBD"
-                  editable={false}
-                  pointerEvents="none"
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-
-      <TabBar activeTab={activeTab} onTabPress={setActiveTab} i18n={i18n} />
+          <TabBar activeTab={activeTab} onTabPress={setActiveTab} i18n={i18n} />
+        </View>
+      </TouchableWithoutFeedback>
 
       <Modal
         animationType="fade"
@@ -577,7 +590,7 @@ const Patsient_Home = () => {
       >
         <TouchableWithoutFeedback onPress={closeLanguageModal}>
           <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
+            <TouchableWithoutFeedback onPress={() => { }}>
               <View style={styles.languageModalContent}>
                 <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
                 {languagesForModal.map((item) => (
@@ -608,7 +621,7 @@ const Patsient_Home = () => {
       >
         <TouchableWithoutFeedback onPress={closeSpecializationModal}>
           <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
+            <TouchableWithoutFeedback onPress={() => { }}>
               <View style={styles.specializationModalContent}>
                 <View style={styles.specializationModalHeader}>
                   <Text style={styles.specializationModalTitle} numberOfLines={1} adjustsFontSizeToFit>
@@ -622,7 +635,7 @@ const Patsient_Home = () => {
                       name="close-circle-outline"
                       size={moderateScale(28)}
                       color="#0EB3EB"
-                      style={{ marginLeft: moderateScale(5) }}
+                      style={{ marginLeft: moderateScale(5)} }
                     />
                   </TouchableOpacity>
                 </View>
@@ -648,9 +661,9 @@ const Patsient_Home = () => {
                   >
                     {availableSpecializations.map((spec) => (
                       <TouchableOpacity
-                        key={spec.value} 
+                        key={spec.value}
                         style={styles.specializationItem}
-                        onPress={() => handleSpecializationSelect(spec)} 
+                        onPress={() => handleSpecializationSelect(spec)}
                       >
                         <Text
                           style={styles.specializationItemText}
@@ -667,7 +680,7 @@ const Patsient_Home = () => {
                             name="play"
                             size={moderateScale(14)}
                             color="white"
-                            style={{ marginLeft: moderateScale(5) }}
+                            style={{ marginLeft: moderateScale(5)} }
                           />
                         </View>
                       </TouchableOpacity>
@@ -688,7 +701,11 @@ const Patsient_Home = () => {
     </View>
   );
 };
+
 const styles = StyleSheet.create({
+  rootContainer: { // New style for the absolute top-level View
+    flex: 1,
+  },
   fullScreenContainer: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -702,7 +719,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "flex-start",
     alignItems: "center",
-    paddingBottom: verticalScale(90),
+    paddingBottom: verticalScale(60) + (Platform.OS === 'ios' ? 0 : 20),
   },
   container: {
     flex: 1,
@@ -718,6 +735,12 @@ const styles = StyleSheet.create({
     paddingTop: verticalScale(10),
     paddingBottom: verticalScale(5),
     zIndex: 10,
+    position: 'relative',
+  },
+  logoTouchArea: {
+    position: 'relative',
+    zIndex: 101,
+    // No paddingRight here, the button will stretch within its own padding.
   },
   logoContainer: {
     paddingLeft: scale(5),
@@ -775,16 +798,14 @@ const styles = StyleSheet.create({
     width: containerWidth,
     paddingTop: verticalScale(20),
     paddingBottom: verticalScale(20),
-    position: "relative",
   },
-  signOutButton: {
-    position: "absolute",
-    top: verticalScale(0),
-    right: scale(0),
+  signOutButtonAbsolute: {
+    position: 'absolute',
+    width: 100,
+    top: moderateScale(50) + verticalScale(5),
     backgroundColor: "rgba(255, 0, 0, 0.7)",
-    borderRadius: moderateScale(30),
-    paddingVertical: verticalScale(10),
-    paddingHorizontal: scale(15),
+    borderRadius: moderateScale(15),
+    paddingVertical: verticalScale(8),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -796,11 +817,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: moderateScale(3.84),
     elevation: 5,
-    zIndex: 100,
   },
   signOutButtonText: {
-    color: "white",
-    fontSize: moderateScale(16),
+    color: '#FFFFFF',
+    fontSize: moderateScale(14),
     fontFamily: "Mont-Bold",
     marginLeft: scale(8),
   },
@@ -844,7 +864,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(15),
     width: width * 0.9,
     height: verticalScale(52),
-    marginTop: verticalScale(80),
+    marginTop: verticalScale(30),
   },
   searchIcon: {
     marginRight: scale(10),
@@ -936,6 +956,7 @@ const styles = StyleSheet.create({
     color: "#0EB3EB",
     textAlign: "center",
     marginHorizontal: scale(10),
+    flex: 1,
   },
   modalCloseButton: {
     flexDirection: "row",
@@ -971,7 +992,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   specializationItemText: {
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(15),
     fontFamily: "Mont-Medium",
     color: "#333333",
     flex: 1,
@@ -1034,4 +1055,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
 export default Patsient_Home;

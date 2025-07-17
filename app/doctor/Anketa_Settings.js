@@ -2016,6 +2016,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
+    
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -2036,6 +2037,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingHorizontal: width * 0.05,
     width: "100%",
+        paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
   }),
   headerContainer: {
     width: "100%",

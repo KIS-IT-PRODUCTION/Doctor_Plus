@@ -786,13 +786,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: "bold",
-    color: "#000000",
-    flex: 1,
-    textAlign: "center",
-    marginHorizontal: moderateScale(10),
-    fontFamily: "Mont-Bold",
+ fontFamily: "Mont-SemiBold", fontSize: moderateScale(20), color: "#333" 
   },
   scrollViewContent: {
     paddingHorizontal: moderateScale(15),
