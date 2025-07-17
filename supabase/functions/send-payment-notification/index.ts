@@ -1,157 +1,179 @@
-// supabase/functions/send-payment-notification/index.ts
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'; // Correct import for Supabase client
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const EXPO_PUSH_TOKEN_API_URL = 'https://exp.host/--/api/v2/push/send';
-
+import { createClient } from '@supabase/supabase-js';
+import { Expo } from 'expo-server-sdk';
+import { DateTime } from 'https://cdn.skypack.dev/luxon@3.4.4';
+const expo = new Expo();
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("ENVIRONMENT_ERROR: Supabase ключі не встановлені для send-payment-notification.");
-  throw new Error("Missing environment variables.");
+  throw new Error("Змінні середовища Supabase не налаштовані.");
 }
-
-const supabaseAdmin = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } }
-);
-
-interface PaymentNotificationPayload {
-    bookingId: string;
-    patientId: string;
-    doctorId: string;
-    paymentStatus: string; // e.g., 'paid', 'failed', 'processing'
-    amount: number;
-    currency: string;
-    notificationTitle: string; // Title for the push notification
-    notificationBody: string;  // Body for the push notification
-    pushDataStatus: string;    // Status to include in push notification data (e.g., 'paid', 'failed')
-    pushDataStatusMessage: string; // User-friendly message for push notification data
-}
-
-serve(async (req) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Content-Type': 'application/json',
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+// Допоміжні функції для отримання даних користувачів
+async function getPatientData(patientId) {
+  if (!patientId) return {
+    token: null,
+    language: 'uk',
+    timezone: 'UTC'
   };
-
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders, status: 204 });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405, headers: corsHeaders });
-  }
-
   try {
-    const payload: PaymentNotificationPayload = await req.json();
-    const { bookingId, patientId, doctorId, paymentStatus, amount, currency, notificationTitle, notificationBody, pushDataStatus, pushDataStatusMessage } = payload;
-
-    if (!bookingId || !patientId || !doctorId || !paymentStatus || !amount || !currency || !notificationTitle || !notificationBody) {
-        console.error('SendPaymentNotification: Missing or invalid fields in payload:', payload);
-        return new Response(JSON.stringify({ error: 'Missing or invalid fields in payload' }), { status: 400, headers: corsHeaders });
+    const { data, error } = await supabaseAdmin.from('profiles').select('notification_token, language, country_timezone').eq('user_id', patientId).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return {
+      token: data?.notification_token || null,
+      language: data?.language || 'uk',
+      timezone: data?.country_timezone || 'UTC'
+    };
+  } catch (e) {
+    console.error(`Помилка отримання даних пацієнта ${patientId}:`, e.message);
+    return {
+      token: null,
+      language: 'uk',
+      timezone: 'UTC'
+    };
+  }
+}
+async function getDoctorData(doctorId) {
+  if (!doctorId) return {
+    token: null,
+    language: 'uk',
+    timezone: 'UTC'
+  };
+  try {
+    const profilePromise = supabaseAdmin.from('profile_doctor').select('notification_token, language').eq('user_id', doctorId).single();
+    const anketaPromise = supabaseAdmin.from('anketa_doctor').select('country_timezone').eq('user_id', doctorId).single();
+    const [profileResult, anketaResult] = await Promise.all([
+      profilePromise,
+      anketaPromise
+    ]);
+    if (profileResult.error && profileResult.error.code !== 'PGRST116') throw profileResult.error;
+    if (anketaResult.error && anketaResult.error.code !== 'PGRST116') throw anketaResult.error;
+    return {
+      token: profileResult.data?.notification_token || null,
+      language: profileResult.data?.language || 'uk',
+      timezone: anketaResult.data?.country_timezone || 'UTC'
+    };
+  } catch (e) {
+    console.error(`Помилка отримання даних лікаря ${doctorId}:`, e.message);
+    return {
+      token: null,
+      language: 'uk',
+      timezone: 'UTC'
+    };
+  }
+}
+// Оновлені переклади
+const translations = {
+  paymentSuccessTitle: {
+    uk: `Оплата успішна! ✅`,
+    en: `Payment successful! ✅`
+  },
+  paymentSuccessBody: {
+    uk: (amount, currency, date, time)=>`Оплата ${amount} ${currency} за консультацію ${date} о ${time} (ваш час) пройшла успішно.`,
+    en: (amount, currency, date, time)=>`Payment of ${amount} ${currency} for the consultation on ${date} at ${time} (your time) was successful.`
+  },
+  paymentFailureTitle: {
+    uk: `Помилка оплати ❌`,
+    en: `Payment error ❌`
+  },
+  paymentFailureBody: {
+    uk: (amount, currency, date, time, status)=>`Оплата ${amount} ${currency} за консультацію ${date} о ${time} (ваш час) не вдалася. Статус: ${status}.`,
+    en: (amount, currency, date, time, status)=>`Payment of ${amount} ${currency} for the consultation on ${date} at ${time} (your time) failed. Status: ${status}.`
+  }
+};
+const getTranslation = (key, lang, ...args)=>{
+  const selectedLang = lang === 'en' ? 'en' : 'uk';
+  const translation = translations[key]?.[selectedLang];
+  return typeof translation === 'function' ? translation(...args) : translation;
+};
+serve(async (req)=>{
+  const corsHeaders = new Headers();
+  corsHeaders.append('Access-Control-Allow-Origin', '*');
+  corsHeaders.append('Access-Control-Allow-Headers', 'authorization, x-client-info, apikey, content-type');
+  corsHeaders.append('Content-Type', 'application/json');
+  if (req.method === 'OPTIONS') return new Response('ok', {
+    headers: corsHeaders
+  });
+  try {
+    const payload = await req.json();
+    const { bookingId, patientId, doctorId, paymentStatus, amount, currency, statusMessage, booking_date, booking_time_slot } = payload;
+    if (!bookingId || !patientId || !doctorId || !paymentStatus || !amount || !currency || !booking_date || !booking_time_slot) {
+      return new Response(JSON.stringify({
+        error: 'Неповні дані. Потрібні всі поля, включно з booking_date та booking_time_slot.'
+      }), {
+        status: 400,
+        headers: corsHeaders
+      });
     }
-
-    console.log('SendPaymentNotification: Received payload:', payload);
-
     const messagesToSend = [];
-
-    // --- Сповіщення для пацієнта ---
-    const { data: patientProfile, error: patientProfileError } = await supabaseAdmin
-        .from('profiles')
-        // ЗМІНЕНО: Використовуємо notification_token
-        .select('notification_token')
-        .eq('user_id', patientId)
-        .single();
-
-    if (patientProfileError) {
-        console.error('SendPaymentNotification: Error fetching patient push token:', patientProfileError.message);
-    } else if (patientProfile && patientProfile.notification_token) { // ЗМІНЕНО: Використовуємо notification_token
-        messagesToSend.push({
-            to: patientProfile.notification_token, // ЗМІНЕНО: Використовуємо notification_token
-            title: notificationTitle,
-            body: notificationBody,
-            data: {
-                type: 'payment_status_update',
-                booking_id: bookingId,
-                status: pushDataStatus,
-                status_message: pushDataStatusMessage,
-                amount: amount,
-                currency: currency,
-                recipient_type: 'patient'
-            },
-        });
-        console.log(`SendPaymentNotification: Prepared notification for patient ${patientId}`);
-    } else {
-        console.warn(`SendPaymentNotification: Patient ${patientId} has no notification_token.`); // ЗМІНЕНО лог
-    }
-
-    // --- Сповіщення для лікаря ---
-    const { data: doctorProfile, error: doctorProfileError } = await supabaseAdmin
-        .from('profile_doctor')
-        // ЗМІНЕНО: Використовуємо notification_token
-        .select('full_name, notification_token')
-        .eq('user_id', doctorId)
-        .single();
-    
-    if (doctorProfileError) {
-        console.error('SendPaymentNotification: Error fetching doctor push token:', doctorProfileError.message);
-    } else if (doctorProfile && doctorProfile.notification_token) { // ЗМІНЕНО: Використовуємо notification_token
-        let doctorNotificationTitle = `Оновлення оплати: ${paymentStatus === 'paid' ? 'Успішно' : 'Помилка'}`;
-        let doctorNotificationBody = `Бронювання №${bookingId} на суму ${amount} ${currency}. Статус: ${pushDataStatusMessage}.`;
-        
-        messagesToSend.push({
-            to: doctorProfile.notification_token, // ЗМІНЕНО: Використовуємо notification_token
-            title: doctorNotificationTitle,
-            body: doctorNotificationBody,
-            data: {
-                type: 'payment_status_update',
-                booking_id: bookingId,
-                status: pushDataStatus,
-                status_message: pushDataStatusMessage,
-                amount: amount,
-                currency: currency,
-                recipient_type: 'doctor'
-            },
-        });
-        console.log(`SendPaymentNotification: Prepared notification for doctor ${doctorId}`);
-    } else {
-        console.warn(`SendPaymentNotification: Doctor ${doctorId} has no notification_token.`); // ЗМІНЕНО лог
-    }
-
-    if (messagesToSend.length > 0) {
-        const pushResponse = await fetch(EXPO_PUSH_TOKEN_API_URL, {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Accept-Encoding': 'gzip, deflate',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(messagesToSend),
-        });
-
-        const pushResponseData = await pushResponse.json();
-        console.log('SendPaymentNotification: Expo Push API response:', pushResponseData);
-        if (pushResponseData.errors) {
-            console.error('SendPaymentNotification: Errors in Expo Push API response:', pushResponseData.errors);
-            return new Response(JSON.stringify({ success: false, message: 'Errors sending some notifications', details: pushResponseData.errors }), { status: 500, headers: corsHeaders });
+    const [patientData, doctorData] = await Promise.all([
+      getPatientData(patientId),
+      getDoctorData(doctorId)
+    ]);
+    const utcDateTime = DateTime.fromISO(`${booking_date}T${booking_time_slot}`, {
+      zone: 'utc'
+    });
+    if (!utcDateTime.isValid) throw new Error('Неправильний формат дати або часу.');
+    // --- Сповіщення для ПАЦІЄНТА з його локальним часом ---
+    if (patientData.token) {
+      const patientLocalDateTime = utcDateTime.setZone(patientData.timezone);
+      const formattedDate = patientLocalDateTime.toLocaleString(DateTime.DATE_FULL, {
+        locale: patientData.language
+      });
+      const formattedTime = patientLocalDateTime.toFormat('HH:mm');
+      const title = getTranslation(paymentStatus === 'paid' ? 'paymentSuccessTitle' : 'paymentFailureTitle', patientData.language);
+      const body = getTranslation(paymentStatus === 'paid' ? 'paymentSuccessBody' : 'paymentFailureBody', patientData.language, amount, currency, formattedDate, formattedTime, statusMessage);
+      messagesToSend.push({
+        to: patientData.token,
+        title,
+        body,
+        sound: 'default',
+        data: {
+          type: 'payment_status_update',
+          booking_id: bookingId,
+          status: paymentStatus
         }
-    } else {
-        console.warn('SendPaymentNotification: No push tokens found for patient or doctor. No notifications sent.');
+      });
     }
-
-    return new Response(JSON.stringify({ success: true, message: 'Notifications processed' }), { status: 200, headers: corsHeaders });
-
-  } catch (error: unknown) {
-    let errorMessage = "An unknown error occurred in send-payment-notification.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
+    // --- Сповіщення для ЛІКАРЯ з його локальним часом ---
+    if (doctorData.token) {
+      // ### FIX: Окремий розрахунок часу для лікаря ###
+      const doctorLocalDateTime = utcDateTime.setZone(doctorData.timezone);
+      const formattedDateForDoctor = doctorLocalDateTime.toLocaleString(DateTime.DATE_FULL, {
+        locale: doctorData.language
+      });
+      const formattedTimeForDoctor = doctorLocalDateTime.toFormat('HH:mm');
+      const title = getTranslation(paymentStatus === 'paid' ? 'paymentSuccessTitle' : 'paymentFailureTitle', doctorData.language);
+      const body = getTranslation(paymentStatus === 'paid' ? 'paymentSuccessBody' : 'paymentFailureBody', doctorData.language, amount, currency, formattedDateForDoctor, formattedTimeForDoctor, statusMessage);
+      messagesToSend.push({
+        to: doctorData.token,
+        title,
+        body,
+        sound: 'default',
+        data: {
+          type: 'payment_status_update',
+          booking_id: bookingId,
+          status: paymentStatus
+        }
+      });
     }
-    console.error("SendPaymentNotification: Uncaught error:", errorMessage, error);
-    return new Response(JSON.stringify({ error: `Server error: ${errorMessage}` }), { status: 500, headers: corsHeaders });
+    if (messagesToSend.length > 0) {
+      await expo.sendPushNotificationsAsync(messagesToSend);
+    }
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Notifications processed'
+    }), {
+      status: 200,
+      headers: corsHeaders
+    });
+  } catch (error) {
+    console.error("Помилка в send-payment-notification:", error.message);
+    return new Response(JSON.stringify({
+      error: `Server error: ${error.message}`
+    }), {
+      status: 500,
+      headers: corsHeaders
+    });
   }
 });
