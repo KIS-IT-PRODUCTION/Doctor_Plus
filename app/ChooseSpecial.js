@@ -13,44 +13,22 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
-  Dimensions
+  Dimensions,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
-import Icon from "../assets/icon.svg"; // Знято коментування для використання логотипу
+import Icon from "../assets/icon.svg";
 
-// Отримання розмірів екрану
+// --- ГЛОБАЛЬНІ КОНСТАНТИ ТА ФУНКЦІЇ МАСШТАБУВАННЯ ---
 const { width, height } = Dimensions.get("window");
-
-// Функції для масштабування розмірів
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
-const moderateScale = (size, factor = 0.5) =>
-  size + (scale(size) - size) * factor;
+const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 
-
-// Helper for safe JSON parsing
-const getParsedArray = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value;
-  }
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn(
-      "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
-      value,
-      e
-    );
-    return [];
-  }
-};
-
-// Data for specializations
+// --- СПИСКИ ДАНИХ (СПЕЦІАЛІЗАЦІЇ, ПРАПОРИ) ---
 const specializationsList = [
   { value: "general_practitioner", nameKey: "general_practitioner" },
   { value: "pediatrician", nameKey: "pediatrician" },
@@ -61,7 +39,7 @@ const specializationsList = [
   { value: "psychiatrist", nameKey: "psychiatrist" },
   { value: "dentist", nameKey: "dentist" },
   { value: "ophthalmologist", nameKey: "ophthalmologist" },
-  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
   { value: "gastroenterologist", nameKey: "gastroenterologist" },
   { value: "endocrinologist", nameKey: "endocrinologist" },
   { value: "oncologist", nameKey: "oncologist" },
@@ -115,8 +93,6 @@ const specializationsList = [
   { value: "homeopath", nameKey: "homeopath" },
   { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
-
-
 const COUNTRY_FLAGS_MAP = {
    "EN": "🇬🇧",
   "UK": "🇺🇦",
@@ -314,112 +290,107 @@ const COUNTRY_FLAGS_MAP = {
   "FM": "🇫🇲", // Federated States of Micronesia
   "FJ": "🇫🇯", // Fiji
 };
-// Reusable component for displaying values in a styled box
-const InfoBox = ({ label, value, children }) => {
+
+// --- ДОПОМІЖНІ ФУНКЦІЇ ---
+
+/**
+ * Безпечно парсить JSON-рядок у масив.
+ * @param {string | any[]} value - Вхідне значення.
+ * @returns {any[]} - Розпарсений масив або порожній масив.
+ */
+const getParsedArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn("Failed to parse array:", value, e);
+    return [];
+  }
+};
+
+/**
+ * Розраховує рейтинг у зірках (0-5) на основі балів.
+ * @param {number} points - Кількість балів.
+ * @returns {number} - Кількість зірок.
+ */
+const calculateStarsFromPoints = (points) => {
+  if (points === null || points === undefined || isNaN(points) || points < 0) return 0;
+  return Math.min(5, Math.floor(points / 200));
+};
+
+
+// --- ДОЧІРНІ КОМПОНЕНТИ ---
+
+/**
+ * Компонент для відображення рядка інформації з іконкою.
+ */
+const InfoBox = ({ icon, label, value, children }) => {
   const { t } = useTranslation();
-  const isEmpty =
-    !value && (!children || (Array.isArray(children) && children.length === 0));
+  const isEmpty = !value && (!children || (Array.isArray(children) && children.length === 0));
+  
   return (
-    <View style={styles.infoBoxRow}>
-      <Text style={styles.infoBoxLabel}>{label}:</Text>
-      <View style={styles.infoBoxValueContainer}>
+    <View style={styles.infoRow}>
+      <Ionicons name={icon} size={moderateScale(18)} color="#546E7A" style={styles.infoIcon} />
+      <Text style={styles.infoLabel}>{label}:</Text>
+      <View style={styles.infoValueContainer}>
         {isEmpty ? (
-          <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-            {t("not_specified")}
-          </Text>
-        ) : children ? (
-          children
-        ) : (
-          <Text style={styles.infoBoxValueText}>{value}</Text>
-        )}
+          <Text style={[styles.infoValue, styles.notSpecifiedText]}>{t("not_specified")}</Text>
+        ) : children || <Text style={styles.infoValue}>{value}</Text>}
       </View>
     </View>
   );
 };
 
-// Функція для відображення прапорів мов
+/**
+ * Компонент для відображення прапорів мов.
+ */
 const LanguageFlags = ({ languages }) => {
-  const { t } = useTranslation();
-  const getFlag = (code) => {
-    return COUNTRY_FLAGS_MAP[String(code).toUpperCase()] || "❓";
-  };
-
-  if (!languages || languages.length === 0) {
-    return (
-      <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-        {t("not_specified")}
-      </Text>
-    );
-  }
-
+  if (!languages || languages.length === 0) return null;
   return (
     <View style={styles.flagsContainer}>
-      {languages.map(
-        (langCode, index) =>
-          typeof langCode === "string" && (
-            <Text key={index} style={styles.flagText}>
-              {getFlag(langCode)}
-            </Text>
-          )
-      )}
+      {languages.map((langCode, index) => (
+        <Text key={index} style={styles.flagText}>{COUNTRY_FLAGS_MAP[String(langCode).toUpperCase()] || "❓"}</Text>
+      ))}
     </View>
   );
 };
 
-// Функція для розрахунку кількості зірочок від 0 до 5
-// де 1000 points = 5 зірочок
-const calculateStarsFromPoints = (points) => {
-  if (points === null || points === undefined || isNaN(points) || points < 0) {
-    return 0; // Якщо балів немає або вони некоректні, повертаємо 0 зірок
-  }
-  // Максимально 1000 балів = 5 зірок. Кожна зірка = 200 балів.
-  return Math.min(5, Math.floor(points / 200));
-};
-
-
+/**
+ * Компонент картки лікаря.
+ */
 const DoctorCard = ({ doctor }) => {
   const navigation = useNavigation();
   const { t } = useTranslation();
 
-  const formatYearsText = useCallback(
-    (years) => {
-      if (years === null || years === undefined || isNaN(years) || years < 0) {
-        return t("not_specified");
-      }
-      const lastDigit = years % 10;
-      const lastTwoDigits = years % 100;
+  // Функція для надійного отримання балів
+  const getPoints = useCallback((doc) => {
+    if (!doc || !doc.profile_doctor) {
+      return null;
+    }
+    // Supabase повертає зв'язки як масив. Беремо перший елемент.
+    const profile = Array.isArray(doc.profile_doctor) ? doc.profile_doctor[0] : doc.profile_doctor;
+    // Повертаємо бали, якщо вони існують і є числом, інакше null.
+    return (profile && typeof profile.doctor_points === 'number') ? profile.doctor_points : null;
+  }, []);
 
-      if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
-        return `${years} ${t("years_plural_genitive")}`;
-      }
-      if (lastDigit === 1) {
-        return `${years} ${t("year_singular")}`;
-      }
-      if (lastDigit >= 2 && lastDigit <= 4) {
-        return `${years} ${t("years_plural_nominative")}`;
-      }
-      return `${years} ${t("years_plural_genitive")}`;
-    },
-    [t]
-  );
+  const doctorPoints = getPoints(doctor);
+  const starRating = calculateStarsFromPoints(doctorPoints);
 
-  const handleGoToDoctor = () => {
-    navigation.navigate("Profile", { doctorId: doctor.user_id });
-  };
+  const formatYearsText = useCallback((years) => {
+    if (years === null || isNaN(years) || years < 0) return t("not_specified");
+    const cases = [2, 0, 1, 1, 1, 2];
+    const titles = [t("years_plural_genitive"), t("year_singular"), t("years_plural_nominative")];
+    return `${years} ${titles[(years % 100 > 4 && years % 100 < 20) ? 2 : cases[Math.min(years % 10, 5)]]}`;
+  }, [t]);
 
-  const getTranslatedSpecializations = (specializationKeys) => {
-    const parsedKeys = getParsedArray(specializationKeys);
-    return parsedKeys
-      .map((specKey) => {
-        const spec = specializationsList.find((s) => s.value === specKey);
-        return spec ? t(spec.nameKey) : specKey; // Fallback to key if not found
-      })
+  const getTranslatedSpecializations = (keys) => {
+    return getParsedArray(keys)
+      .map(key => specializationsList.find(s => s.value === key)?.nameKey || key)
+      .map(nameKey => t(nameKey))
       .join(", ");
   };
-
-  // Отримуємо doctor_points з об'єкта doctor, який має вкладений profile_doctor
-  const doctorPoints = doctor.profile_doctor?.[0]?.doctor_points;
-  const starRating = calculateStarsFromPoints(doctorPoints);
 
   return (
     <View style={styles.card}>
@@ -428,216 +399,111 @@ const DoctorCard = ({ doctor }) => {
           <Image source={{ uri: doctor.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person-circle-outline" size={moderateScale(60)} color="#0EB3EB" />
+            <Ionicons name="person-outline" size={moderateScale(40)} color="#90A4AE" />
           </View>
         )}
         <View style={styles.doctorSummary}>
-          <Text style={styles.doctorName}>{doctor.full_name || t("not_specified")}</Text>
-          <InfoBox label={t("rating")}>
-            {/* Відображаємо повні зірочки */}
-            {Array.from({ length: starRating }).map((_, i) => (
-              <Ionicons key={`star-full-${i}`} name="star" size={moderateScale(18)} color="#FFD700" />
+          <Text style={styles.doctorName} numberOfLines={2}>{doctor.full_name || t("not_specified")}</Text>
+          <View style={styles.ratingContainer}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Ionicons key={i} name={i < starRating ? "star" : "star-outline"} size={moderateScale(18)} color={i < starRating ? "#FFC107" : "#CFD8DC"} />
             ))}
-            {/* Відображаємо пусті зірочки */}
-            {Array.from({ length: 5 - starRating }).map((_, i) => (
-              <Ionicons key={`star-outline-${i}`} name="star-outline" size={moderateScale(18)} color="#ccc" />
-            ))}
-              {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
-              <Text style={styles.ratingPointsText}> ({doctorPoints} {t('points_short')})</Text>
-            )}
-          </InfoBox>
-          <InfoBox label={t("communication_language")}>
-            <LanguageFlags languages={getParsedArray(doctor.communication_languages)} />
-          </InfoBox>
+            {/* ВИПРАВЛЕНО: Показуємо бали, якщо вони не null */}
+            {doctorPoints !== null && <Text style={styles.ratingPointsText}>({doctorPoints})</Text>}
+          </View>
         </View>
       </View>
 
       <View style={styles.cardDetails}>
-        <InfoBox
-          label={t("specialization")}
-          value={getTranslatedSpecializations(doctor.specialization)}
-        />
-        <InfoBox
-          label={t("work_experience")}
-          value={formatYearsText(doctor.experience_years)}
-        />
-        <InfoBox label={t("time_in_app")} value={doctor.time_in_app || t("not_specified")} />
-        {/* Кількість консультацій тепер береться з doctor.consultations_count */}
-        <InfoBox
-          label={t("consultations_count")}
-          value={doctor.consultations_count?.toString() || "0"}
-        />
+        <InfoBox icon="medkit-outline" label={t("specialization")} value={getTranslatedSpecializations(doctor.specialization)} />
+        <InfoBox icon="time-outline" label={t("work_experience")} value={formatYearsText(doctor.experience_years)} />
+        <InfoBox icon="chatbubbles-outline" label={t("consultations_count")} value={doctor.consultations_count?.toString() || "0"} />
+        <InfoBox icon="language-outline" label={t("communication_language")}>
+          <LanguageFlags languages={getParsedArray(doctor.communication_languages)} />
+        </InfoBox>
       </View>
 
       <View style={styles.cardFooter}>
-        <TouchableOpacity style={styles.goToButton} onPress={handleGoToDoctor}>
-          <Text style={styles.goToButtonText}>{t("go_to")}</Text>
-        </TouchableOpacity>
         <Text style={styles.priceText}>
-          {t("price")}:{" "}
-          {doctor.consultation_cost
-            ? `${doctor.consultation_cost}$`
-            : t("not_specified_price")}
+          {doctor.consultation_cost ? `${doctor.consultation_cost}$` : t("not_specified_price")}
         </Text>
+        <TouchableOpacity style={styles.goToButton} onPress={() => navigation.navigate("Profile", { doctorId: doctor.user_id })}>
+          <Text style={styles.goToButtonText}>{t("details")}</Text>
+          <Ionicons name="arrow-forward" size={moderateScale(16)} color="#FFF" />
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-
+// --- ГОЛОВНИЙ КОМПОНЕНТ ЕКРАНА ---
 const ChooseSpecial = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { specialization: initialSpecialization, searchQuery } = route.params || {};
-
   const { t } = useTranslation();
-  const [isSortModalVisible, setSortModalVisible] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(300)).current;
 
+  // Стейт
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentSortOption, setCurrentSortOption] = useState("rating_desc"); // Default sort by rating desc
+  const [currentSortOption, setCurrentSortOption] = useState("rating_desc");
+  const [isSortModalVisible, setSortModalVisible] = useState(false);
+  
+  // Анімація
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
 
-  // --- Додано: Ефект для скидання сортування при зміні спеціалізації ---
-  useEffect(() => {
-    if (initialSpecialization || searchQuery) {
-      setCurrentSortOption("rating_desc");
-    }
-  }, [initialSpecialization, searchQuery]);
-
-
+  // Логіка завантаження даних
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let data = [];
-      let fetchError = null;
-
-      let query = supabase
-        .from("anketa_doctor")
-        .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, doctor_check")
-        .eq("doctor_check", true);
-
+      let query = supabase.from("anketa_doctor").select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, doctor_check").eq("doctor_check", true);
+      
       if (initialSpecialization) {
-        const { data: categoryData, error: categoryError } = await query
-          .filter("specialization", "cs", `["${initialSpecialization}"]`);
-
-        data = categoryData;
-        fetchError = categoryError;
+        query = query.filter("specialization", "cs", `["${initialSpecialization}"]`);
       } else if (searchQuery) {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
-            p_search_query: searchQuery,
-        });
-
-        if (rpcError) {
-            console.error("Error searching doctors with RPC:", rpcError);
-            setError(`${t("error_fetching_doctors")}: ${rpcError.message}`);
+        const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', { p_search_query: searchQuery });
+        if (rpcError) throw rpcError;
+        const doctorIds = rpcData.filter(d => d.doctor_check).map(d => d.user_id);
+        if (doctorIds.length === 0) {
             setDoctors([]);
             setLoading(false);
             return;
         }
-        data = rpcData.filter(doctor => doctor.doctor_check === true);
-        fetchError = rpcError;
-      } else {
-          const { data: allDoctorsData, error: allDoctorsError } = await query;
-          data = allDoctorsData;
-          fetchError = allDoctorsError;
+        query = query.in('user_id', doctorIds);
       }
+      
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
 
-      if (fetchError) {
-        console.error("Error fetching doctors:", fetchError);
-        setError(`${t("error_fetching_doctors")}: ${fetchError.message}`);
-        setDoctors([]);
-      } else {
-        const processedDoctorsPromises = data.map(async (doctor) => {
-          let normalizedProfileDoctor = null;
-          if (doctor.profile_doctor) {
-            if (Array.isArray(doctor.profile_doctor)) {
-              normalizedProfileDoctor = doctor.profile_doctor;
-            } else {
-              normalizedProfileDoctor = [doctor.profile_doctor];
-            }
-          }
+      const consultationCounts = await Promise.all(
+        data.map(d => 
+          supabase.from('patient_bookings').select('id', { count: 'exact', head: true }).eq('doctor_id', d.user_id).eq('consultation_conducted', true)
+        )
+      );
 
-          const parsedCommunicationLanguages = getParsedArray(doctor.communication_languages).map(lang => {
-            if (typeof lang === 'object' && lang !== null && lang.code) {
-              return String(lang.code).toUpperCase();
-            }
-            return String(lang).toUpperCase();
-          }).filter(code => COUNTRY_FLAGS_MAP[code]);
+      const processedDoctors = data.map((doctor, index) => ({
+        ...doctor,
+        consultations_count: consultationCounts[index].count || 0,
+      }));
 
-          let timeInAppDisplay = t("not_specified");
-          if (doctor.created_at) {
-            const joinedDate = new Date(doctor.created_at);
-            const now = new Date();
-            const diffTime = Math.abs(now.getTime() - joinedDate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            if (diffDays < 30) {
-              timeInAppDisplay = t("days_in_app", { count: diffDays });
-            } else if (diffDays < 365) {
-              const diffMonths = Math.floor(diffDays / 30);
-              timeInAppDisplay = t("months_in_app", { count: diffMonths });
-            } else {
-              const diffYears = Math.floor(diffDays / 365);
-              timeInAppDisplay = t("years_in_app", { count: diffYears });
-            }
-          }
-
-          // Fetch consultations count for each doctor
-          const { count: consultationsCount, error: countError } = await supabase
-            .from('patient_bookings')
-            .select('id', { count: 'exact' })
-            .eq('doctor_id', doctor.user_id)
-            .eq('consultation_conducted', true); // Фільтруємо лише проведені консультації
-
-          if (countError) {
-            console.error(`Error fetching consultations count for doctor ${doctor.user_id}:`, countError);
-            // Optionally, handle this error, e.g., set count to 0 or leave it undefined
-          }
-
-          return {
-            ...doctor,
-            profile_doctor: normalizedProfileDoctor,
-            communication_languages: parsedCommunicationLanguages,
-            time_in_app: timeInAppDisplay,
-            consultations_count: consultationsCount || 0, // Додаємо кількість консультацій
-          };
-        });
-
-        const processedDoctors = await Promise.all(processedDoctorsPromises);
-
-
-        const sortedDoctors = [...processedDoctors].sort((a, b) => {
-          const pointsA = a.profile_doctor?.[0]?.doctor_points || 0;
-          const pointsB = b.profile_doctor?.[0]?.doctor_points || 0;
-
-          switch (currentSortOption) {
-            case "experience_desc":
-              return (b.experience_years || 0) - (a.experience_years || 0);
-            case "experience_asc":
-              return (a.experience_years || 0) - (b.experience_years || 0);
-            case "price_asc":
-              return (a.consultation_cost || 0) - (b.consultation_cost || 0);
-            case "price_desc":
-              return (b.consultation_cost || 0) - (a.consultation_cost || 0);
-            case "rating_desc":
-              return pointsB - pointsA;
-            case "rating_asc":
-              return pointsA - pointsB;
-            default:
-              return 0;
-          }
-        });
-
-        setDoctors(sortedDoctors);
-      }
+      const sortedDoctors = [...processedDoctors].sort((a, b) => {
+        const pointsA = a.profile_doctor?.[0]?.doctor_points || 0;
+        const pointsB = b.profile_doctor?.[0]?.doctor_points || 0;
+        switch (currentSortOption) {
+          case "experience_desc": return (b.experience_years || 0) - (a.experience_years || 0);
+          case "experience_asc": return (a.experience_years || 0) - (b.experience_years || 0);
+          case "price_asc": return (a.consultation_cost || 0) - (b.consultation_cost || 0);
+          case "price_desc": return (b.consultation_cost || 0) - (a.consultation_cost || 0);
+          case "rating_asc": return pointsA - pointsB;
+          default: return pointsB - pointsA;
+        }
+      });
+      setDoctors(sortedDoctors);
     } catch (e) {
-      console.error("Unexpected error during doctor fetch:", e);
       setError(`${t("unexpected_error")}: ${e.message}`);
-      setDoctors([]);
     } finally {
       setLoading(false);
     }
@@ -646,6 +512,10 @@ const ChooseSpecial = () => {
   useEffect(() => {
     fetchDoctors();
   }, [fetchDoctors]);
+  
+  useEffect(() => {
+    setCurrentSortOption("rating_desc");
+  }, [initialSpecialization, searchQuery]);
 
   const sortOptions = [
     { label: t("sort_by_rating_desc"), value: "rating_desc" },
@@ -656,446 +526,321 @@ const ChooseSpecial = () => {
     { label: t("sort_by_price_desc"), value: "price_desc" },
   ];
 
-  const handleBackPress = () => {
-    navigation.goBack();
-  };
-
-  const openSortModal = () => {
-    setSortModalVisible(true);
+  const toggleSortModal = (visible) => {
+    if (visible) setSortModalVisible(true);
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const closeSortModal = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 300,
-        duration: 300,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setSortModalVisible(false));
+      Animated.timing(fadeAnim, { toValue: visible ? 1 : 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: visible ? 0 : 300, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]).start(() => !visible && setSortModalVisible(false));
   };
 
   const handleSortOptionSelect = (option) => {
     setCurrentSortOption(option.value);
-    closeSortModal();
+    toggleSortModal(false);
   };
 
- const getHeaderTitle = () => {
+  const getHeaderTitle = () => {
     if (initialSpecialization) {
-      const spec = specializationsList.find(
-        (s) => s.value === initialSpecialization
+      const spec = specializationsList.find(s => s.value === initialSpecialization);
+      return spec ? t(spec.nameKey) : t("doctors_general");
+    }
+    if (searchQuery) return `${t("search_results_for")} "${searchQuery}"`;
+    return t("doctors");
+  };
+
+  // Функція для рендерингу основного контенту
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centeredContainer}>
+          <ActivityIndicator size="large" color="#0EB3EB" />
+          <Text style={styles.statusText}>{t("loading_doctors")}</Text>
+        </View>
       );
-      return spec ? t(spec.nameKey) : t("doctors_general"); // Замість "doctors", використовуємо "doctors_general" або щось більш унікальне
     }
-    if (searchQuery) {
-        return `${t("search_results_for")} "${searchQuery}"`;
+    if (error) {
+      return (
+        <View style={styles.centeredContainer}>
+          <Ionicons name="cloud-offline-outline" size={moderateScale(50)} color="#B0BEC5" />
+          <Text style={styles.statusText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchDoctors}>
+            <Text style={styles.retryButtonText}>{t("retry")}</Text>
+          </TouchableOpacity>
+        </View>
+      );
     }
-    return t("doctors"); // Якщо нічого не обрано, показуємо "Лікарі"
-};
-
-  if (loading) {
+    if (doctors.length === 0) {
+      return (
+        <View style={styles.centeredContainer}>
+          <Ionicons name="search-outline" size={moderateScale(50)} color="#B0BEC5" />
+          <Text style={styles.statusText}>{t("no_doctors_found")}</Text>
+        </View>
+      );
+    }
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0EB3EB" />
-        <Text style={styles.loadingText}>{t("loading_doctors")}</Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollViewContent}>
+        {doctors.map((doctor) => <DoctorCard key={doctor.user_id} doctor={doctor} />)}
+      </ScrollView>
     );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchDoctors}>
-          <Text style={styles.retryButtonText}>{t("retry")}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={24} color="black" />
+        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={moderateScale(24)} color="#37474F" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
-        <View style={styles.rightIcon}>
-          {/* Повернення відображення логотипу */}
-          <Icon width={moderateScale(50)} height={moderateScale(50)} />
-        </View>
+        <Text style={styles.headerTitle} numberOfLines={1}>{getHeaderTitle()}</Text>
+        <TouchableOpacity style={styles.headerButton} onPress={() => toggleSortModal(true)}>
+          <Ionicons name="filter" size={moderateScale(22)} color="#37474F" />
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.sortButton} onPress={openSortModal}>
-        <Text style={styles.sortButtonText}>{t("sort")}</Text>
-      </TouchableOpacity>
+      {renderContent()}
 
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        {doctors.length > 0 ? (
-          doctors.map((doctor) => (
-            <DoctorCard key={doctor.user_id} doctor={doctor} />
-          ))
-        ) : (
-          <Text style={styles.noDoctorsFound}>{t("no_doctors_found")}</Text>
-        )}
-      </ScrollView>
-
-      <Modal
-        animationType="none"
-        transparent={true}
-        visible={isSortModalVisible}
-        onRequestClose={closeSortModal}
-      >
-        <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-          <Animated.View
-            style={[
-              styles.sortModalContainer,
-              { transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            <View style={styles.sortOptionsList}>
-              {sortOptions.map((option, index) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.sortOptionButton,
-                    currentSortOption === option.value &&
-                    styles.sortOptionSelected,
-                  ]}
-                  onPress={() => handleSortOptionSelect(option)}
-                >
-                  <Text
-                    style={[
-                      styles.sortOptionText,
-                      currentSortOption === option.value &&
-                      styles.sortOptionTextSelected,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity
-              style={styles.closeSortButton}
-              onPress={closeSortModal}
-            >
-              <Text style={styles.closeSortButtonText}>{t("close")}</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </Animated.View>
+      <Modal transparent={true} visible={isSortModalVisible} onRequestClose={() => toggleSortModal(false)}>
+        <TouchableWithoutFeedback onPress={() => toggleSortModal(false)}>
+            <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+                <TouchableWithoutFeedback>
+                    <Animated.View style={[styles.sortModalContainer, { transform: [{ translateY: slideAnim }] }]}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.sortModalTitle}>{t("sort")}</Text>
+                        {sortOptions.map((option) => (
+                        <TouchableOpacity key={option.value} style={styles.sortOptionButton} onPress={() => handleSortOptionSelect(option)}>
+                            <Text style={[styles.sortOptionText, currentSortOption === option.value && styles.sortOptionTextSelected]}>{option.label}</Text>
+                            {currentSortOption === option.value && <Ionicons name="checkmark-circle" size={moderateScale(22)} color="#0EB3EB" />}
+                        </TouchableOpacity>
+                        ))}
+                    </Animated.View>
+                </TouchableWithoutFeedback>
+            </Animated.View>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );
 };
 
+// --- СТИЛІ ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "white",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0, // Adjusted for Android StatusBar
+    backgroundColor: "#F4F6F8",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
-  container: {
-    flex: 1,
-    backgroundColor: "white",
-  },
-  loadingContainer: {
+  centeredContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: moderateScale(20),
   },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#000000",
-    fontFamily: "Mont-Regular",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#ffebee",
-  },
-  errorText: {
-    fontSize: 16,
-    color: "#000000",
+  statusText: {
+    marginTop: verticalScale(15),
+    fontSize: moderateScale(16),
+    color: "#546E7A",
     textAlign: "center",
-    marginBottom: 15,
     fontFamily: "Mont-Regular",
   },
   retryButton: {
+    marginTop: verticalScale(20),
     backgroundColor: "#0EB3EB",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(30),
+    borderRadius: moderateScale(25),
   },
   retryButtonText: {
     color: "#FFF",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: moderateScale(16),
     fontFamily: "Mont-Bold",
-  },
-  noDoctorsFound: {
-    fontSize: 18,
-    textAlign: "center",
-    marginTop: 50,
-    color: "#777",
-    fontFamily: "Mont-Regular",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: "#FFF",
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(10),
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#ECEFF1",
   },
-  backButton: {
-    marginRight: 15,
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: 25,
-    width: 48,
-    height: 48,
+  headerButton: {
+    width: moderateScale(44),
+    height: moderateScale(44),
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-   fontFamily: "Mont-SemiBold", fontSize: moderateScale(20), color: "#333" 
-  },
-  rightIcon: {
-    width: 50,
-    height: 50,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 15,
-  },
-  sortButton: {
-    backgroundColor: "#0EB3EB",
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    alignSelf: "center",
-    marginTop: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  sortButtonText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: "Mont-SemiBold",
+    fontSize: moderateScale(18),
+    color: "#37474F",
   },
   scrollViewContent: {
-    paddingHorizontal: 15,
-    paddingBottom: 20,
+    padding: moderateScale(15),
   },
   card: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: "#FFF",
+    borderRadius: moderateScale(16),
+    marginBottom: verticalScale(15),
+    shadowColor: "#90A4AE",
+    shadowOffset: { width: 0, height: verticalScale(4) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(12),
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#ECEFF1',
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#CFD8DC",
-    paddingBottom: 10,
+    padding: moderateScale(15),
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 15,
+    width: moderateScale(70),
+    height: moderateScale(70),
+    borderRadius: moderateScale(35),
+    marginRight: scale(15),
     borderWidth: 2,
-    borderColor: "#0EB3EB",
-    backgroundColor: "#F5F5F5",
+    borderColor: "#B0BEC5",
   },
   avatarPlaceholder: {
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: '#E3F2FD',
-    borderWidth: 1,
-    borderColor: '#B3E0F2',
+    backgroundColor: '#F4F6F8',
   },
   doctorSummary: {
     flex: 1,
   },
   doctorName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
+    fontSize: moderateScale(18),
     fontFamily: "Mont-Bold",
+    color: "#263238",
+    marginBottom: verticalScale(4),
   },
-  infoBoxRow: {
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingPointsText: {
+    fontSize: moderateScale(14),
+    color: '#78909C',
+    marginLeft: scale(5),
+    fontFamily: 'Mont-Regular',
+  },
+  cardDetails: {
+    paddingHorizontal: moderateScale(15),
+    paddingBottom: verticalScale(10),
+  },
+  infoRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
+    alignItems: "flex-start",
+    marginVertical: verticalScale(5),
   },
-  infoBoxLabel: {
-    fontSize: 13,
-    color: "#555",
-    marginRight: 5,
+  infoIcon: {
+    marginRight: scale(10),
+    marginTop: verticalScale(2),
+  },
+  infoLabel: {
+    fontSize: moderateScale(14),
     fontFamily: "Mont-Medium",
+    color: "#546E7A",
+    width: scale(110), // Фіксована ширина для вирівнювання
   },
-  infoBoxValueContainer: {
+  infoValueContainer: {
     flex: 1,
     flexDirection: "row",
-    alignItems: "center",
     flexWrap: "wrap",
+    alignItems: "center",
   },
-  infoBoxValueText: {
-    fontSize: 14,
-    color: "#333",
-    fontWeight: "500",
+  infoValue: {
+    fontSize: moderateScale(14),
     fontFamily: "Mont-Regular",
-    flexShrink: 1,
+    color: "#37474F",
   },
   notSpecifiedText: {
     fontStyle: "italic",
-    color: "#777",
+    color: "#90A4AE",
   },
   flagsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
   },
   flagText: {
-    fontSize: 18,
-    marginRight: 5,
-  },
-  ratingPointsText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 5,
-    fontFamily: 'Mont-Regular',
-  },
-  cardDetails: {
-    paddingTop: 10,
-    marginBottom: 10,
+    fontSize: moderateScale(20),
+    marginRight: scale(5),
   },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 15,
+    marginTop: verticalScale(10),
+    padding: moderateScale(15),
     borderTopWidth: 1,
-    borderTopColor: "#CFD8DC",
-    paddingTop: 10,
+    borderTopColor: "#ECEFF1",
+    backgroundColor: '#FAFBFC',
+    borderBottomLeftRadius: moderateScale(16),
+    borderBottomRightRadius: moderateScale(16),
+  },
+  priceText: {
+    fontSize: moderateScale(20),
+    fontFamily: "Mont-Bold",
+    color: "#0EB3EB",
   },
   goToButton: {
     backgroundColor: "#0EB3EB",
-    paddingVertical: 10,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(20),
+    borderRadius: moderateScale(20),
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   goToButtonText: {
     color: "#FFF",
-    fontSize: 15,
-    fontWeight: "bold",
+    fontSize: moderateScale(15),
     fontFamily: "Mont-Bold",
-  },
-  priceText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#3498DB",
-    fontFamily: "Mont-Bold",
+    marginRight: scale(5),
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
   sortModalContainer: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    maxHeight: "70%",
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: moderateScale(20),
+    borderTopRightRadius: moderateScale(20),
+    padding: moderateScale(20),
   },
-  sortOptionsList: {
-    marginBottom: 10,
+  modalHandle: {
+    width: scale(40),
+    height: verticalScale(5),
+    backgroundColor: '#CFD8DC',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: verticalScale(15),
+  },
+  sortModalTitle: {
+    fontSize: moderateScale(20),
+    fontFamily: 'Mont-Bold',
+    textAlign: 'center',
+    marginBottom: verticalScale(20),
+    color: '#37474F',
   },
   sortOptionButton: {
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: verticalScale(15),
   },
   sortOptionText: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "500",
+    fontSize: moderateScale(16),
     fontFamily: "Mont-Regular",
-  },
-  sortOptionSelected: {
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
-    borderRadius: 8,
+    color: "#37474F",
   },
   sortOptionTextSelected: {
-    fontWeight: "bold",
+    fontFamily: "Mont-Bold",
     color: "#0EB3EB",
-    fontFamily: "Mont-Bold",
-  },
-  closeSortButton: {
-    backgroundColor: "#0EB3EB",
-    paddingVertical: 12,
-    borderRadius: 25,
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  closeSortButtonText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "bold",
-    fontFamily: "Mont-Bold",
   },
 });
 

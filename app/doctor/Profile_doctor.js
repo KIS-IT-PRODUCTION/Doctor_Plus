@@ -917,7 +917,7 @@ const Profile_doctor = ({ route }) => {
               style={styles.notificationButton}
               onPress={() => navigation.navigate("Messege")}
             >
-                <Ionicons name="notifications-outline" size={24} color="white" />
+                <Ionicons name="notifications" size={moderateScale(24)} color="white" />
                 {unreadNotificationsCount > 0 && (
                   <View style={styles.notificationBadge}>
                     <Text style={styles.notificationNumber}>

@@ -14,43 +14,18 @@ import {
   StatusBar
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Constants from "expo-constants";
 import { useNavigation } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
-// import Icon from "../assets/icon.svg"; // Залишаємо закоментованим, якщо не використовується напряму тут
 
-// Отримання розмірів екрану
+// --- ГЛОБАЛЬНІ КОНСТАНТИ ТА ФУНКЦІЇ МАСШТАБУВАННЯ ---
 const { width, height } = Dimensions.get("window");
-
-// Функції для масштабування розмірів
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
-const moderateScale = (size, factor = 0.5) =>
-  size + (scale(size) - size) * factor;
+const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 
-
-// === Компоненти та дані ===
-
-const getParsedArray = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value;
-  }
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn(
-      "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
-      value,
-      e
-    );
-    return [];
-  }
-};
-
-  const specializationsList = [
+// --- СПИСКИ ДАНИХ (СПЕЦІАЛІЗАЦІЇ, ПРАПОРИ) ---
+const specializationsList = [
   { value: "general_practitioner", nameKey: "general_practitioner" },
   { value: "pediatrician", nameKey: "pediatrician" },
   { value: "cardiologist", nameKey: "cardiologist" },
@@ -60,7 +35,7 @@ const getParsedArray = (value) => {
   { value: "psychiatrist", nameKey: "psychiatrist" },
   { value: "dentist", nameKey: "dentist" },
   { value: "ophthalmologist", nameKey: "ophthalmologist" },
-  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
   { value: "gastroenterologist", nameKey: "gastroenterologist" },
   { value: "endocrinologist", nameKey: "endocrinologist" },
   { value: "oncologist", nameKey: "oncologist" },
@@ -114,8 +89,6 @@ const getParsedArray = (value) => {
   { value: "homeopath", nameKey: "homeopath" },
   { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
-
-
 
 const COUNTRY_FLAGS_MAP = {
    "EN": "🇬🇧",
@@ -316,111 +289,79 @@ const COUNTRY_FLAGS_MAP = {
 };
 
 
-const LanguageFlags = ({ languages }) => {
-  const { t } = useTranslation(); // Отримуємо t для перекладу "not_specified"
-  const getFlag = (code) => {
-    // Звертаємося до глобальної мапи прапорів
-    return COUNTRY_FLAGS_MAP[String(code).toUpperCase()] || "❓";
-  };
-
-  if (!languages || languages.length === 0) {
-    return (
-      <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-        {t("not_specified")}
-      </Text>
-    );
+// --- ДОПОМІЖНІ ФУНКЦІЇ ---
+const getParsedArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
   }
-
-  return (
-    <View style={styles.flagsContainer}>
-      {languages.map(
-        (langCode, index) =>
-          typeof langCode === "string" && (
-            <Text key={index} style={styles.flagText}>
-              {getFlag(langCode)}
-            </Text>
-          )
-      )}
-    </View>
-  );
 };
 
-const InfoBox = ({ label, value, children }) => {
+const calculateStarsFromPoints = (points) => {
+  if (points === null || points === undefined || isNaN(points) || points < 0) return 0;
+  return Math.min(5, Math.floor(points / 200));
+};
+
+// --- ДОЧІРНІ КОМПОНЕНТИ (ПЕРЕВИКОРИСТАНІ З CHOOSE_SPECIAL) ---
+
+const InfoBox = ({ icon, label, value, children }) => {
   const { t } = useTranslation();
-  const isEmpty =
-    !value && (!children || (Array.isArray(children) && children.length === 0));
+  const isEmpty = !value && (!children || (Array.isArray(children) && children.length === 0));
+  
   return (
-    <View style={styles.infoBoxRow}>
-      <Text style={styles.infoBoxLabel}>{label}:</Text>
-      <View style={styles.infoBoxValueContainer}>
+    <View style={styles.infoRow}>
+      <Ionicons name={icon} size={moderateScale(18)} color="#546E7A" style={styles.infoIcon} />
+      <Text style={styles.infoLabel}>{label}:</Text>
+      <View style={styles.infoValueContainer}>
         {isEmpty ? (
-          <Text style={[styles.infoBoxValueText, styles.notSpecifiedText]}>
-            {t("not_specified")}
-          </Text>
-        ) : children ? (
-          children
-        ) : (
-          <Text style={styles.infoBoxValueText}>{value}</Text>
-        )}
+          <Text style={[styles.infoValue, styles.notSpecifiedText]}>{t("not_specified")}</Text>
+        ) : children || <Text style={styles.infoValue}>{value}</Text>}
       </View>
     </View>
   );
 };
 
-// Функція для розрахунку кількості зірочок від 0 до 5
-// де 1000 points = 5 зірочок
-const calculateStarsFromPoints = (points) => {
-  if (points === null || points === undefined || isNaN(points) || points < 0) {
-    return 0; // Якщо балів немає або вони некоректні, повертаємо 0 зірок
-  }
-  // Максимально 1000 балів = 5 зірок. Кожна зірка = 200 балів.
-  return Math.min(5, Math.floor(points / 200));
+const LanguageFlags = ({ languages }) => {
+  if (!languages || languages.length === 0) return null;
+  return (
+    <View style={styles.flagsContainer}>
+      {languages.map((langCode, index) => (
+        <Text key={index} style={styles.flagText}>{COUNTRY_FLAGS_MAP[String(langCode).toUpperCase()] || "❓"}</Text>
+      ))}
+    </View>
+  );
 };
-
 
 const DoctorCard = ({ doctor }) => {
   const navigation = useNavigation();
   const { t } = useTranslation();
 
-  const formatYearsText = useCallback(
-    (years) => {
-      if (years === null || years === undefined || isNaN(years) || years < 0) {
-        return t("not_specified");
-      }
-      const lastDigit = years % 10;
-      const lastTwoDigits = years % 100;
+  const getPoints = useCallback((doc) => {
+    if (!doc || !doc.profile_doctor) return null;
+    const profile = Array.isArray(doc.profile_doctor) ? doc.profile_doctor[0] : doc.profile_doctor;
+    return (profile && typeof profile.doctor_points === 'number') ? profile.doctor_points : null;
+  }, []);
 
-      if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
-        return `${years} ${t("years_plural_genitive")}`;
-      }
-      if (lastDigit === 1) {
-        return `${years} ${t("year_singular")}`;
-      }
-      if (lastDigit >= 2 && lastDigit <= 4) {
-        return `${years} ${t("years_plural_nominative")}`;
-      }
-      return `${years} ${t("years_plural_genitive")}`;
-    },
-    [t]
-  );
+  const doctorPoints = getPoints(doctor);
+  const starRating = calculateStarsFromPoints(doctorPoints);
 
-  const handleGoToDoctor = () => {
-    navigation.navigate("Profile", { doctorId: doctor.user_id });
-  };
+  const formatYearsText = useCallback((years) => {
+    if (years === null || isNaN(years) || years < 0) return t("not_specified");
+    const cases = [2, 0, 1, 1, 1, 2];
+    const titles = [t("years_plural_genitive"), t("year_singular"), t("years_plural_nominative")];
+    return `${years} ${titles[(years % 100 > 4 && years % 100 < 20) ? 2 : cases[Math.min(years % 10, 5)]]}`;
+  }, [t]);
 
-  const getTranslatedSpecializations = (specializationKeys) => {
-    const parsedKeys = getParsedArray(specializationKeys);
-    return parsedKeys
-      .map((specKey) => {
-        const spec = specializationsList.find((s) => s.value === specKey);
-        return spec ? t(spec.nameKey) : specKey;
-      })
+  const getTranslatedSpecializations = (keys) => {
+    return getParsedArray(keys)
+      .map(key => specializationsList.find(s => s.value === key)?.nameKey || key)
+      .map(nameKey => t(nameKey))
       .join(", ");
   };
-
-  // Отримуємо doctor_points з об'єкта doctor, який має вкладений profile_doctor
-  const doctorPoints = doctor.profile_doctor?.doctor_points;
-  const starRating = calculateStarsFromPoints(doctorPoints);
 
   return (
     <View style={styles.card}>
@@ -429,63 +370,43 @@ const DoctorCard = ({ doctor }) => {
           <Image source={{ uri: doctor.avatar_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Ionicons name="person-circle-outline" size={moderateScale(60)} color="#0EB3EB" />
+            <Ionicons name="person-outline" size={moderateScale(40)} color="#90A4AE" />
           </View>
         )}
         <View style={styles.doctorSummary}>
-          <Text style={styles.doctorName}>{doctor.full_name || t("not_specified")}</Text>
-          <InfoBox label={t("rating")}>
-            {/* Відображаємо повні зірочки */}
-            {Array.from({ length: starRating }).map((_, i) => (
-              <Ionicons key={`star-full-${i}`} name="star" size={moderateScale(18)} color="#FFD700" />
+          <Text style={styles.doctorName} numberOfLines={2}>{doctor.full_name || t("not_specified")}</Text>
+          <View style={styles.ratingContainer}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Ionicons key={i} name={i < starRating ? "star" : "star-outline"} size={moderateScale(18)} color={i < starRating ? "#FFC107" : "#CFD8DC"} />
             ))}
-            {/* Відображаємо пусті зірочки */}
-            {Array.from({ length: 5 - starRating }).map((_, i) => (
-              <Ionicons key={`star-outline-${i}`} name="star-outline" size={moderateScale(18)} color="#ccc" />
-            ))}
-            {doctorPoints !== undefined && doctorPoints !== null && !isNaN(doctorPoints) && (
-              <Text style={styles.ratingPointsText}> ({doctorPoints} {t('points_short')})</Text>
-            )}
-          </InfoBox>
-          <InfoBox label={t("communication_language")}>
-            {/* Передаємо languages, як у Profile_doctor */}
-            <LanguageFlags languages={getParsedArray(doctor.communication_languages)} />
-          </InfoBox>
+            {doctorPoints !== null && <Text style={styles.ratingPointsText}>({doctorPoints})</Text>}
+          </View>
         </View>
       </View>
 
       <View style={styles.cardDetails}>
-        <InfoBox
-          label={t("specialization")}
-          value={getTranslatedSpecializations(doctor.specialization)}
-        />
-        <InfoBox
-          label={t("work_experience")}
-          value={formatYearsText(doctor.experience_years)}
-        />
-        <InfoBox label={t("time_in_app")} value={doctor.time_in_app || t("not_specified")} />
-        <InfoBox
-          label={t("consultations_count")}
-          value={doctor.consultations_count?.toString() || "0"}
-        />
+        <InfoBox icon="medkit-outline" label={t("specialization")} value={getTranslatedSpecializations(doctor.specialization)} />
+        <InfoBox icon="time-outline" label={t("work_experience")} value={formatYearsText(doctor.experience_years)} />
+        <InfoBox icon="chatbubbles-outline" label={t("consultations_count")} value={doctor.consultations_count?.toString() || "0"} />
+        <InfoBox icon="language-outline" label={t("communication_language")}>
+          <LanguageFlags languages={getParsedArray(doctor.communication_languages)} />
+        </InfoBox>
       </View>
 
       <View style={styles.cardFooter}>
-        <TouchableOpacity style={styles.goToButton} onPress={handleGoToDoctor}>
-          <Text style={styles.goToButtonText}>{t("go_to")}</Text>
-        </TouchableOpacity>
         <Text style={styles.priceText}>
-          {t("price")}:{" "}
-          {doctor.consultation_cost
-            ? `${doctor.consultation_cost}$`
-            : t("not_specified_price")}
+          {doctor.consultation_cost ? `${doctor.consultation_cost}$` : t("not_specified_price")}
         </Text>
+        <TouchableOpacity style={styles.goToButton} onPress={() => navigation.navigate("Profile", { doctorId: doctor.user_id })}>
+          <Text style={styles.goToButtonText}>{t("details")}</Text>
+          <Ionicons name="arrow-forward" size={moderateScale(16)} color="#FFF" />
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-
+// --- ГОЛОВНИЙ КОМПОНЕНТ ЕКРАНА ---
 const Search = () => {
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -495,507 +416,379 @@ const Search = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
-  const [hasUserInitiatedSearch, setHasUserInitiatedSearch] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false); // Чи був хоча б один пошук
+  const searchInputRef = useRef(null);
 
-
-  const handleBackPress = () => {
-    navigation.goBack();
-  };
-
-  const fetchDoctors = useCallback(async (query = "", category = null) => {
-    setLoading(true);
-    setSearchError(null);
-    setDoctors([]);
-
-    if (!query && !category && !hasUserInitiatedSearch) {
+  const fetchDoctors = useCallback(async (query, category) => {
+    if (!query && !category) {
       setDoctors([]);
-      setLoading(false);
+      setHasSearched(false);
       return;
     }
 
+    setLoading(true);
+    setSearchError(null);
+    setHasSearched(true);
+
     try {
-      let data = [];
-      let error = null;
+      let baseQuery = supabase.from("anketa_doctor").select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url").eq("doctor_check", true);
 
       if (category) {
-        const { data: categoryData, error: categoryError } = await supabase
-          .from("anketa_doctor")
-          .select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, search_tags") // IMPORTANT: Select profile_doctor(doctor_points)
-          .filter("specialization", "cs", `["${category}"]`)
-          .eq("doctor_check", true); // <<< ДОДАНО: Фільтруємо за doctor_check = true
-        data = categoryData;
-        error = categoryError;
+        baseQuery = baseQuery.filter("specialization", "cs", `["${category}"]`);
       } else if (query) {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', {
-            p_search_query: query,
-        });
-
-        if (rpcData && !rpcError) {
-          const doctorIds = rpcData.map(d => d.user_id);
-          const { data: profileData, error: profileError } = await supabase
-            .from('profile_doctor')
-            .select('user_id, doctor_points')
-            .in('user_id', doctorIds);
-
-          if (!profileError) {
-            const profileMap = new Map(profileData.map(p => [p.user_id, p.doctor_points]));
-            data = rpcData.map(d => ({
-              ...d,
-              profile_doctor: { doctor_points: profileMap.get(d.user_id) }
-            }));
-            error = rpcError;
-          } else {
-            console.warn("Could not fetch doctor_points for RPC results:", profileError.message);
-            data = rpcData;
-            error = rpcError || profileError;
-          }
-
-          if (data) {
-            const { data: anketaDoctorData, error: anketaDoctorError } = await supabase
-              .from('anketa_doctor')
-              .select('user_id, doctor_check')
-              .in('user_id', data.map(d => d.user_id));
-
-            if (!anketaDoctorError) {
-              const checkedDoctorsMap = new Map(anketaDoctorData.map(d => [d.user_id, d.doctor_check]));
-              data = data.filter(d => checkedDoctorsMap.get(d.user_id) === true);
-            } else {
-              console.warn("Could not fetch doctor_check status for RPC results:", anketaDoctorError.message);
-            }
-          }
-
-        } else {
-          data = rpcData;
-          error = rpcError;
+        const { data: rpcData, error: rpcError } = await supabase.rpc('search_doctors_by_name_or_specialization', { p_search_query: query });
+        if (rpcError) throw rpcError;
+        
+        const doctorIds = rpcData.filter(d => d.doctor_check).map(d => d.user_id);
+        if (doctorIds.length === 0) {
+            setDoctors([]);
+            setLoading(false);
+            return;
         }
-
-      } else {
-        setDoctors([]);
-        setLoading(false);
-        return;
+        baseQuery = baseQuery.in('user_id', doctorIds);
       }
 
-      if (error) {
-        console.error("Error fetching doctors:", error);
-        setSearchError(`${t("error_fetching_doctors")}: ${error.message}`);
-        setDoctors([]);
-      } else {
-        const processedDoctors = await Promise.all(data.map(async (doctor) => { // Added async here
-          // Отримуємо мови, перетворюючи їх на верхній регістр та фільтруючи за COUNTRY_FLAGS_MAP
-          const parsedCommunicationLanguages = getParsedArray(doctor.communication_languages).map(lang => {
-            if (typeof lang === 'object' && lang !== null && lang.code) {
-              return String(lang.code).toUpperCase();
-            }
-            return String(lang).toUpperCase();
-          }).filter(code => COUNTRY_FLAGS_MAP[code]); // Фільтруємо, щоб були лише ті, для яких є прапори
+      const { data, error } = await baseQuery.order('created_at', { ascending: false });
+      if (error) throw error;
+      
+      const consultationCounts = await Promise.all(
+        data.map(d => 
+          supabase.from('patient_bookings').select('id', { count: 'exact', head: true }).eq('doctor_id', d.user_id).eq('consultation_conducted', true)
+        )
+      );
 
+      const processedDoctors = data.map((doctor, index) => ({
+        ...doctor,
+        consultations_count: consultationCounts[index].count || 0,
+      }));
 
-          let timeInAppDisplay = t("not_specified");
-          if (doctor.created_at) {
-            const joinedDate = new Date(doctor.created_at);
-            const now = new Date();
-            const diffTime = Math.abs(now.getTime() - joinedDate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      setDoctors(processedDoctors);
 
-            if (diffDays < 30) {
-              timeInAppDisplay = t("days_in_app", { count: diffDays });
-            } else if (diffDays < 365) {
-              const diffMonths = Math.floor(diffDays / 30);
-              timeInAppDisplay = t("months_in_app", { count: diffMonths });
-            } else {
-              const diffYears = Math.floor(diffDays / 365);
-              timeInAppDisplay = t("years_in_app", { count: diffYears });
-            }
-          }
-
-          // Fetch consultations count for each doctor
-          const { count: consultationsCount, error: countError } = await supabase
-            .from('patient_bookings')
-            .select('id', { count: 'exact' })
-            .eq('doctor_id', doctor.user_id)
-            .eq('consultation_conducted', true); // Фільтруємо лише проведені консультації
-
-          if (countError) {
-            console.error(`Error fetching consultations count for doctor ${doctor.user_id}:`, countError);
-            // Optionally, handle this error, e.g., set count to 0 or leave it undefined
-          }
-
-          return {
-            ...doctor,
-            communication_languages: parsedCommunicationLanguages,
-            time_in_app: timeInAppDisplay,
-            consultations_count: consultationsCount || 0, // Додаємо кількість консультацій
-          };
-        }));
-        setDoctors(processedDoctors);
-      }
     } catch (e) {
-      console.error("Unexpected search error:", e);
       setSearchError(t("unexpected_error"));
+      console.error("Search error:", e);
     } finally {
       setLoading(false);
     }
-  }, [t, hasUserInitiatedSearch]);
+  }, [t]);
 
   useEffect(() => {
-    if (searchText.length > 0 || activeCategory !== null) {
-      setHasUserInitiatedSearch(true);
-      const debounceTimeout = setTimeout(() => {
-        if (activeCategory) {
-          fetchDoctors(null, activeCategory);
-        } else {
-          fetchDoctors(searchText, null);
-        }
-      }, 500);
+    const handler = setTimeout(() => {
+      if (searchText || activeCategory) {
+        fetchDoctors(searchText, activeCategory);
+      } else {
+        setDoctors([]);
+        setHasSearched(false);
+      }
+    }, 500); // Затримка для уникнення частих запитів
 
-      return () => clearTimeout(debounceTimeout);
-    } else {
-      setHasUserInitiatedSearch(false);
-      setDoctors([]);
-      setSearchError(null);
-    }
+    return () => clearTimeout(handler);
   }, [searchText, activeCategory, fetchDoctors]);
 
-
-  const handleSearchTextInput = (text) => {
+  const handleSearchTextChange = (text) => {
     setSearchText(text);
-    setActiveCategory(null);
+    if (activeCategory) setActiveCategory(null);
   };
 
   const handleCategoryPress = (categoryValue) => {
     if (activeCategory === categoryValue) {
-      setActiveCategory(null);
-      setSearchText("");
+      setActiveCategory(null); // Скасувати вибір
     } else {
       setActiveCategory(categoryValue);
-      setSearchText("");
+      setSearchText(""); // Очистити текстовий пошук при виборі категорії
+      if (searchInputRef.current) searchInputRef.current.blur();
     }
   };
 
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centeredContainer}>
+          <ActivityIndicator size="large" color="#0EB3EB" />
+        </View>
+      );
+    }
+    if (searchError) {
+      return (
+        <View style={styles.centeredContainer}>
+            <Ionicons name="cloud-offline-outline" size={moderateScale(50)} color="#B0BEC5" />
+            <Text style={styles.statusText}>{searchError}</Text>
+        </View>
+      );
+    }
+    if (!hasSearched) {
+      return (
+        <View style={styles.centeredContainer}>
+            <Ionicons name="search-circle-outline" size={moderateScale(80)} color="#E0E0E0" />
+            <Text style={styles.statusText}>{t("initial_search_prompt")}</Text>
+        </View>
+      );
+    }
+    if (doctors.length === 0) {
+      return (
+        <View style={styles.centeredContainer}>
+            <Ionicons name="sad-outline" size={moderateScale(80)} color="#E0E0E0" />
+            <Text style={styles.statusText}>{t("no_doctors_found")}</Text>
+        </View>
+      );
+    }
+    return (
+      <ScrollView contentContainerStyle={styles.doctorsListContainer}>
+        {doctors.map((doctor) => <DoctorCard key={doctor.user_id} doctor={doctor} />)}
+      </ScrollView>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <Ionicons name="arrow-back" size={moderateScale(24)} color="black" />
-          </TouchableOpacity>
-          <View style={styles.searchBar}>
-            <Ionicons
-              name="search"
-              size={moderateScale(20)}
-              color="#888"
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={t("search_placeholder")}
-              placeholderTextColor="#888"
-              value={searchText}
-              onChangeText={handleSearchTextInput}
-              returnKeyType="search"
-            />
-            {loading && <ActivityIndicator size="small" color="#0EB3EB" style={styles.loadingIndicator} />}
-            {searchText.length > 0 && !loading && (
-              <TouchableOpacity onPress={() => setSearchText("")} style={styles.clearSearchButton}>
-                <Ionicons name="close-circle" size={moderateScale(20)} color="#888" />
-              </TouchableOpacity>
-            )}
-          </View>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={moderateScale(24)} color="#37474F" />
+        </TouchableOpacity>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={moderateScale(20)} color="#90A4AE" style={styles.searchIcon} />
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder={t("search_placeholder")}
+            placeholderTextColor="#90A4AE"
+            value={searchText}
+            onChangeText={handleSearchTextChange}
+            returnKeyType="search"
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText("")} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={moderateScale(20)} color="#B0BEC5" />
+            </TouchableOpacity>
+          )}
         </View>
+      </View>
 
-        {searchError && <Text style={styles.errorMessage}>{searchError}</Text>}
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryScrollContainer}
-        >
-          {specializationsList.map((category, index) => (
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScrollContainer}>
+          {specializationsList.map((category) => (
             <TouchableOpacity
-              key={index}
-              style={[
-                styles.categoryButton,
-                activeCategory === category.value && styles.categoryButtonActive,
-              ]}
+              key={category.value}
+              style={[styles.categoryButton, activeCategory === category.value && styles.categoryButtonActive]}
               onPress={() => handleCategoryPress(category.value)}
             >
-              <Text style={[
-                styles.categoryButtonText,
-                activeCategory === category.value && styles.categoryButtonTextActive,
-              ]}>
-                {String(t(category.nameKey))}
+              <Text style={[styles.categoryButtonText, activeCategory === category.value && styles.categoryButtonTextActive]}>
+                {t(category.nameKey)}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        <ScrollView contentContainerStyle={styles.doctorsListContainer}>
-          {!hasUserInitiatedSearch && !loading && (
-            <View style={{ alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
-              <Text style={styles.initialSearchPrompt}>{t("initial_search_prompt")}</Text>
-            </View>
-          )}
-
-          {loading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#0EB3EB" />
-              <Text style={styles.loadingText}>{t("loading_doctors")}</Text>
-            </View>
-          )}
-
-          {!loading && hasUserInitiatedSearch && doctors.length > 0 ? (
-            doctors.map((doctor) => (
-              <DoctorCard key={doctor.user_id} doctor={doctor} />
-            ))
-          ) : !loading && hasUserInitiatedSearch && !searchError && doctors.length === 0 && (
-            <View style={{ alignItems: "center", justifyContent: "start" }}>
-              <Ionicons name="not-search" size={moderateScale(150)} color="rgba(14, 179, 235, 0.2)" />
-              <Text style={styles.noDoctorsFound}>{t("no_doctors_found")}</Text>
-            </View>
-          )}
-        </ScrollView>
       </View>
+      
+      {renderContent()}
     </SafeAreaView>
   );
 };
 
+// --- СТИЛІ ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingTop: Platform.OS === "ios" ? StatusBar.currentHeight + 5 : 10,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#F4F6F8",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: scale(15),
+    paddingHorizontal: scale(10),
     paddingVertical: verticalScale(10),
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECEFF1',
   },
   backButton: {
-    marginRight: scale(15),
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: moderateScale(25),
-    width: moderateScale(48),
-    height: moderateScale(48),
-    justifyContent: "center",
-    alignItems: "center",
+    padding: moderateScale(10),
   },
   searchBar: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: moderateScale(555),
-    paddingHorizontal: scale(15),
-    flex: 1,
-    height: verticalScale(50),
+    backgroundColor: "#F4F6F8",
+    borderRadius: moderateScale(12),
+    height: verticalScale(44),
+    paddingHorizontal: scale(10),
+    marginLeft: scale(10),
   },
   searchIcon: {
-    marginRight: scale(10),
+    marginRight: scale(8),
   },
   searchInput: {
     flex: 1,
     fontSize: moderateScale(16),
-    color: "#333",
+    fontFamily: 'Mont-Regular',
+    color: "#263238",
   },
-  loadingIndicator: {
-    marginLeft: scale(10),
-  },
-  clearSearchButton: {
-    marginLeft: scale(10),
-    padding: scale(5),
-  },
-  errorMessage: {
-    color: 'red',
-    textAlign: 'center',
-    marginTop: verticalScale(10),
-    fontSize: moderateScale(14),
-    paddingHorizontal: scale(15),
+  clearButton: {
+    padding: moderateScale(5),
   },
   categoryScrollContainer: {
+    paddingVertical: verticalScale(15),
     paddingHorizontal: scale(15),
-    paddingVertical: verticalScale(10),
+    backgroundColor: '#FFF',
   },
   categoryButton: {
-    backgroundColor: "rgba(14, 179, 235, 0.7)",
+    backgroundColor: "#E3F2FD",
     borderRadius: moderateScale(20),
+    paddingVertical: verticalScale(8),
     paddingHorizontal: scale(15),
     marginRight: scale(10),
     justifyContent: "center",
-    alignItems: "center",
-    height: verticalScale(40),
-    marginBottom: verticalScale(15),
   },
   categoryButtonActive: {
     backgroundColor: "#0EB3EB",
   },
   categoryButtonText: {
-    color: "#fff",
-    fontSize: moderateScale(16),
-    fontWeight: "bold",
-    fontFamily: "Mont-Bold",
+    color: "#0EB3EB",
+    fontSize: moderateScale(14),
+    fontFamily: "Mont-SemiBold",
   },
   categoryButtonTextActive: {
-    color: "#fff",
+    color: "#FFF",
   },
-  doctorsListContainer: {
-    paddingHorizontal: scale(15),
-    paddingBottom: verticalScale(300),
-  },
-  loadingContainer: {
+  centeredContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: verticalScale(50),
+    padding: moderateScale(20),
   },
-  loadingText: {
-    marginTop: verticalScale(10),
+  statusText: {
+    marginTop: verticalScale(15),
     fontSize: moderateScale(16),
-    color: "#000000",
-    fontFamily: "Mont-Regular",
-  },
-  noDoctorsFound: {
-    fontSize: moderateScale(18),
+    color: "#546E7A",
     textAlign: "center",
-    color: "#777",
     fontFamily: "Mont-Regular",
   },
-  initialSearchPrompt: {
-    fontSize: moderateScale(18),
-    textAlign: "center",
-    color: "#555",
-    fontFamily: "Mont-Regular",
-    paddingHorizontal: scale(20),
-  },
-  card: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: moderateScale(15),
+  doctorsListContainer: {
     padding: moderateScale(15),
+  },
+  // Стилі для картки, скопійовані з ChooseSpecial для консистентності
+  card: {
+    backgroundColor: "#FFF",
+    borderRadius: moderateScale(16),
     marginBottom: verticalScale(15),
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: "#90A4AE",
+    shadowOffset: { width: 0, height: verticalScale(4) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(12),
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#ECEFF1',
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: verticalScale(10),
-    borderBottomWidth: 1,
-    borderBottomColor: "#CFD8DC",
-    paddingBottom: verticalScale(10),
+    padding: moderateScale(15),
   },
   avatar: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
+    width: moderateScale(70),
+    height: moderateScale(70),
+    borderRadius: moderateScale(35),
     marginRight: scale(15),
     borderWidth: 2,
-    borderColor: "#0EB3EB",
-    backgroundColor: "#F5F5F5",
+    borderColor: "#B0BEC5",
   },
   avatarPlaceholder: {
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: '#E3F2FD',
-    borderWidth: 1,
-    borderColor: '#B3E0F2',
+    backgroundColor: '#F4F6F8',
   },
   doctorSummary: {
     flex: 1,
   },
   doctorName: {
     fontSize: moderateScale(18),
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: verticalScale(8),
     fontFamily: "Mont-Bold",
-  },
-  infoBoxRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    color: "#263238",
     marginBottom: verticalScale(4),
   },
-  infoBoxLabel: {
-    fontSize: moderateScale(13),
-    color: "#555",
-    marginRight: scale(5),
-    fontFamily: "Mont-Medium",
-  },
-  infoBoxValueContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  infoBoxValueText: {
-    fontSize: moderateScale(14),
-    color: "#333",
-    fontWeight: "500",
-    fontFamily: "Mont-Regular",
-    flexShrink: 1,
-  },
-  notSpecifiedText: {
-    fontStyle: "italic",
-    color: "#777",
-  },
-  flagsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  flagText: {
-    fontSize: moderateScale(18),
-    marginRight: scale(5),
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   ratingPointsText: {
     fontSize: moderateScale(14),
-    color: '#666',
+    color: '#78909C',
     marginLeft: scale(5),
     fontFamily: 'Mont-Regular',
   },
   cardDetails: {
-    paddingTop: verticalScale(10),
-    marginBottom: verticalScale(10),
+    paddingHorizontal: moderateScale(15),
+    paddingBottom: verticalScale(10),
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginVertical: verticalScale(5),
+  },
+  infoIcon: {
+    marginRight: scale(10),
+    marginTop: verticalScale(2),
+  },
+  infoLabel: {
+    fontSize: moderateScale(14),
+    fontFamily: "Mont-Medium",
+    color: "#546E7A",
+    width: scale(110),
+  },
+  infoValueContainer: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  infoValue: {
+    fontSize: moderateScale(14),
+    fontFamily: "Mont-Regular",
+    color: "#37474F",
+  },
+  notSpecifiedText: {
+    fontStyle: "italic",
+    color: "#90A4AE",
+  },
+  flagsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  flagText: {
+    fontSize: moderateScale(20),
+    marginRight: scale(5),
   },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: verticalScale(15),
+    marginTop: verticalScale(10),
+    padding: moderateScale(15),
     borderTopWidth: 1,
-    borderTopColor: "#CFD8DC",
-    paddingTop: verticalScale(10),
+    borderTopColor: "#ECEFF1",
+    backgroundColor: '#FAFBFC',
+    borderBottomLeftRadius: moderateScale(16),
+    borderBottomRightRadius: moderateScale(16),
+  },
+  priceText: {
+    fontSize: moderateScale(20),
+    fontFamily: "Mont-Bold",
+    color: "#0EB3EB",
   },
   goToButton: {
     backgroundColor: "#0EB3EB",
     paddingVertical: verticalScale(10),
-    paddingHorizontal: scale(25),
-    borderRadius: moderateScale(25),
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    paddingHorizontal: scale(20),
+    borderRadius: moderateScale(20),
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   goToButtonText: {
     color: "#FFF",
     fontSize: moderateScale(15),
-    fontWeight: "bold",
     fontFamily: "Mont-Bold",
-  },
-  priceText: {
-    fontSize: moderateScale(18),
-    fontWeight: "bold",
-    color: "#3498DB",
-    fontFamily: "Mont-Bold",
+    marginRight: scale(5),
   },
 });
 
