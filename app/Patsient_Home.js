@@ -17,7 +17,7 @@ import {
   RefreshControl,
   Modal,
   Animated,
-  Image, // ДОДАНО ЦЕЙ ІМПОРТ
+  Image, // Залишаємо Image для растрових зображень
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,9 +28,11 @@ import { useAuth } from "../providers/AuthProvider";
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 
+// Імпорт для SVG з URL
+import SvgUri from 'react-native-svg'; // <--- ДОДАЙТЕ ЦЕЙ ІМПОРТ
+
 // Імпорт кастомних компонентів
 import Icon from "../assets/icon.svg";
-// import People from "../assets/Main/people.svg"; // КОМЕНТУЄМО АБО ВИДАЛЯЄМО ЦЕЙ ІМПОРТ
 import Doctor from "../assets/Main/doctor.svg";
 import TabBar from "../components/TopBar.js";
 
@@ -45,7 +47,9 @@ const moderateScale = (size, factor = 0.5) =>
 
 const containerWidth = width * 0.9;
 
-// Повний список спеціалізацій
+const TAB_BAR_HEIGHT = verticalScale(90);
+const SEARCH_BAR_BOTTOM_OFFSET = verticalScale(40);
+
 const allDoctorSpecializations = [
   { value: "general_practitioner", nameKey: "general_practitioner" },
   { value: "pediatrician", nameKey: "pediatrician" },
@@ -116,7 +120,6 @@ const Patsient_Home = () => {
   const { session, loading: authLoading } = useAuth();
   const { t, i18n } = useTranslation();
 
-  // Стейт для керування UI
   const [activeTab, setActiveTab] = useState("Home");
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isSpecializationModalVisible, setSpecializationModalVisible] = useState(false);
@@ -124,21 +127,18 @@ const Patsient_Home = () => {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   
-  // Стейт для даних
   const [availableSpecializations, setAvailableSpecializations] = useState([]);
   const [loadingSpecializations, setLoadingSpecializations] = useState(true);
   const [specializationsError, setSpecializationsError] = useState(null);
 
-  // ДОДАНО: СТЕЙТ ДЛЯ ЗОБРАЖЕННЯ
   const [mainScreenImageUrl, setMainScreenImageUrl] = useState(null);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(null);
+
+  const [introMottoText, setIntroMottoText] = useState("");
   
-  // Стейт та значення для анімації кнопки виходу
   const [isSignOutVisible, setIsSignOutVisible] = useState(false);
   const signOutAnimation = useRef(new Animated.Value(0)).current;
-
-  // --- ЛОГІКА КОМПОНЕНТА ---
 
   useEffect(() => {
     const loadUserLanguage = async () => {
@@ -213,7 +213,6 @@ const Patsient_Home = () => {
     }
   }, [t]);
 
-  // ДОДАНО: Завантаження URL зображення з Supabase
   const fetchMainScreenImage = useCallback(async () => {
     setImageLoading(true);
     setImageError(null);
@@ -224,14 +223,12 @@ const Patsient_Home = () => {
         .eq('setting_name', 'main_screen_image_url')
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = Row not found (setting might not exist yet)
+      if (error && error.code !== 'PGRST116') throw error;
 
       if (data?.setting_value) {
         setMainScreenImageUrl(data.setting_value);
       } else {
         setMainScreenImageUrl(null);
-        // Можна встановити дефолтний URL, якщо потрібно:
-        // setMainScreenImageUrl('https://example.com/default_people.png'); 
       }
     } catch (err) {
       console.error("Error fetching main screen image URL:", err.message);
@@ -242,12 +239,34 @@ const Patsient_Home = () => {
     }
   }, [t]);
 
+  const fetchIntroMottoText = useCallback(async () => {
+    try {
+        const currentLang = i18n.language; 
+        const settingName = `intro_motto_text_${currentLang}`; 
+
+        const { data, error } = await supabase
+            .from('app_settings')
+            .select('setting_value')
+            .eq('setting_name', settingName)
+            .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+
+        setIntroMottoText(data?.setting_value || t("default_intro_motto_text"));
+    } catch (err) {
+        console.error("Error fetching intro motto text:", err.message);
+        setIntroMottoText(t("default_intro_motto_text"));
+    }
+  }, [i18n.language, t]); 
+
+
   useFocusEffect(
     useCallback(() => {
       setActiveTab("Home");
       if (session?.user) fetchUnreadMessagesCount();
-      fetchMainScreenImage(); // ВИКЛИКАЄМО НОВУ ФУНКЦІЮ ПРИ ФОКУСІ НА ЕКРАНІ
-    }, [fetchUnreadMessagesCount, session?.user, fetchMainScreenImage])
+      fetchMainScreenImage();
+      fetchIntroMottoText();
+    }, [fetchUnreadMessagesCount, session?.user, fetchMainScreenImage, fetchIntroMottoText])
   );
   
   useEffect(() => {
@@ -259,7 +278,8 @@ const Patsient_Home = () => {
   
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
-  }, [i18n.language]);
+    fetchIntroMottoText();
+  }, [i18n.language, fetchIntroMottoText]);
 
   const fetchAvailableSpecializations = useCallback(async () => {
     setLoadingSpecializations(true);
@@ -283,12 +303,12 @@ const Patsient_Home = () => {
     await Promise.all([
       session?.user ? fetchUnreadMessagesCount() : Promise.resolve(),
       fetchAvailableSpecializations(),
-      fetchMainScreenImage(), // ДОДАНО ЦЕЙ ВИКЛИК ПРИ ОНОВЛЕННІ
+      fetchMainScreenImage(),
+      fetchIntroMottoText(),
     ]);
     setRefreshing(false);
-  }, [session, isSignOutVisible, fetchUnreadMessagesCount, fetchAvailableSpecializations, fetchMainScreenImage]);
+  }, [session, isSignOutVisible, fetchUnreadMessagesCount, fetchAvailableSpecializations, fetchMainScreenImage, fetchIntroMottoText]);
 
-  // Функція для анімації кнопки виходу
   const toggleSignOutButton = () => {
     const toValue = isSignOutVisible ? 0 : 1;
     setIsSignOutVisible(!isSignOutVisible);
@@ -319,7 +339,6 @@ const Patsient_Home = () => {
     );
   };
   
-  // Обробники для модальних вікон
   const openLanguageModal = () => setLanguageModalVisible(true);
   const closeLanguageModal = () => setLanguageModalVisible(false);
   
@@ -344,7 +363,6 @@ const Patsient_Home = () => {
     { nameKey: "english", code: "en" },
   ];
   
-  // Стиль для анімованої кнопки
   const signOutButtonAnimatedStyle = {
     opacity: signOutAnimation,
     transform: [{
@@ -352,7 +370,6 @@ const Patsient_Home = () => {
     }],
   };
   
-  // --- JSX РЕНДЕРИНГ ---
   return (
     <View style={styles.rootContainer}>
       <SafeAreaView style={styles.safeAreaContent}>
@@ -401,27 +418,39 @@ const Patsient_Home = () => {
                 </Text>
               </TouchableOpacity>
               <View style={styles.doctorsImageContainer}>
-                {/* ЗАМІСТЬ People.svg ТЕПЕР ВИКОРИСТОВУЄМО Image */}
                 {imageLoading ? (
                   <ActivityIndicator size="large" color="#0EB3EB" style={styles.imageLoader} />
                 ) : imageError ? (
                   <Text style={styles.imageErrorText}>{imageError}</Text>
                 ) : mainScreenImageUrl ? (
-                  <Image
-                    source={{ uri: mainScreenImageUrl }}
-                    style={styles.peopleImage} // Використовуємо той же стиль
-                    resizeMode="contain"
-                  />
+                  // Умовний рендеринг для SVG або растрових зображень
+                  mainScreenImageUrl.endsWith('.svg') ? (
+                    <SvgUri
+                      width={styles.peopleImage.width}
+                      height={styles.peopleImage.height}
+                      source={{ uri: mainScreenImageUrl }}
+                      style={styles.peopleImage} // Передаємо стилі для SvgUri
+                    />
+                  ) : (
+                    <Image
+                      source={{ uri: mainScreenImageUrl }}
+                      style={styles.peopleImage}
+                      resizeMode="cover" // Змінено на cover для растрових зображень
+                    />
+                  )
                 ) : (
-                  // Якщо немає зображення або помилка, можна відобразити дефолтний плейсхолдер
                   <Text style={styles.imageErrorText}>{t("no_image_available")}</Text>
                 )}
               </View>
+
+              <Text style={styles.introMottoText}>
+                {introMottoText}
+              </Text>
+
             </View>
           </View>
         </ScrollView>
 
-        {/* Кнопка пошуку, зафіксована над TabBar */}
         <TouchableOpacity
           style={styles.searchContainer}
           onPress={() => navigation.navigate("Search")}
@@ -440,7 +469,6 @@ const Patsient_Home = () => {
 
       <TabBar activeTab={activeTab} onTabPress={setActiveTab} i18n={i18n} />
 
-      {/* --- Модальні вікна --- */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -517,7 +545,6 @@ const Patsient_Home = () => {
   );
 };
 
-// --- СТИЛІ КОМПОНЕНТА ---
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
@@ -530,7 +557,7 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     flexGrow: 1,
     alignItems: "center",
-    paddingBottom: verticalScale(140), // Відступ для контенту над кнопкою пошуку
+    paddingBottom: TAB_BAR_HEIGHT + SEARCH_BAR_BOTTOM_OFFSET + verticalScale(52 + 10),
   },
   container: {
     width: "100%",
@@ -550,17 +577,14 @@ const styles = StyleSheet.create({
   signOutContainer: {
     position: 'absolute',
     top: moderateScale(60),
-    transform: [{ translateX: -moderateScale(65) }], // Центрування кнопки
+    transform: [{ translateX: -moderateScale(65) }],
     width: moderateScale(180),
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: moderateScale(20),
     paddingVertical: verticalScale(10),
     paddingHorizontal: scale(15),
-    transform: [{ translateY: 5 , translateX: 15}], // Початкове положення для анімації
-    // transition: "opacity 0.3s, transform 2.6s, rotation 2.6s", // ЦІ РЯДКИ НЕ ПІДТРИМУЮТЬСЯ
-    // rotation: "60deg", // ЦІ РЯДКИ НЕ ПІДТРИМУЮТЬСЯ
-    // Додаємо zIndex, щоб кнопка була поверх інших елементів
+    transform: [{ translateY: 5 , translateX: 15}],
     zIndex: 100,
   },
   signOutButton: {
@@ -656,26 +680,19 @@ const styles = StyleSheet.create({
   },
   doctorsImageContainer: {
     marginTop: verticalScale(20),
-    height: verticalScale(300),
     width: "100%",
-    justifyContent: 'center', // Для центрування ActivityIndicator
-    alignItems: 'center',     // Для центрування ActivityIndicator
+    aspectRatio: 14 / 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderRadius: moderateScale(20), // Перенесено сюди
+    backgroundColor: "#F0F0F0", // Додано для кращого вигляду
   },
   peopleImage: {
     width: "100%",
     height: "100%",
-    // resizeMode: "contain" вже вказано в компоненті Image
-    position: "absolute", // Може бути, якщо потрібно позиціонувати поверх інших елементів
-    alignItems: "center",
-    justifyContent: "center",
-    
-    zIndex: -1, // Забезпечує, що зображення буде позаду, якщо вище є інші елементи
-    borderRadius: moderateScale(20),
-    // shadowColor: "#000", // Ці властивості тіні можуть бути не застосовані до Image без View-обгортки на деяких платформах.
-    // shadowOffset: { width: 0, height: 2 }, // Якщо потрібна тінь, оберніть <Image> у <View> і застосуйте тінь до <View>.
   },
   imageLoader: {
-    // Стилі для індикатора завантаження
   },
   imageErrorText: {
     fontSize: moderateScale(16),
@@ -683,11 +700,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Mont-Regular',
   },
+  introMottoText: {
+    fontSize: moderateScale(17),
+    fontFamily: "Mont-Medium",
+    color: "#424242",
+    textAlign: "center",
+    marginHorizontal: scale(25),
+    marginTop: verticalScale(25),
+    marginBottom: verticalScale(30),
+    lineHeight: verticalScale(25),
+  },
   searchContainer: {
     position: 'absolute',
-    bottom: verticalScale(120), // Відступ від низу (над TabBar)
+    bottom: TAB_BAR_HEIGHT + SEARCH_BAR_BOTTOM_OFFSET,
     left: '50%',
-    transform: [{ translateX: -(width * 0.9) / 2 }], // Правильне центрування
+    transform: [{ translateX: -(width * 0.9) / 2 }],
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(14, 179, 235, 0.2)",
@@ -695,6 +722,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(15),
     width: width * 0.9,
     height: verticalScale(52),
+    zIndex: 5,
   },
   searchIcon: {
     marginRight: scale(10),
@@ -792,13 +820,6 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(10),
     borderWidth: 1,
     borderColor: '#EFEFEF'
-  },
-  specializationItemText: {
-    fontSize: moderateScale(15),
-    fontFamily: "Mont-Medium",
-    color: "#333333",
-    flex: 1,
-    marginRight: scale(10),
   },
   goToButton: {
     backgroundColor: "#0EB3EB",

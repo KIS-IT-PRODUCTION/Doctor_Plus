@@ -7,24 +7,24 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0572764303C2D15F09971883 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6286E477B805FEA026AF1B95 /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		2CAB242C93799619D2FC0BBD /* libPods-DoctorPlus.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5397C729581FCB2AA0198DFA /* libPods-DoctorPlus.a */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		66A9D368203E8328DB61C046 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FBBEF7F5EDB4EA9B30282C /* ExpoModulesProvider.swift */; };
+		902764926E3BD57747130823 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 92126EFCAC2BAA25B1F448CE /* PrivacyInfo.xcprivacy */; };
+		A7AE369AC2E12299C99CB84E /* libPods-DoctorPlus.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7932C210FA1D4A44583C1EC9 /* libPods-DoctorPlus.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		F3A710AC5A1F020AB659CE17 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED8C2AD5E96CBF35D390ED7 /* ExpoModulesProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* DoctorPlus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DoctorPlus.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = DoctorPlus/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = DoctorPlus/Info.plist; sourceTree = "<group>"; };
-		22CF235988367FFC4FCF4E60 /* Pods-DoctorPlus.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.debug.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.debug.xcconfig"; sourceTree = "<group>"; };
-		5397C729581FCB2AA0198DFA /* libPods-DoctorPlus.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-DoctorPlus.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		5B602A999CAF9E4D67933D18 /* Pods-DoctorPlus.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.release.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.release.xcconfig"; sourceTree = "<group>"; };
-		6286E477B805FEA026AF1B95 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = DoctorPlus/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		97FBBEF7F5EDB4EA9B30282C /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-DoctorPlus/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		1F96A45EED951FB66543E63A /* Pods-DoctorPlus.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.release.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.release.xcconfig"; sourceTree = "<group>"; };
+		3ED8C2AD5E96CBF35D390ED7 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-DoctorPlus/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		7932C210FA1D4A44583C1EC9 /* libPods-DoctorPlus.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-DoctorPlus.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		92126EFCAC2BAA25B1F448CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = DoctorPlus/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9C7D1C7FA92698473FA8A73C /* Pods-DoctorPlus.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DoctorPlus.debug.xcconfig"; path = "Target Support Files/Pods-DoctorPlus/Pods-DoctorPlus.debug.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = DoctorPlus/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -37,21 +37,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2CAB242C93799619D2FC0BBD /* libPods-DoctorPlus.a in Frameworks */,
+				A7AE369AC2E12299C99CB84E /* libPods-DoctorPlus.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0789EB93006FB6FDD67665BC /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				E11721355A982F1DBE8075C7 /* DoctorPlus */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
 		13B07FAE1A68108700A75B9A /* DoctorPlus */ = {
 			isa = PBXGroup;
 			children = (
@@ -61,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				6286E477B805FEA026AF1B95 /* PrivacyInfo.xcprivacy */,
+				92126EFCAC2BAA25B1F448CE /* PrivacyInfo.xcprivacy */,
 			);
 			name = DoctorPlus;
 			sourceTree = "<group>";
@@ -70,16 +62,16 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				5397C729581FCB2AA0198DFA /* libPods-DoctorPlus.a */,
+				7932C210FA1D4A44583C1EC9 /* libPods-DoctorPlus.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		43C4E551194CE8B926FFF3F8 /* Pods */ = {
+		32698B2109A597B1C40753BA /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				22CF235988367FFC4FCF4E60 /* Pods-DoctorPlus.debug.xcconfig */,
-				5B602A999CAF9E4D67933D18 /* Pods-DoctorPlus.release.xcconfig */,
+				9C7D1C7FA92698473FA8A73C /* Pods-DoctorPlus.debug.xcconfig */,
+				1F96A45EED951FB66543E63A /* Pods-DoctorPlus.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -98,8 +90,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				43C4E551194CE8B926FFF3F8 /* Pods */,
-				0789EB93006FB6FDD67665BC /* ExpoModulesProviders */,
+				32698B2109A597B1C40753BA /* Pods */,
+				D362B5EDE26263CC229F46D3 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -123,12 +115,20 @@
 			path = DoctorPlus/Supporting;
 			sourceTree = "<group>";
 		};
-		E11721355A982F1DBE8075C7 /* DoctorPlus */ = {
+		CCD690CB398F89CA23F0CFFD /* DoctorPlus */ = {
 			isa = PBXGroup;
 			children = (
-				97FBBEF7F5EDB4EA9B30282C /* ExpoModulesProvider.swift */,
+				3ED8C2AD5E96CBF35D390ED7 /* ExpoModulesProvider.swift */,
 			);
 			name = DoctorPlus;
+			sourceTree = "<group>";
+		};
+		D362B5EDE26263CC229F46D3 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				CCD690CB398F89CA23F0CFFD /* DoctorPlus */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -139,13 +139,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "DoctorPlus" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				2249AB3863E74846C78E6309 /* [Expo] Configure project */,
+				05C1D45DD9B2F2085D75F7F2 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				55821B130E8A672D82B7F4CB /* [CP] Embed Pods Frameworks */,
+				38C0F482EFEBDBB4EEDFA039 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				0572764303C2D15F09971883 /* PrivacyInfo.xcprivacy in Resources */,
+				902764926E3BD57747130823 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,6 +217,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
+		};
+		05C1D45DD9B2F2085D75F7F2 /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-DoctorPlus/expo-configure-project.sh\"\n";
 		};
 		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -240,26 +259,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		2249AB3863E74846C78E6309 /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-DoctorPlus/expo-configure-project.sh\"\n";
-		};
-		55821B130E8A672D82B7F4CB /* [CP] Embed Pods Frameworks */ = {
+		38C0F482EFEBDBB4EEDFA039 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -371,7 +371,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				66A9D368203E8328DB61C046 /* ExpoModulesProvider.swift in Sources */,
+				F3A710AC5A1F020AB659CE17 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -380,7 +380,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 22CF235988367FFC4FCF4E60 /* Pods-DoctorPlus.debug.xcconfig */;
+			baseConfigurationReference = 9C7D1C7FA92698473FA8A73C /* Pods-DoctorPlus.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -420,7 +420,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5B602A999CAF9E4D67933D18 /* Pods-DoctorPlus.release.xcconfig */;
+			baseConfigurationReference = 1F96A45EED951FB66543E63A /* Pods-DoctorPlus.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -486,7 +486,7 @@
 				DEVELOPMENT_TEAM = 53RRR8478R;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -552,7 +552,7 @@
 				DEVELOPMENT_TEAM = 53RRR8478R;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;

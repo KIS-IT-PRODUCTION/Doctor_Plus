@@ -147,6 +147,7 @@
   "unexpected_error": "An unexpected error occurred.",
   "logout_confirm_title": "Confirm Logout",
   "logout_confirm_message": "Are you sure you want to log out?",
+  "default_intro_motto_text": "Your health is our priority. Find a qualified doctor who will take care of you.",
 
   "error_notifications": "Notifications Error",
   "failed_to_get_push_token_permissions": "Failed to get push token for notifications! Please check permissions in your device settings.",
