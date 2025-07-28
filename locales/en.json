@@ -860,5 +860,21 @@
   "i_agree_with": "I agree with ",
   "privacy_policy": "Privacy Policy",
   "you_have_successfully_booked_the_slot_for": "You have successfully booked the slot for",
-  "are_you_sure_you_want_to_book_for": "Are you sure you want to book for"
+  "are_you_sure_you_want_to_book_for": "Are you sure you want to book for",
+   "paymentInfoTitle": "Payment Information",
+  "ibanInstruction": "You need to add an IBAN account. Payments for consultations will be credited to this account.",
+  "commissionInfo": "A service commission of 10% is withheld from each consultation.",
+  "paymentCondition": "Payment for the consultation is received after the patient confirms its completion.",
+  "paymentInfoButton": "Payment Information",
+  "paymentInfoDetails": "Payment details",
+  "paymentInfoDetailsDescription": "You can view your payment details in the profile settings.",
+  "details":"Go to",
+  "paymentInfoIBANRequired": "Please enter your IBAN account.",
+  "paymentInfoIBANInvalid": "Invalid IBAN account entered. A Ukrainian IBAN has the format 'UA' followed by 27 digits. Please check your input.",
+
+  "statusInfoTitle": "Profile Status",
+  "statusConfirmedTitle": "Profile Confirmed",
+  "statusPendingTitle": "Profile Under Review",
+  "statusConfirmedDetails": "Your profile has been successfully verified and is now visible to patients. You can now accept consultation requests.",
+  "statusPendingDetails": "Your profile is awaiting review by an administrator. This usually takes up to 3 business days. We will notify you once the review is complete. Until then, your profile will not be visible to patients."
 }
