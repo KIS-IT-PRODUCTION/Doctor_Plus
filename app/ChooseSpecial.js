@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -20,7 +20,6 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
-import Icon from "../assets/icon.svg";
 
 // --- ГЛОБАЛЬНІ КОНСТАНТИ ТА ФУНКЦІЇ МАСШТАБУВАННЯ ---
 const { width, height } = Dimensions.get("window");
@@ -94,210 +93,10 @@ const specializationsList = [
   { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
 const COUNTRY_FLAGS_MAP = {
-   "EN": "🇬🇧",
-  "UK": "🇺🇦",
- "DE": "🇩🇪", // Germany/German
-  "PH": "🇵🇭", // Philippines
-  "HR": "🇭🇷", // Croatia
-  "CF": "🇨🇫", // Central African Republic
-  "TD": "🇹🇩", // Chad
-  "CZ": "🇨🇿", // Czechia
-  "CL": "🇨🇱", // Chile
-  "ME": "🇲🇪", // Montenegro
-  "LK": "🇱🇰", // Sri Lanka
-  "JM": "🇯🇲", // Jamaica
-  "UA": "🇺🇦", // Ukraine
-  "GB": "🇬🇧", // United Kingdom
-  "US": "🇺🇸", // United States
-  "CA": "🇨🇦", // Canada
-  "FR": "🇫🇷", // France
-  "PL": "🇵🇱", // Poland
-  "IT": "🇮🇹", // Italy
-  "ES": "🇪🇸", // Spain
-  "JP": "🇯🇵", // Japan
-  "CN": "🇨🇳", // China
-  "IN": "🇮🇳", // India
-  "AU": "🇦🇺", // Australia
-  "BR": "🇧🇷", // Brazil
-  "TR": "🇹🇷", // Turkey
-  "SE": "🇸🇪", // Sweden
-  "CH": "🇨🇭", // Switzerland
-  "NL": "🇳🇱", // Netherlands
-  "NO": "🇳🇴", // Norway
-  "DK": "🇩🇰", // Denmark
-  "FI": "🇫🇮", // Finland
-  "ZA": "🇿🇦", // South Africa
-  "MX": "🇲🇽", // Mexico
-  "KR": "🇰🇷", // South Korea
-  "AR": "🇦🇷", // Argentina
-  "IE": "🇮🇪", // Ireland
-  "NZ": "🇳🇿", // New Zealand
-  "SG": "🇸🇬", // Singapore
-  "IL": "🇮🇱", // Israel
-  "MY": "🇲🇾", // Malaysia
-  "TH": "🇹🇭", // Thailand
-  "VN": "🇻🇳", // Vietnam
-  "ID": "🇮🇩", // Indonesia
-  "EG": "🇪🇬", // Egypt
-  "NG": "🇳🇬", // Nigeria
-  "SA": "🇸🇦", // Saudi Arabia
-  "AE": "🇦🇪", // United Arab Emirates
-  "KW": "🇰🇼", // Kuwait
-  "QA": "🇶🇦", // Qatar
-  "AT": "🇦🇹", // Austria
-  "AZ": "🇦🇿", // Azerbaijan
-  "AL": "🇦🇱", // Albania
-  "DZ": "🇩🇿", // Algeria
-  "AO": "🇦🇴", // Angola
-  "AD": "🇦🇩", // Andorra
-  "AG": "🇦🇬", // Antigua and Barbuda
-  "AF": "🇦🇫", // Afghanistan
-  "BS": "🇧🇸", // Bahamas
-  "BD": "🇧🇩", // Bangladesh
-  "BB": "🇧🇧", // Barbados
-  "BH": "🇧🇭", // Bahrain
-  "BZ": "🇧🇿", // Belize
-  "BE": "🇧🇪", // Belgium
-  "BJ": "🇧🇯", // Benin
-  "BY": "🇧🇾", // Belarus
-  "BG": "🇧🇬", // Bulgaria
-  "BO": "🇧🇴", // Bolivia
-  "BA": "🇧🇦", // Bosnia and Herzegovina
-  "BW": "🇧🇼", // Botswana
-  "BN": "🇧🇳", // Brunei
-  "BF": "🇧🇫", // Burkina Faso
-  "BI": "🇧🇮", // Burundi
-  "BT": "🇧🇹", // Bhutan
-  "VU": "🇻🇺", // Vanuatu
-  "VE": "🇻🇪", // Venezuela
-  "AM": "🇦🇲", // Armenia
-  "GA": "🇬🇦", // Gabon
-  "HT": "🇭🇹", // Haiti
-  "GM": "🇬🇲", // Gambia
-  "GH": "🇬🇭", // Ghana
-  "GY": "🇬🇾", // Guyana
-  "GT": "🇬🇹", // Guatemala
-  "GN": "🇬🇳", // Guinea
-  "GW": "🇬🇼", // Guinea-Bissau
-  "HN": "🇭🇳", // Honduras
-  "GD": "🇬🇩", // Grenada
-  "GR": "🇬🇷", // Greece
-  "GE": "🇬🇪", // Georgia
-  "DJ": "🇩🇯", // Djibouti
-  "DM": "🇩🇲", // Dominica
-  "DO": "🇩🇴", // Dominican Republic
-  "CD": "🇨🇩", // DR Congo
-  "EC": "🇪🇨", // Ecuador
-  "GQ": "🇬🇶", // Equatorial Guinea
-  "ER": "🇪🇷", // Eritrea
-  "SZ": "🇸🇿", // Eswatini
-  "EE": "🇪🇪", // Estonia
-  "ET": "🇪🇹", // Ethiopia
-  "YE": "🇾🇪", // Yemen
-  "ZM": "🇿🇲", // Zambia
-  "ZW": "🇿🇼", // Zimbabwe
-  "IR": "🇮🇷", // Iran
-  "IS": "🇮🇸", // Iceland
-  "IQ": "🇮🇶", // Iraq
-  "JO": "🇯🇴", // Jordan
-  "CV": "🇨🇻", // Cape Verde
-  "KZ": "🇰🇿", // Kazakhstan
-  "KH": "🇰🇭", // Cambodia
-  "CM": "🇨🇲", // Cameroon
-  "KE": "🇰🇪", // Kenya
-  "KG": "🇰🇬", // Kyrgyzstan
-  "CY": "🇨🇾", // Cyprus
-  "KI": "🇰🇮", // Kiribati
-  "CO": "🇨🇴", // Colombia
-  "KM": "🇰🇲", // Comoros
-  "CR": "🇨🇷", // Costa Rica
-  "CI": "🇨🇮", // Ivory Coast
-  "CU": "🇨🇺", // Cuba
-  "LA": "🇱🇦", // Laos
-  "LV": "🇱🇻", // Latvia
-  "LS": "🇱🇸", // Lesotho
-  "LT": "🇱🇹", // Lithuania
-  "LR": "🇱🇷", // Liberia
-  "LB": "🇱🇧", // Lebanon
-  "LY": "🇱🇾", // Libya
-  "LI": "🇱🇮", // Liechtenstein
-  "LU": "🇱🇺", // Luxembourg
-  "MM": "🇲🇲", // Myanmar
-  "MU": "🇲🇺", // Mauritius
-  "MR": "🇲🇷", // Mauritania
-  "MG": "🇲🇬", // Madagascar
-  "MW": "🇲🇼", // Malawi
-  "ML": "🇲🇱", // Mali
-  "MV": "🇲🇻", // Maldives
-  "MT": "🇲🇹", // Malta
-  "MA": "🇲🇦", // Morocco
-  "MH": "🇲🇭", // Marshall Islands
-  "MZ": "🇲🇿", // Mozambique
-  "MD": "🇲🇩", // Moldova
-  "MC": "🇲🇨", // Monaco
-  "MN": "🇲🇳", // Mongolia
-  "NA": "🇳🇦", // Namibia
-  "NR": "🇳🇷", // Nauru
-  "NP": "🇳🇵", // Nepal
-  "NE": "🇳🇪", // Niger
-  "NI": "🇳🇮", // Nicaragua
-  "OM": "🇴🇲", // Oman
-  "PK": "🇵🇰", // Pakistan
-  "PW": "🇵🇼", // Palau
-  "PA": "🇵🇦", // Panama
-  "PG": "🇵🇬", // Papua New Guinea
-  "PY": "🇵🇾", // Paraguay
-  "PE": "🇵🇪", // Peru
-  "SS": "🇸🇸", // South Sudan
-  "KP": "🇰🇵", // North Korea
-  "MK": "🇲🇰", // North Macedonia
-  "PT": "🇵🇹", // Portugal
-  "CG": "🇨🇬", // Republic of the Congo
-  "RU": "🇷🇺", // Russia
-  "RW": "🇷🇼", // Rwanda
-  "RO": "🇷🇴", // Romania
-  "SV": "🇸🇻", // El Salvador
-  "WS": "🇼🇸", // Samoa
-  "SM": "🇸🇲", // San Marino
-  "ST": "🇸🇹", // Sao Tome and Principe
-  "SC": "🇸🇨", // Seychelles
-  "SN": "🇸🇳", // Senegal
-  "VC": "🇻🇨", // Saint Vincent and the Grenadines
-  "KN": "🇰🇳", // Saint Kitts and Nevis
-  "LC": "🇱🇨", // Saint Lucia
-  "RS": "🇷🇸", // Serbia
-  "SY": "🇸🇾", // Syria
-  "SK": "🇸🇰", // Slovakia
-  "SI": "🇸🇮", // Slovenia
-  "SB": "🇸🇧", // Solomon Islands
-  "SO": "🇸🇴", // Somalia
-  "SD": "🇸🇩", // Sudan
-  "SR": "🇸🇷", // Suriname
-  "TL": "🇹🇱", // East Timor
-  "SL": "🇸🇱", // Sierra Leone
-  "TJ": "🇹🇯", // Tajikistan
-  "TZ": "🇹🇿", // Tanzania
-  "TG": "🇹🇬", // Togo
-  "TO": "🇹🇴", // Tonga
-  "TT": "🇹🇹", // Trinidad and Tobago
-  "TV": "🇹🇻", // Tuvalu
-  "TN": "🇹🇳", // Tunisia
-  "TM": "🇹🇲", // Turkmenistan
-  "UG": "🇺🇬", // Uganda
-  "HU": "🇭🇺", // Hungary
-  "UZ": "🇺🇿", // Uzbekistan
-  "UY": "🇺🇾", // Uruguay
-  "FM": "🇫🇲", // Federated States of Micronesia
-  "FJ": "🇫🇯", // Fiji
+  "EN": "🇬🇧", "UK": "🇺🇦", "DE": "🇩🇪", "PH": "🇵🇭", "HR": "🇭🇷", "CF": "🇨🇫", "TD": "🇹🇩", "CZ": "🇨🇿", "CL": "🇨🇱", "ME": "🇲🇪", "LK": "🇱🇰", "JM": "🇯🇲", "UA": "🇺🇦", "GB": "🇬🇧", "US": "🇺🇸", "CA": "🇨🇦", "FR": "🇫🇷", "PL": "🇵🇱", "IT": "🇮🇹", "ES": "🇪🇸", "JP": "🇯🇵", "CN": "🇨🇳", "IN": "🇮🇳", "AU": "🇦🇺", "BR": "🇧🇷", "TR": "🇹🇷", "SE": "🇸🇪", "CH": "🇨🇭", "NL": "🇳🇱", "NO": "🇳🇴", "DK": "🇩🇰", "FI": "🇫🇮", "ZA": "🇿🇦", "MX": "🇲🇽", "KR": "🇰🇷", "AR": "🇦🇷", "IE": "🇮🇪", "NZ": "🇳🇿", "SG": "🇸🇬", "IL": "🇮🇱", "MY": "🇲🇾", "TH": "🇹🇭", "VN": "🇻🇳", "ID": "🇮🇩", "EG": "🇪🇬", "NG": "🇳🇬", "SA": "🇸🇦", "AE": "🇦🇪", "KW": "🇰🇼", "QA": "🇶🇦", "AT": "🇦🇹", "AZ": "🇦🇿", "AL": "🇦🇱", "DZ": "🇩🇿", "AO": "🇦🇴", "AD": "🇦🇩", "AG": "🇦🇬", "AF": "🇦🇫", "BS": "🇧🇸", "BD": "🇧🇩", "BB": "🇧🇧", "BH": "🇧🇭", "BZ": "🇧🇿", "BE": "🇧🇪", "BJ": "🇧🇯", "BY": "🇧🇾", "BG": "🇧🇬", "BO": "🇧🇴", "BA": "🇧🇦", "BW": "🇧🇼", "BN": "🇧🇳", "BF": "🇧🇫", "BI": "🇧🇮", "BT": "🇧🇹", "VU": "🇻🇺", "VE": "🇻🇪", "AM": "🇦🇲", "GA": "🇬🇦", "HT": "🇭🇹", "GM": "🇬🇲", "GH": "🇬🇭", "GY": "🇬🇾", "GT": "🇬🇹", "GN": "🇬🇳", "GW": "🇬🇼", "HN": "🇭🇳", "GD": "🇬🇩", "GR": "🇬🇷", "GE": "🇬🇪", "DJ": "🇩🇯", "DM": "🇩🇲", "DO": "🇩🇴", "CD": "🇨🇩", "EC": "🇪🇨", "GQ": "🇬🇶", "ER": "🇪🇷", "SZ": "🇸🇿", "EE": "🇪🇪", "ET": "🇪🇹", "YE": "🇾🇪", "ZM": "🇿🇲", "ZW": "🇿🇼", "IR": "🇮🇷", "IS": "🇮🇸", "IQ": "🇮🇶", "JO": "🇯🇴", "CV": "🇨🇻", "KZ": "🇰🇿", "KH": "🇰🇭", "CM": "🇨🇲", "KE": "🇰🇪", "KG": "🇰🇬", "CY": "🇨🇾", "KI": "🇰🇮", "CO": "🇨🇴", "KM": "🇰🇲", "CR": "🇨🇷", "CI": "🇨🇮", "CU": "🇨🇺", "LA": "🇱🇦", "LV": "🇱🇻", "LS": "🇱🇸", "LT": "🇱🇹", "LR": "🇱🇷", "LB": "🇱🇧", "LY": "🇱🇾", "LI": "🇱🇮", "LU": "🇱🇺", "MM": "🇲🇲", "MU": "🇲🇺", "MR": "🇲🇷", "MG": "🇲🇬", "MW": "🇲🇼", "ML": "🇲🇱", "MV": "🇲🇻", "MT": "🇲🇹", "MA": "🇲🇦", "MH": "🇲🇭", "MZ": "🇲🇿", "MD": "🇲🇩", "MC": "🇲🇨", "MN": "🇲🇳", "NA": "🇳🇦", "NR": "🇳🇷", "NP": "🇳🇵", "NE": "🇳🇪", "NI": "🇳🇮", "OM": "🇴🇲", "PK": "🇵🇰", "PW": "🇵🇼", "PA": "🇵🇦", "PG": "🇵🇬", "PY": "🇵🇾", "PE": "🇵🇪", "SS": "🇸🇸", "KP": "🇰🇵", "MK": "🇲🇰", "PT": "🇵🇹", "CG": "🇨🇬", "RU": "🇷🇺", "RW": "🇷🇼", "RO": "🇷🇴", "SV": "🇸🇻", "WS": "🇼🇸", "SM": "🇸🇲", "ST": "🇸🇹", "SC": "🇸🇨", "SN": "🇸🇳", "VC": "🇻🇨", "KN": "🇰🇳", "LC": "🇱🇨", "RS": "🇷🇸", "SY": "🇸🇾", "SK": "🇸🇰", "SI": "🇸🇮", "SB": "🇸🇧", "SO": "🇸🇴", "SD": "🇸🇩", "SR": "🇸🇷", "TL": "🇹🇱", "SL": "🇸🇱", "TJ": "🇹🇯", "TZ": "🇹🇿", "TG": "🇹🇬", "TO": "🇹🇴", "TT": "🇹🇹", "TV": "🇹🇻", "TN": "🇹🇳", "TM": "🇹🇲", "UG": "🇺🇬", "HU": "🇭🇺", "UZ": "🇺🇿", "UY": "🇺🇾", "FM": "🇫🇲", "FJ": "🇫🇯",
 };
 
 // --- ДОПОМІЖНІ ФУНКЦІЇ ---
-
-/**
- * Безпечно парсить JSON-рядок у масив.
- * @param {string | any[]} value - Вхідне значення.
- * @returns {any[]} - Розпарсений масив або порожній масив.
- */
 const getParsedArray = (value) => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -310,22 +109,21 @@ const getParsedArray = (value) => {
   }
 };
 
-/**
- * Розраховує рейтинг у зірках (0-5) на основі балів.
- * @param {number} points - Кількість балів.
- * @returns {number} - Кількість зірок.
- */
 const calculateStarsFromPoints = (points) => {
   if (points === null || points === undefined || isNaN(points) || points < 0) return 0;
   return Math.min(5, Math.floor(points / 200));
 };
 
+const getPoints = (doc) => {
+  if (!doc || !doc.profile_doctor) {
+    return null;
+  }
+  const profile = Array.isArray(doc.profile_doctor) ? doc.profile_doctor[0] : doc.profile_doctor;
+  return (profile && typeof profile.doctor_points === 'number') ? profile.doctor_points : null;
+};
+
 
 // --- ДОЧІРНІ КОМПОНЕНТИ ---
-
-/**
- * Компонент для відображення рядка інформації з іконкою.
- */
 const InfoBox = ({ icon, label, value, children }) => {
   const { t } = useTranslation();
   const isEmpty = !value && (!children || (Array.isArray(children) && children.length === 0));
@@ -343,9 +141,6 @@ const InfoBox = ({ icon, label, value, children }) => {
   );
 };
 
-/**
- * Компонент для відображення прапорів мов.
- */
 const LanguageFlags = ({ languages }) => {
   if (!languages || languages.length === 0) return null;
   return (
@@ -357,23 +152,9 @@ const LanguageFlags = ({ languages }) => {
   );
 };
 
-/**
- * Компонент картки лікаря.
- */
 const DoctorCard = ({ doctor }) => {
   const navigation = useNavigation();
   const { t } = useTranslation();
-
-  // Функція для надійного отримання балів
-  const getPoints = useCallback((doc) => {
-    if (!doc || !doc.profile_doctor) {
-      return null;
-    }
-    // Supabase повертає зв'язки як масив. Беремо перший елемент.
-    const profile = Array.isArray(doc.profile_doctor) ? doc.profile_doctor[0] : doc.profile_doctor;
-    // Повертаємо бали, якщо вони існують і є числом, інакше null.
-    return (profile && typeof profile.doctor_points === 'number') ? profile.doctor_points : null;
-  }, []);
 
   const doctorPoints = getPoints(doctor);
   const starRating = calculateStarsFromPoints(doctorPoints);
@@ -408,7 +189,6 @@ const DoctorCard = ({ doctor }) => {
             {Array.from({ length: 5 }).map((_, i) => (
               <Ionicons key={i} name={i < starRating ? "star" : "star-outline"} size={moderateScale(18)} color={i < starRating ? "#FFC107" : "#CFD8DC"} />
             ))}
-            {/* ВИПРАВЛЕНО: Показуємо бали, якщо вони не null */}
             {doctorPoints !== null && <Text style={styles.ratingPointsText}>({doctorPoints})</Text>}
           </View>
         </View>
@@ -443,24 +223,50 @@ const ChooseSpecial = () => {
   const { specialization: initialSpecialization, searchQuery } = route.params || {};
   const { t } = useTranslation();
 
-  // Стейт
-  const [doctors, setDoctors] = useState([]);
+  const [originalDoctors, setOriginalDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentSortOption, setCurrentSortOption] = useState("rating_desc");
+  const [currentSortOption, setCurrentSortOption] = useState("popularity");
   const [isSortModalVisible, setSortModalVisible] = useState(false);
   
-  // Анімація
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(300)).current;
 
-  // Логіка завантаження даних
+  // Функція сортування
+  const sortDoctors = useCallback((doctorsToSort, option) => {
+    const sorted = [...doctorsToSort];
+    switch (option) {
+      case "rating_desc":
+        return sorted.sort((a, b) => getPoints(b) - getPoints(a));
+      case "rating_asc":
+        return sorted.sort((a, b) => getPoints(a) - getPoints(b));
+      case "experience_desc":
+        return sorted.sort((a, b) => (b.experience_years || 0) - (a.experience_years || 0));
+      case "experience_asc":
+        return sorted.sort((a, b) => (a.experience_years || 0) - (b.experience_years || 0));
+      case "price_asc":
+        return sorted.sort((a, b) => (a.consultation_cost || 0) - (b.consultation_cost || 0));
+      case "price_desc":
+        return sorted.sort((a, b) => (b.consultation_cost || 0) - (a.consultation_cost || 0));
+      case "popularity":
+      default:
+        // Сортуємо за початковим порядком (адмін-сортування)
+        return sorted.sort((a, b) => (a.display_order || 9999) - (b.display_order || 9999));
+    }
+  }, []);
+
+  const displayedDoctors = useMemo(() => sortDoctors(originalDoctors, currentSortOption), [originalDoctors, currentSortOption, sortDoctors]);
+
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let query = supabase.from("anketa_doctor").select("*, profile_doctor(doctor_points), consultation_cost, experience_years, created_at, avatar_url, doctor_check").eq("doctor_check", true);
-      
+      let query = supabase
+        .from("anketa_doctor")
+        .select("*, profile_doctor(doctor_points), display_order")
+        .eq("doctor_check", true)
+        .order('display_order', { ascending: true }); // Сортування за порядком адміна
+
       if (initialSpecialization) {
         query = query.filter("specialization", "cs", `["${initialSpecialization}"]`);
       } else if (searchQuery) {
@@ -468,7 +274,7 @@ const ChooseSpecial = () => {
         if (rpcError) throw rpcError;
         const doctorIds = rpcData.filter(d => d.doctor_check).map(d => d.user_id);
         if (doctorIds.length === 0) {
-            setDoctors([]);
+            setOriginalDoctors([]);
             setLoading(false);
             return;
         }
@@ -477,7 +283,7 @@ const ChooseSpecial = () => {
       
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
-
+      
       const consultationCounts = await Promise.all(
         data.map(d => 
           supabase.from('patient_bookings').select('id', { count: 'exact', head: true }).eq('doctor_id', d.user_id).eq('consultation_conducted', true)
@@ -488,36 +294,25 @@ const ChooseSpecial = () => {
         ...doctor,
         consultations_count: consultationCounts[index].count || 0,
       }));
-
-      const sortedDoctors = [...processedDoctors].sort((a, b) => {
-        const pointsA = a.profile_doctor?.[0]?.doctor_points || 0;
-        const pointsB = b.profile_doctor?.[0]?.doctor_points || 0;
-        switch (currentSortOption) {
-          case "experience_desc": return (b.experience_years || 0) - (a.experience_years || 0);
-          case "experience_asc": return (a.experience_years || 0) - (b.experience_years || 0);
-          case "price_asc": return (a.consultation_cost || 0) - (b.consultation_cost || 0);
-          case "price_desc": return (b.consultation_cost || 0) - (a.consultation_cost || 0);
-          case "rating_asc": return pointsA - pointsB;
-          default: return pointsB - pointsA;
-        }
-      });
-      setDoctors(sortedDoctors);
+      
+      setOriginalDoctors(processedDoctors);
     } catch (e) {
       setError(`${t("unexpected_error")}: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [t, initialSpecialization, searchQuery, currentSortOption]);
+  }, [t, initialSpecialization, searchQuery]);
 
   useEffect(() => {
     fetchDoctors();
   }, [fetchDoctors]);
   
   useEffect(() => {
-    setCurrentSortOption("rating_desc");
+    setCurrentSortOption("popularity");
   }, [initialSpecialization, searchQuery]);
 
   const sortOptions = [
+    { label: t("sort_by_popularity"), value: "popularity" },
     { label: t("sort_by_rating_desc"), value: "rating_desc" },
     { label: t("sort_by_rating_asc"), value: "rating_asc" },
     { label: t("sort_by_experience_desc"), value: "experience_desc" },
@@ -569,7 +364,7 @@ const ChooseSpecial = () => {
         </View>
       );
     }
-    if (doctors.length === 0) {
+    if (displayedDoctors.length === 0) {
       return (
         <View style={styles.centeredContainer}>
           <Ionicons name="search-outline" size={moderateScale(50)} color="#B0BEC5" />
@@ -579,7 +374,7 @@ const ChooseSpecial = () => {
     }
     return (
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        {doctors.map((doctor) => <DoctorCard key={doctor.user_id} doctor={doctor} />)}
+        {displayedDoctors.map((doctor) => <DoctorCard key={doctor.user_id} doctor={doctor} />)}
       </ScrollView>
     );
   };
@@ -608,7 +403,7 @@ const ChooseSpecial = () => {
                         <Text style={styles.sortModalTitle}>{t("sort")}</Text>
                         {sortOptions.map((option) => (
                         <TouchableOpacity key={option.value} style={styles.sortOptionButton} onPress={() => handleSortOptionSelect(option)}>
-                            <Text style={[styles.sortOptionText, currentSortOption === option.value && styles.sortOptionTextSelected]}>{option.label}</Text>
+                            <Text style={[styles.sortOptionText, currentSortOption === option.value && styles.sortOptionTextSelected]}>{t(option.label)}</Text>
                             {currentSortOption === option.value && <Ionicons name="checkmark-circle" size={moderateScale(22)} color="#0EB3EB" />}
                         </TouchableOpacity>
                         ))}

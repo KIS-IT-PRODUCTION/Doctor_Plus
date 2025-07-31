@@ -20,11 +20,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../../providers/supabaseClient"; // Переконайтесь, що шлях правильний
+import { supabase } from "../../providers/supabaseClient";
 import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { decode } from "base64-arraybuffer";
+
+
 
 const specializations = [
   { value: "general_practitioner", nameKey: "general_practitioner" },
@@ -1809,6 +1811,7 @@ const generalAppLanguages = [
   { nameKey: "english", code: "en", emoji: "" },
   { nameKey: "ukrainian", code: "uk", emoji: "" },
 ];
+
 const Anketa_Settings = () => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -1843,6 +1846,11 @@ const Anketa_Settings = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isDeletingProfile, setIsDeletingProfile] = useState(false);
+  
+  const [isDeleteConfirmationModalVisible, setIsDeleteConfirmationModalVisible] = useState(false);
+  const [emailToDelete, setEmailToDelete] = useState("");
+  const [passwordToDelete, setPasswordToDelete] = useState("");
+  
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(i18n.language.toUpperCase());
 
@@ -1883,8 +1891,6 @@ const Anketa_Settings = () => {
     return `${years} ${t("years_plural_genitive")}`;
   };
 
-  // !!! ВИПРАВЛЕННЯ ТУТ !!!
-  // Залежність змінено на [], щоб ефект виконувався лише один раз при монтуванні.
   useEffect(() => {
     const fetchUserProfile = async () => {
       setIsLoadingProfile(true);
@@ -1901,7 +1907,6 @@ const Anketa_Settings = () => {
           .eq("user_id", user.id)
           .single();
 
-        // Змінюємо мову, якщо вона збережена і відрізняється від поточної
         if (profileDoctorData?.language && profileDoctorData.language !== i18n.language) {
           i18n.changeLanguage(profileDoctorData.language);
         }
@@ -1923,7 +1928,12 @@ const Anketa_Settings = () => {
           const communicationLanguages = data.communication_languages ? (Array.isArray(data.communication_languages) ? data.communication_languages : JSON.parse(data.communication_languages)) : [];
           setSelectedConsultationLanguages(communicationLanguages);
           const specializationData = data.specialization ? (Array.isArray(data.specialization) ? data.specialization : JSON.parse(data.specialization)) : [];
-          const mappedSpecializations = specializationData.map(value => specializations.find(spec => spec.value === value)).filter(Boolean);
+          
+          const mappedSpecializations = specializationData.map(value => {
+            const cleanValue = value.replace('categories.', ''); 
+            return specializations.find(spec => spec.value === cleanValue);
+          }).filter(Boolean);
+
           setSelectedSpecializations(mappedSpecializations);
           setPhotoUri(data.avatar_url || null);
           setDiplomaUri(data.diploma_url || null);
@@ -1946,7 +1956,7 @@ const Anketa_Settings = () => {
     };
 
     fetchUserProfile();
-  }, []); // <--- ОСНОВНА ЗМІНА ТУТ
+  }, []);
 
   const openCountryModal = () => setIsCountryModalVisible(true);
   const closeCountryModal = () => setIsCountryModalVisible(false);
@@ -2065,7 +2075,7 @@ const Anketa_Settings = () => {
       let avatarUrl = photoUri;
       if (photoUri && !photoUri.startsWith("http")) {
         avatarUrl = await uploadFile(photoUri, "avatars", user.id, "profile");
-        if (!avatarUrl) return; // uploadFile покаже Alert
+        if (!avatarUrl) return;
       }
       let diplomaUrl = diplomaUri;
       if (diplomaUri && !diplomaUri.startsWith("http")) {
@@ -2111,12 +2121,91 @@ const Anketa_Settings = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    // ... (код без змін)
+  const confirmSignOut = () => {
+    Alert.alert(
+      t("signOutTitle"),
+      t("logout_confirm_message"),
+      [
+        {
+          text: t("cancel"),
+          style: "cancel"
+        },
+        {
+          text: t("signOut"),
+          onPress: async () => {
+            try {
+              const { error } = await supabase.auth.signOut();
+              if (error) {
+                Alert.alert(t("error_title"), error.message);
+              } else {
+                navigation.navigate("MainScreen");
+              }
+            } catch (err) {
+              Alert.alert(t("error_title"), t("error_signing_out"));
+              console.error(err);
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+  
+  const handleDeleteProfile = () => {
+    setIsDeleteConfirmationModalVisible(true);
   };
 
-  const handleDeleteProfile = async () => {
-    // ... (код без змін)
+  const confirmAndDeleteProfile = async () => {
+    setIsDeletingProfile(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        Alert.alert(t("error_title"), t("error_not_authenticated"));
+        return;
+      }
+      
+      if (emailToDelete !== user.email) {
+          Alert.alert(t("error_title"), t("error_email_mismatch"));
+          return;
+      }
+      
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailToDelete,
+        password: passwordToDelete,
+      });
+
+      if (signInError) {
+        Alert.alert(t("error_title"), t("error_invalid_credentials"));
+        return;
+      }
+
+      const { error: anketaError } = await supabase
+        .from("anketa_doctor")
+        .delete()
+        .eq("user_id", user.id);
+
+      if (anketaError) throw anketaError;
+
+      const { error: profileError } = await supabase
+        .from("profile_doctor")
+        .delete()
+        .eq("user_id", user.id);
+
+      if (profileError) throw profileError;
+
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+
+      Alert.alert(t("success_title"), t("profile_deleted"));
+      setIsDeleteConfirmationModalVisible(false);
+      navigation.navigate("MainScreen");
+    } catch (err) {
+      console.error("Помилка видалення профілю:", err);
+      Alert.alert(t("error_title"), err.message || t("error_deleting_profile"));
+    } finally {
+      setIsDeletingProfile(false);
+    }
   };
 
   const showStatusInfo = () => {
@@ -2176,7 +2265,7 @@ const Anketa_Settings = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.signOutButtonAboveSearch} onPress={handleSignOut}>
+            <TouchableOpacity style={styles.signOutButtonAboveSearch} onPress={confirmSignOut}>
               <Ionicons name="log-out-outline" size={24} color="white" />
               <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
             </TouchableOpacity>
@@ -2303,7 +2392,37 @@ const Anketa_Settings = () => {
       </Modal>
       
       <Modal animationType="slide" transparent={true} visible={isSpecializationModalVisible} onRequestClose={closeSpecializationModal}>
-        <TouchableWithoutFeedback onPress={closeSpecializationModal}><View style={styles.centeredView}><View style={[styles.modalView(width), styles.modalBorder]}><ScrollView>{specializations.map(spec => (<Pressable key={spec.value} style={styles.countryItem} onPress={() => toggleSpecializationSelect(spec)}><Text style={[styles.countryName, selectedSpecializations.some(s => s.value === spec.value) && styles.countryItemTextSelected]}>{t(spec.nameKey)}</Text>{selectedSpecializations.some(s => s.value === spec.value) && <Ionicons name="checkmark-circle" size={24} color="#0EB3EB" style={styles.checkmarkIcon} />}</Pressable>))}</ScrollView><Pressable style={[styles.button, styles.buttonClose]} onPress={closeSpecializationModal}><Text style={styles.textStyle}>{t("close")}</Text></Pressable></View></View></TouchableWithoutFeedback>
+        <TouchableWithoutFeedback onPress={closeSpecializationModal}>
+          <View style={styles.centeredView}>
+            <View style={[styles.modalView(width), styles.modalBorder]}>
+              <ScrollView>
+                <Text style={{ fontFamily: "Mont-Medium", fontSize: 18, position:"static" }}> {t("select_specialization")}</Text>
+                {specializations.map(spec => (
+                  <Pressable 
+                    key={spec.value} 
+                    style={[
+                      styles.countryItem,
+                      selectedSpecializations.some(s => s.value === spec.value) && styles.countryItemSelected,
+                    ]} 
+                    onPress={() => toggleSpecializationSelect(spec)}
+                  >
+                    <Text style={[
+                      styles.countryName, 
+                      selectedSpecializations.some(s => s.value === spec.value) && styles.countryItemTextSelected
+                    ]}>
+                       {t(spec.nameKey)}
+                    </Text>
+                    {selectedSpecializations.some(s => s.value === spec.value) && 
+                      <Ionicons name="checkmark-circle" size={24} color="#0EB3EB" style={styles.checkmarkIcon} />}
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable style={[styles.button, styles.buttonClose]} onPress={closeSpecializationModal}>
+                <Text style={styles.textStyle}>{t("close")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       <Modal animationType="slide" transparent={true} visible={isExperienceYearsModalVisible} onRequestClose={closeExperienceYearsModal}>
@@ -2317,6 +2436,51 @@ const Anketa_Settings = () => {
       <Modal animationType="fade" transparent={true} visible={isImageModalVisible} onRequestClose={closeImageModal}>
         <TouchableWithoutFeedback onPress={closeImageModal}><View style={styles.fullScreenImageModalOverlay}>{selectedImageUri && <Image source={{ uri: selectedImageUri }} style={styles.fullScreenImage} resizeMode="contain" />}<TouchableOpacity style={styles.closeImageModalButton} onPress={closeImageModal}><Ionicons name="close-circle" size={40} color="white" /></TouchableOpacity></View></TouchableWithoutFeedback>
       </Modal>
+      
+      {/* Модальне вікно для підтвердження видалення профілю */}
+      <Modal animationType="fade" transparent={true} visible={isDeleteConfirmationModalVisible} onRequestClose={() => setIsDeleteConfirmationModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setIsDeleteConfirmationModalVisible(false)}>
+          <View style={styles.centeredView}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalView(width), styles.modalBorder, styles.deleteModalView]}>
+                <Text style={styles.modalTitle}>{t("deleteProfile_title")}</Text>
+                <Text style={styles.infoModalText}>{t("deleteProfile_message")}</Text>
+                
+                <TextInput
+                  style={[styles.input, styles.deleteInput]}
+                  placeholder={t("email")}
+                  value={emailToDelete}
+                  onChangeText={setEmailToDelete}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                <TextInput
+                  style={[styles.input, styles.deleteInput]}
+                  placeholder={t("password")}
+                  value={passwordToDelete}
+                  onChangeText={setPasswordToDelete}
+                  secureTextEntry
+                />
+                
+                <TouchableOpacity
+                  style={[styles.button, styles.deleteButton, { marginTop: 20 }]}
+                  onPress={confirmAndDeleteProfile}
+                  disabled={isDeletingProfile}
+                >
+                  {isDeletingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.textStyle}>{t("confirm_delete")}</Text>}
+                </TouchableOpacity>
+                <Pressable
+                  style={[styles.button, styles.buttonClose, { marginTop: 10 }]}
+                  onPress={() => setIsDeleteConfirmationModalVisible(false)}
+                >
+                  <Text style={styles.textStyle}>{t("cancel")}</Text>
+                </Pressable>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -2388,6 +2552,17 @@ const styles = StyleSheet.create({
   closeImageModalButton: { position: "absolute", top: Platform.OS === "ios" ? 50 : 20, right: 20, zIndex: 1 },
   deleteProfileButton: (width) => ({ backgroundColor: "#FF3B30", borderRadius: 555, paddingVertical: 15, width: width * 0.9, height: 52, alignItems: "center", marginTop: 10, marginBottom: 20 }),
   deleteProfileButtonText: { color: "#fff", fontSize: 18, fontWeight: "bold", textAlign: "center" },
+  deleteModalView: { paddingHorizontal: 20, paddingVertical: 30 },
+  deleteInput: {
+    backgroundColor: "rgba(255, 0, 0, 0.1)",
+    marginBottom: 10,
+    borderColor: "#FF3B30",
+    borderWidth: 1,
+    color: "#000",
+  },
+  deleteButton: {
+    backgroundColor: "#FF3B30",
+  }
 });
 
 export default Anketa_Settings;

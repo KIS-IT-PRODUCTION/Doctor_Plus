@@ -314,17 +314,18 @@ const Register = () => {
       if (data.user) {
         console.log("Supabase user registered. User ID:", data.user.id);
 
-        // Insert doctor's profile data, INCLUDING the initial points
+        // --- ЗМІНА ТУТ: Додаємо email до об'єкта профілю ---
         const { error: profileError } = await supabase
           .from("profile_doctor")
           .insert([
             {
               user_id: data.user.id,
               full_name: fullName.trim(),
+              email: email.trim(), // <--- Додано: пошта
               phone: phone.trim() || null,
               country: country?.name || null,
               language: i18n.language || null,
-              doctor_points: 1000, // <--- Додано: ініціалізуємо бали лікаря
+              doctor_points: 1000,
             },
           ]);
 
@@ -334,12 +335,8 @@ const Register = () => {
             profileError.message
           );
           setRegistrationError(t("error_profile_save_failed"));
-          // Optionally, you might want to delete the auth user here if profile saving fails
-          // await supabase.auth.admin.deleteUser(data.user.id); // Consider if you want to clean up auth user on profile creation failure
           return;
         }
-
-        // Removed the separate "doctor_points" table insert, as the column is now in "profile_doctor"
 
         Alert.alert(t("success_title"), t("success_registration_message"));
         setFullName("");

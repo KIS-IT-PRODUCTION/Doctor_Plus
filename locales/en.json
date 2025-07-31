@@ -876,5 +876,13 @@
   "statusConfirmedTitle": "Profile Confirmed",
   "statusPendingTitle": "Profile Under Review",
   "statusConfirmedDetails": "Your profile has been successfully verified and is now visible to patients. You can now accept consultation requests.",
-  "statusPendingDetails": "Your profile is awaiting review by an administrator. This usually takes up to 3 business days. We will notify you once the review is complete. Until then, your profile will not be visible to patients."
+  "statusPendingDetails": "Your profile is awaiting review by an administrator. This usually takes up to 3 business days. We will notify you once the review is complete. Until then, your profile will not be visible to patients.",
+  "no_schedule_data_available": "No schedule data available.",
+  "sort_by_popularity": "By popularity",
+  "deleteProfile_title": "Delete Profile",
+  "deleteProfile_message": "Are you sure you want to delete your profile? This action is irreversible. To confirm, please enter your email and password.",
+  "confirm_delete": "Confirm Delete",
+  "error_email_mismatch": "The entered email does not match your account.",
+  "error_invalid_credentials": "Invalid password. Please try again.",
+  "not_specified_price": "Not specified"
 }
