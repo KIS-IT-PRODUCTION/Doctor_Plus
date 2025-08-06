@@ -29,7 +29,6 @@ import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TabBar_doctor from "../../components/TopBar_doctor";
 import { useAuth } from "../../providers/AuthProvider";
-import { useDoctorProfile } from "../../components/DoctorProfileContext";
 
 const { width, height } = Dimensions.get("window");
 const isLargeScreen = width > 768;
@@ -62,60 +61,61 @@ const specializations = [
   { value: "psychiatrist", nameKey: "psychiatrist" },
   { value: "dentist", nameKey: "dentist" },
   { value: "ophthalmologist", nameKey: "ophthalmologist" },
-  { value: "ent_specialist", nameKey: "categories.ent_specialist" }, // Зберігаємо оригінальний формат nameKey
+  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
   { value: "gastroenterologist", nameKey: "gastroenterologist" },
   { value: "endocrinologist", nameKey: "endocrinologist" },
   { value: "oncologist", nameKey: "oncologist" },
   { value: "allergist", nameKey: "allergist" },
   { value: "physiotherapist", nameKey: "physiotherapist" },
-  { value: "traumatologist", nameKey: "traumatologist" }, // Додано
-  { value: "gynecologist", nameKey: "gynecologist" },       // Додано
-  { value: "urologist", nameKey: "urologist" },             // Додано
-  { value: "pulmonologist", nameKey: "pulmonologist" },     // Додано
-  { value: "nephrologist", nameKey: "nephrologist" },       // Додано
-  { value: "rheumatologist", nameKey: "rheumatologist" },   // Додано
-  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" }, // Додано
-  { value: "psychologist", nameKey: "psychologist" },       // Додано
-  { value: "nutritionist", nameKey: "nutritionist" },       // Додано
-  { value: "radiologist", nameKey: "radiologist" },         // Додано
-  { value: "anesthesiologist", nameKey: "anesthesiologist" }, // Додано
-  { value: "oncologist_radiation", nameKey: "oncologist_radiation" }, // Додано
-  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" }, // Додано
-  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" }, // Додано
-  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" }, // Додано
-  { value: "immunologist", nameKey: "immunologist" }, // Додано
-  { value: "genetics_specialist", nameKey: "genetics_specialist" }, // Додано
-  { value: "geriatrician", nameKey: "geriatrician" }, // Додано
-  { value: "toxicologist", nameKey: "toxicologist" }, // Додано
-  { value: "forensic_expert", nameKey: "forensic_expert" }, // Додано
-  { value: "epidemiologist", nameKey: "epidemiologist" }, // Додано
-  { value: "pathologist", nameKey: "pathologist" }, // Додано
-  { value: "rehabilitologist", nameKey: "rehabilitologist" }, // Додано
-  { value: "manual_therapist", nameKey: "manual_therapist" }, // Додано
-  { value: "chiropractor", nameKey: "chiropractor" }, // Додано
-  { value: "reflexologist", nameKey: "reflexologist" }, // Додано
-  { value: "massage_therapist", nameKey: "massage_therapist" }, // Додано
-  { value: "dietitian", nameKey: "dietitian" }, // Додано
-  { value: "sexologist", nameKey: "sexologist" }, // Додано
-  { value: "phlebologist", nameKey: "phlebologist" }, // Додано
-  { value: "mammologist", nameKey: "mammologist" }, // Додано
-  { value: "proctologist", nameKey: "proctologist" }, // Додано
-  { value: "andrologist", nameKey: "andrologist" }, // Додано
-  { value: "reproductive_specialist", nameKey: "reproductive_specialist" }, // Додано
-  { value: "transfusiologist", nameKey: "transfusiologist" }, // Додано
-  { value: "balneologist", nameKey: "balneologist" }, // Додано
-  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" }, // Додано
-  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" }, // Додано
-  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" }, // Додано
-  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" }, // Додано
-  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" }, // Додано
-  { value: "neonatologist", nameKey: "neonatologist" }, // Додано
-  { value: "speech_therapist", nameKey: "speech_therapist" }, // Додано
-  { value: "ergotherapist", nameKey: "ergotherapist" }, // Додано
-  { value: "osteopath", nameKey: "osteopath" }, // Додано
-  { value: "homeopath", nameKey: "homeopath" }, // Додано
-  { value: "acupuncturist", nameKey: "acupuncturist" }, // Додано
+  { value: "traumatologist", nameKey: "traumatologist" },
+  { value: "gynecologist", nameKey: "gynecologist" },
+  { value: "urologist", nameKey: "urologist" },
+  { value: "pulmonologist", nameKey: "pulmonologist" },
+  { value: "nephrologist", nameKey: "nephrologist" },
+  { value: "rheumatologist", nameKey: "rheumatologist" },
+  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" },
+  { value: "psychologist", nameKey: "psychologist" },
+  { value: "nutritionist", nameKey: "nutritionist" },
+  { value: "radiologist", nameKey: "radiologist" },
+  { value: "anesthesiologist", nameKey: "anesthesiologist" },
+  { value: "oncologist_radiation", nameKey: "oncologist_radiation" },
+  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" },
+  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" },
+  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" },
+  { value: "immunologist", nameKey: "immunologist" },
+  { value: "genetics_specialist", nameKey: "genetics_specialist" },
+  { value: "geriatrician", nameKey: "geriatrician" },
+  { value: "toxicologist", nameKey: "toxicologist" },
+  { value: "forensic_expert", nameKey: "forensic_expert" },
+  { value: "epidemiologist", nameKey: "epidemiologist" },
+  { value: "pathologist", nameKey: "pathologist" },
+  { value: "rehabilitologist", nameKey: "rehabilitologist" },
+  { value: "manual_therapist", nameKey: "manual_therapist" },
+  { value: "chiropractor", nameKey: "chiropractor" },
+  { value: "reflexologist", nameKey: "reflexologist" },
+  { value: "massage_therapist", nameKey: "massage_therapist" },
+  { value: "dietitian", nameKey: "dietitian" },
+  { value: "sexologist", nameKey: "sexologist" },
+  { value: "phlebologist", nameKey: "phlebologist" },
+  { value: "mammologist", nameKey: "mammologist" },
+  { value: "proctologist", nameKey: "proctologist" },
+  { value: "andrologist", nameKey: "andrologist" },
+  { value: "reproductive_specialist", nameKey: "reproductive_specialist" },
+  { value: "transfusiologist", nameKey: "transfusiologist" },
+  { value: "balneologist", nameKey: "balneologist" },
+  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" },
+  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" },
+  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" },
+  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" },
+  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" },
+  { value: "neonatologist", nameKey: "neonatologist" },
+  { value: "speech_therapist", nameKey: "speech_therapist" },
+  { value: "ergotherapist", nameKey: "ergotherapist" },
+  { value: "osteopath", nameKey: "osteopath" },
+  { value: "homeopath", nameKey: "homeopath" },
+  { value: "acupuncturist", nameKey: "acupuncturist" },
 ];
+
 async function registerForPushNotificationsAsync(userId) {
   let token;
 
@@ -176,10 +176,10 @@ async function registerForPushNotificationsAsync(userId) {
       return;
     }
   } else {
-    Alert.alert(
-      "Помилка",
-      "Push-сповіщення працюють лише на фізичних пристроях!"
-    );
+    // Alert.alert(
+    //   "Помилка",
+    //   "Push-сповіщення працюють лише на фізичних пристроях!"
+    // );
     console.log("Must use physical device for Push Notifications");
     return;
   }
@@ -468,15 +468,19 @@ const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
   const { session } = useAuth();
-  const { doctorData, isLoading, error, isConnected, fetchDoctorProfile } = useDoctorProfile();
+
+  const [doctorData, setDoctorData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isConnected, setIsConnected] = useState(true);
 
   const doctorIdFromParams = route.params?.doctorId ? String(route.params.doctorId) : null;
+  const isProfileOwner = !doctorIdFromParams || (session?.user?.id === doctorIdFromParams);
 
   const [currentLoggedInDoctorId, setCurrentLoggedInDoctorId] = useState(null);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const timeoutRef = useRef(null);
-
+  
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
@@ -490,7 +494,6 @@ const Profile_doctor = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
-  // Стан для модального вікна про незаповнений профіль
   const [isProfileCompletionModalVisible, setIsProfileCompletionModalVisible] = useState(false);
 
   const [activeTab, setActiveTab] = useState("Profile_doctor");
@@ -531,15 +534,104 @@ const Profile_doctor = ({ route }) => {
     const userId = session?.user?.id;
     if (userId) {
       setCurrentLoggedInDoctorId(userId);
-      console.log("Profile_doctor: Registering for push notifications for user:", userId);
       registerForPushNotificationsAsync(userId);
     } else {
       setCurrentLoggedInDoctorId(null);
     }
   }, [session]);
 
+  // --- FIX ---
+  // Логіка повністю перероблена згідно з вашим поясненням.
+  const fetchDoctorProfile = useCallback(async (userId, isRefresh = false) => {
+    if (!isRefresh) {
+      setIsLoading(true);
+      setLoadingAvatar(true);
+      setLoadingDiploma(true);
+      setLoadingCertificate(true);
+    }
+    setError(null);
+    setAvatarError(false);
+    setCertificateError(false);
+    setDiplomaError(false);
+
+    try {
+      // 1. Спочатку завжди шукаємо повну анкету в `anketa_doctor`
+      const { data: anketaData, error: anketaError } = await supabase
+        .from('anketa_doctor')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      // Перевіряємо помилку. Ігноруємо 'PGRST116', яка означає "рядок не знайдено".
+      if (anketaError && anketaError.code !== 'PGRST116') {
+        throw anketaError;
+      }
+
+      if (anketaData) {
+        // 2. Успіх: повна анкета знайдена, використовуємо її
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setDoctorData(anketaData);
+      } else {
+        // 3. Повної анкети немає. Завантажуємо базові дані з `profile_doctor`
+        const { data: profileData, error: profileError } = await supabase
+          .from('profile_doctor')
+          .select(`
+            user_id,
+            full_name,
+            email,
+            phone,
+            country,
+            doctor_points
+          `)
+          .eq('user_id', userId)
+          .single();
+
+        if (profileError) {
+          throw profileError;
+        }
+        
+        if (profileData) {
+          // 4. Створюємо мінімальний об'єкт профілю.
+          // Поля, що існують тільки в `anketa_doctor`, встановлюються в null.
+          // `checkProfileCompleteness` правильно визначить його як неповний.
+          const minimalProfile = {
+            ...profileData, // Дані з profile_doctor
+            // Явно встановлюємо поля з anketa_doctor в null, щоб UI не показував старі дані
+            avatar_url: null, 
+            communication_languages: null,
+            specialization: null,
+            experience_years: null,
+            education: null,
+            achievements: null,
+            about_me: null,
+            consultation_cost: null,
+            diploma_url: null,
+            certificate_photo_url: null,
+            work_location: null,
+            doctor_check: false, 
+          };
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setDoctorData(minimalProfile);
+        } else {
+          // 5. Не знайдено навіть базового профілю
+          setError('Не вдалося знайти профіль лікаря.');
+        }
+      }
+    } catch (err) {
+      console.error("Помилка при завантаженні профілю лікаря:", err);
+      setError(err.message);
+    } finally {
+      if (!isRefresh) {
+        setIsLoading(false);
+      }
+    }
+  }, [setLoadingAvatar, setLoadingDiploma, setLoadingCertificate]);
+
+
   const checkProfileCompleteness = useCallback((profile) => {
     if (!profile) return false;
+    // Ця перевірка тепер працює коректно, оскільки вона завжди
+    // аналізує дані, що прийшли з `anketa_doctor`.
     const isComplete =
       profile.full_name &&
       profile.avatar_url &&
@@ -557,70 +649,29 @@ const Profile_doctor = ({ route }) => {
     return isComplete;
   }, []);
 
-  // Цей ефект тепер відповідає лише за показ модального вікна про незаповнений профіль
   useEffect(() => {
-    // Показуємо модальне вікно тільки якщо:
-    // 1. Завантаження завершилося і немає помилки
-    // 2. Є дані профілю (навіть якщо вони неповні)
-    // 3. Це профіль поточного залогіненого лікаря (не чийсь інший)
-    // 4. Профіль не є повним
-    if (!isLoading && !error && doctorData && currentLoggedInDoctorId && doctorData.user_id === currentLoggedInDoctorId) {
-      const isComplete = checkProfileCompleteness(doctorData);
-      setIsProfileCompletionModalVisible(!isComplete);
+    // Показуємо модальне вікно, тільки якщо це власник профілю і анкета не заповнена
+    if (!isLoading && !error && isProfileOwner && !checkProfileCompleteness(doctorData)) {
+      setIsProfileCompletionModalVisible(true);
     } else {
-      setIsProfileCompletionModalVisible(false); // Приховати модалку, якщо умови не відповідають
+      setIsProfileCompletionModalVisible(false);
     }
-  }, [doctorData, isLoading, error, currentLoggedInDoctorId, checkProfileCompleteness]);
-
+  }, [doctorData, isLoading, error, isProfileOwner, checkProfileCompleteness]);
 
   useFocusEffect(
     useCallback(() => {
-      console.log("Profile_doctor: useFocusEffect triggered.");
       setActiveTab("Profile_doctor");
-
-      const targetId = doctorIdFromParams || currentLoggedInDoctorId;
-
-      if (targetId) {
-        fetchDoctorProfile(targetId, false);
-      } else {
-        console.log("Profile_doctor: No target doctor ID (from params or session).");
+      const targetId = doctorIdFromParams || session?.user?.id;
+      if (targetId && (!doctorData || doctorData.user_id !== targetId)) {
+        fetchDoctorProfile(targetId);
       }
-
-      // Очищення таймауту при кожному фокусі
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      // Встановлення таймауту для випадку, якщо завантаження дуже довго триває
-      timeoutRef.current = setTimeout(() => {
-        // Якщо досі завантажується і немає помилки від провайдера, вивести Alert
-        if (isLoading && !error) {
-          Alert.alert(t("loading_timeout_title"), t("loading_timeout_message"), [
-            { text: t("retry_button"), onPress: onRetry },
-            { text: t("back_to_home_button"), onPress: onBackToHome },
-          ]);
-        }
-      }, 30000); // 30 секунд
-
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-      };
-    }, [
-      t,
-      doctorIdFromParams,
-      currentLoggedInDoctorId,
-      fetchDoctorProfile,
-      isLoading,
-      error,
-      onRetry,
-      onBackToHome,
-    ])
+      return () => {};
+    }, [doctorIdFromParams, session?.user?.id, doctorData, fetchDoctorProfile])
   );
 
   const fetchUnreadNotificationsCount = useCallback(async () => {
-    if (!currentLoggedInDoctorId) {
+    const userId = session?.user?.id;
+    if (!userId) {
       setUnreadNotificationsCount(0);
       return;
     }
@@ -629,7 +680,7 @@ const Profile_doctor = ({ route }) => {
       const { count, error: countError } = await supabase
         .from("doctor_notifications")
         .select("id", { count: "exact" })
-        .eq("doctor_id", currentLoggedInDoctorId)
+        .eq("doctor_id", userId)
         .eq("is_read", false);
 
       if (countError) {
@@ -640,32 +691,15 @@ const Profile_doctor = ({ route }) => {
         setUnreadNotificationsCount(0);
       } else {
         setUnreadNotificationsCount(count || 0);
-        console.log(
-          `Unread notifications count for ${currentLoggedInDoctorId}: ${count}`
-        );
       }
-    } catch (err) {
-      let errorMessage = "Unknown error";
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === "string") {
-        errorMessage = err;
-      } else if (
-        typeof err === "object" &&
-        err !== null &&
-        "message" in err &&
-        typeof err.message === "string"
-      ) {
-        errorMessage = err.message;
-      }
+    } catch (err)      {
       console.error(
         "Unexpected error fetching unread notifications count:",
-        errorMessage,
         err
       );
       setUnreadNotificationsCount(0);
     }
-  }, [currentLoggedInDoctorId]);
+  }, [session?.user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -692,12 +726,12 @@ const Profile_doctor = ({ route }) => {
   };
 
   const handleProfileDoctorSettingsPress = () => {
-    setIsProfileCompletionModalVisible(false); // Закриваємо модалку перед переходом
+    setIsProfileCompletionModalVisible(false);
     navigation.navigate("Anketa_Settings");
   };
 
   const handleChooseConsultationTime = () => {
-    const targetDoctorId = doctorIdFromParams || currentLoggedInDoctorId;
+    const targetDoctorId = doctorIdFromParams || session?.user?.id;
 
     if (targetDoctorId) {
       navigation.navigate("ConsultationTime", { doctorId: targetDoctorId });
@@ -722,6 +756,7 @@ const Profile_doctor = ({ route }) => {
         navigation.navigate("Support_doctor");
         break;
       case "Profile_doctor":
+        // Already here, do nothing
         break;
       default:
         break;
@@ -742,23 +777,9 @@ const Profile_doctor = ({ route }) => {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
-      let errorMessage = "Invalid JSON format";
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === "string") {
-        errorMessage = err;
-      } else if (
-        typeof err === "object" &&
-        err !== null &&
-        "message" in err &&
-        typeof e.message === "string"
-      ) {
-        errorMessage = e.message;
-      }
       console.warn(
-        "Warning: Invalid JSON format for array (expected array or parsable JSON string):",
+        "Warning: Invalid JSON format for array:",
         value,
-        errorMessage,
         err
       );
       return [];
@@ -800,30 +821,30 @@ const Profile_doctor = ({ route }) => {
 
   const onRetry = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsProfileCompletionModalVisible(false); // Закриваємо модалку при повторній спробі
+    setIsProfileCompletionModalVisible(false);
 
-    const targetId = doctorIdFromParams || currentLoggedInDoctorId;
+    const targetId = doctorIdFromParams || session?.user?.id;
     if (targetId) {
-      fetchDoctorProfile(targetId, true); // Примусове оновлення з контексту
+      fetchDoctorProfile(targetId);
     } else {
       console.warn("Retry failed: Doctor ID missing.");
     }
-  }, [doctorIdFromParams, currentLoggedInDoctorId, fetchDoctorProfile]);
+  }, [doctorIdFromParams, session?.user?.id, fetchDoctorProfile]);
 
   const onBackToHome = useCallback(() => {
     navigation.navigate("HomeScreen");
   }, [navigation]);
 
   const onGoToAnketa = useCallback(() => {
-    setIsProfileCompletionModalVisible(false); // Закриваємо модалку перед переходом
+    setIsProfileCompletionModalVisible(false);
     navigation.navigate("Anketa_Settings");
   }, [navigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setIsProfileCompletionModalVisible(false); // Закриваємо модалку при оновленні
+    setIsProfileCompletionModalVisible(false);
 
-    const idToRefresh = doctorIdFromParams || currentLoggedInDoctorId;
+    const idToRefresh = doctorIdFromParams || session?.user?.id;
     if (idToRefresh) {
       await fetchDoctorProfile(idToRefresh, true);
       await fetchUnreadNotificationsCount();
@@ -831,31 +852,27 @@ const Profile_doctor = ({ route }) => {
       console.warn("Cannot refresh: Doctor ID missing.");
     }
     setRefreshing(false);
-  }, [fetchDoctorProfile, fetchUnreadNotificationsCount, doctorIdFromParams, currentLoggedInDoctorId]);
+  }, [fetchDoctorProfile, fetchUnreadNotificationsCount, doctorIdFromParams, session?.user?.id]);
 
-  const currentDoctor = doctorData || {};
+  const finalDoctorData = doctorData || {};
+  const defaultAvatarUrl = "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo";
 
-  // Логіка для відображення повноекранних станів:
-  // 1. Завантаження (коли isLoading = true)
-  // 2. Помилка або відсутність зв'язку (коли !isLoading і є error або немає isConnected)
-  // 3. Профіль не знайдено (коли !isLoading, немає doctorData, немає error, є isConnected)
-  // 4. Основний контент профілю
-  const showLoading = isLoading;
-  const showErrorMessage = !isLoading && (error || !isConnected);
-  const showProfileNotFound = !isLoading && !doctorData && !error && isConnected; // Профіль не знайдено, і немає інших активних помилок/завантаження
+  const showLoading = isLoading && !doctorData;
+  const showGenericError = !isLoading && error && !doctorData;
+  const showDoctorNotFound = !isLoading && !doctorData && !error && !isProfileOwner;
+  const showProfileContent = !isLoading && doctorData;
+
 
   return (
     <SafeAreaView style={styles.container}>
       {showLoading ? (
-        // Блок завантаження
         <View style={styles.fullscreenContainer}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0EB3EB" />
             <Text style={styles.loadingText}>{t("loading_profile_data")}</Text>
           </View>
         </View>
-      ) : showErrorMessage ? (
-        // Блок помилки / відсутності зв'язку
+      ) : showGenericError ? (
         <View style={styles.fullscreenContainer}>
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle-outline" size={50} color="#D32F2F" />
@@ -872,24 +889,13 @@ const Profile_doctor = ({ route }) => {
             </TouchableOpacity>
           </View>
         </View>
-      ) : showProfileNotFound ? (
-        // Блок "Профіль не знайдено"
+      ) : showDoctorNotFound ? (
         <View style={styles.fullscreenContainer}>
           <View style={styles.noDoctorContainer}>
             <Ionicons name="information-circle-outline" size={50} color="#0EB3EB" />
             <Text style={styles.noDoctorText}>
-              {currentLoggedInDoctorId === doctorIdFromParams
-                ? t("profile_not_filled_message") // Якщо це профіль поточного користувача, показуємо про заповнення
-                : t("doctor_not_found")} {/* Інакше - лікар не знайдений */}
+              {t("doctor_not_found")}
             </Text>
-            {currentLoggedInDoctorId === doctorIdFromParams && ( // Кнопка "Заповнити профіль" тільки для власника
-              <TouchableOpacity
-                style={styles.goToAnketaButton}
-                onPress={onGoToAnketa}
-              >
-                <Text style={styles.goToAnketaButtonText}>{t("fill_profile")}</Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
                 style={styles.backToHomeButton}
                 onPress={onBackToHome}
@@ -898,8 +904,7 @@ const Profile_doctor = ({ route }) => {
             </TouchableOpacity>
           </View>
         </View>
-      ) : (
-        // Основний вміст профілю
+      ) : showProfileContent ? (
         <>
           <View style={styles.header}>
             <TouchableOpacity
@@ -913,19 +918,21 @@ const Profile_doctor = ({ route }) => {
             </TouchableOpacity>
 
             <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
-            <TouchableOpacity
-              style={styles.notificationButton}
-              onPress={() => navigation.navigate("Messege")}
-            >
-                <Ionicons name="notifications" size={moderateScale(24)} color="white" />
-                {unreadNotificationsCount > 0 && (
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationNumber}>
-                      {unreadNotificationsCount}
-                    </Text>
-                  </View>
-                )}
-            </TouchableOpacity>
+            {isProfileOwner && (
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => navigation.navigate("Messege")}
+              >
+                  <Ionicons name="notifications" size={moderateScale(24)} color="white" />
+                  {unreadNotificationsCount > 0 && (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationNumber}>
+                        {unreadNotificationsCount}
+                      </Text>
+                    </View>
+                  )}
+              </TouchableOpacity>
+            )}
           </View>
           <ScrollView
             style={styles.scrollView}
@@ -940,46 +947,46 @@ const Profile_doctor = ({ route }) => {
             }
           >
             <View style={styles.doctorMainInfo}>
-              {(currentDoctor.avatar_url && !avatarError) ? (
-                <View style={styles.avatarContainer}>
-                  {loadingAvatar && (
-                    <ActivityIndicator
-                      size="large"
-                      color="#0EB3EB"
-                      style={styles.avatarLoadingIndicator}
+              <View style={styles.avatarContainer}>
+                {finalDoctorData.avatar_url ? (
+                  <>
+                    <Image
+                      key={finalDoctorData.avatar_url}
+                      source={{ uri: finalDoctorData.avatar_url }}
+                      style={styles.avatar}
+                      onLoad={() => setLoadingAvatar(false)}
+                      onError={() => {
+                        setLoadingAvatar(false);
+                        setAvatarError(true);
+                        console.error("Error loading avatar image:", finalDoctorData.avatar_url);
+                      }}
                     />
-                  )}
+                    {loadingAvatar && !avatarError && (
+                      <ActivityIndicator
+                        size="large"
+                        color="#0EB3EB"
+                        style={styles.avatarLoadingIndicator}
+                      />
+                    )}
+                  </>
+                ) : (
                   <Image
-                    source={{ uri: currentDoctor.avatar_url }}
+                    source={{ uri: defaultAvatarUrl }}
                     style={styles.avatar}
-                    onLoadStart={() => setLoadingAvatar(true)}
-                    onLoad={() => setLoadingAvatar(false)}
-                    onError={() => {
-                      setLoadingAvatar(false);
-                      setAvatarError(true);
-                      console.error("Error loading avatar image:", currentDoctor.avatar_url);
-                    }}
                   />
-                </View>
-              ) : (
-                <Image
-                  source={{
-                    uri: "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo",
-                  }}
-                  style={styles.avatar}
-                />
-              )}
+                )}
+              </View>
               <View style={styles.doctorDetails}>
                 <Text style={styles.doctorName}>
-                  {currentDoctor.full_name || t("not_specified")}
+                  {finalDoctorData.full_name || t("not_specified")}
                 </Text>
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("rating")}:</Text>
                   <ValueBox t={t}>
-                    {Array.from({ length: getStarRating(currentDoctor.profile_doctor?.doctor_points) }).map((_, i) => (
+                    {Array.from({ length: getStarRating(finalDoctorData.doctor_points) }).map((_, i) => (
                       <Ionicons key={`star-full-${i}`} name="star" size={18} color="#FFD700" />
                     ))}
-                    {Array.from({ length: 5 - getStarRating(currentDoctor.profile_doctor?.doctor_points) }).map((_, i) => (
+                    {Array.from({ length: 5 - getStarRating(finalDoctorData.doctor_points) }).map((_, i) => (
                       <Ionicons key={`star-outline-${i}`} name="star-outline" size={18} color="#ccc" />
                     ))}
                   </ValueBox>
@@ -987,29 +994,29 @@ const Profile_doctor = ({ route }) => {
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("communication_language")}:</Text>
                   <ValueBox t={t}>
-                    <LanguageFlags languages={getLanguages(currentDoctor.communication_languages)} />
+                    <LanguageFlags languages={getLanguages(finalDoctorData.communication_languages)} />
                   </ValueBox>
                 </View>
 
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("specialization")}:</Text>
-                  <ValueBox t={t}>{getSpecializations(currentDoctor.specialization)}</ValueBox>
+                  <ValueBox t={t}>{getSpecializations(finalDoctorData.specialization)}</ValueBox>
                 </View>
 
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("work_experience")}:</Text>
-                  <ValueBox t={t}>{formatYearsText(currentDoctor.experience_years)}</ValueBox>
+                  <ValueBox t={t}>{formatYearsText(finalDoctorData.experience_years)}</ValueBox>
                 </View>
 
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("work_location")}:</Text>
-                  <ValueBox t={t}>{currentDoctor.work_location || t("not_specified")}</ValueBox>
+                  <ValueBox t={t}>{finalDoctorData.work_location || t("not_specified")}</ValueBox>
                 </View>
 
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("consultation_cost")}:</Text>
                   <ValueBox t={t}>
-                    {currentDoctor.consultation_cost ? `$${currentDoctor.consultation_cost}` : t("not_specified")}
+                    {finalDoctorData.consultation_cost ? `$${finalDoctorData.consultation_cost}` : t("not_specified")}
                   </ValueBox>
                 </View>
               </View>
@@ -1026,43 +1033,44 @@ const Profile_doctor = ({ route }) => {
                   {t("choose_consultation_time")}
                 </Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleProfileDoctorSettingsPress}
-            >
-                <Animated.View style={{ transform: [{ rotate: settingsIconRotate }] }}>
-                    <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
-                </Animated.View>
-                <Text style={styles.actionButtonText}>
-                  {t("profile_doctor_settings")}
-                </Text>
-            </TouchableOpacity>
+            
+            {isProfileOwner && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleProfileDoctorSettingsPress}
+              >
+                  <Animated.View style={{ transform: [{ rotate: settingsIconRotate }] }}>
+                      <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
+                  </Animated.View>
+                  <Text style={styles.actionButtonText}>
+                    {t("profile_doctor_settings")}
+                  </Text>
+              </TouchableOpacity>
+            )}
 
             <Text style={styles.sectionTitleLink}>{t("more_about_doctor")}</Text>
 
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionHeader}>{t("about_me")}</Text>
               <Text style={styles.sectionContent}>
-                {currentDoctor.about_me || t("not_specified_full")}
+                {finalDoctorData.about_me || t("not_specified_full")}
               </Text>
             </View>
 
-
-            {currentDoctor.achievements && currentDoctor.achievements.length > 0 && (
+            {finalDoctorData.achievements && finalDoctorData.achievements.length > 0 && (
               <View style={styles.sectionContainer}>
                 <Text style={styles.sectionHeader}>{t("achievements")}</Text>
                 <Text style={styles.sectionContent}>
-                  {currentDoctor.achievements}
+                  {finalDoctorData.achievements}
                 </Text>
               </View>
             )}
 
-            {currentDoctor.diploma_url && !diplomaError ? (
+            {finalDoctorData.diploma_url ? (
               <View style={styles.sectionContainer}>
                 <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
                 <View style={styles.imageWrapper}>
-                  {loadingDiploma && (
+                  {loadingDiploma && !diplomaError && (
                     <ActivityIndicator
                       size="large"
                       color="#0EB3EB"
@@ -1070,14 +1078,14 @@ const Profile_doctor = ({ route }) => {
                     />
                   )}
                   <Image
-                    source={{ uri: currentDoctor.diploma_url }}
+                    key={finalDoctorData.diploma_url}
+                    source={{ uri: finalDoctorData.diploma_url }}
                     style={styles.documentImage}
-                    onLoadStart={() => setLoadingDiploma(true)}
                     onLoad={() => setLoadingDiploma(false)}
                     onError={() => {
                       setLoadingDiploma(false);
                       setDiplomaError(true);
-                      console.error("Error loading diploma image:", currentDoctor.diploma_url);
+                      console.error("Error loading diploma image:", finalDoctorData.diploma_url);
                     }}
                   />
                 </View>
@@ -1090,11 +1098,12 @@ const Profile_doctor = ({ route }) => {
                 </View>
               </View>
             )}
-            {currentDoctor.certificate_photo_url && !certificateError ? (
+            
+            {finalDoctorData.certificate_photo_url ? (
               <View style={styles.sectionContainer}>
                 <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
                 <View style={styles.imageWrapper}>
-                  {loadingCertificate && (
+                  {loadingCertificate && !certificateError && (
                     <ActivityIndicator
                       size="large"
                       color="#0EB3EB"
@@ -1102,14 +1111,14 @@ const Profile_doctor = ({ route }) => {
                     />
                   )}
                   <Image
-                    source={{ uri: currentDoctor.certificate_photo_url }}
+                    key={finalDoctorData.certificate_photo_url}
+                    source={{ uri: finalDoctorData.certificate_photo_url }}
                     style={styles.documentImage}
-                    onLoadStart={() => setLoadingCertificate(true)}
                     onLoad={() => setLoadingCertificate(false)}
                     onError={() => {
                       setLoadingCertificate(false);
                       setCertificateError(true);
-                      console.error("Error loading certificate image:", currentDoctor.certificate_photo_url);
+                      console.error("Error loading certificate image:", finalDoctorData.certificate_photo_url);
                     }}
                   />
                 </View>
@@ -1124,7 +1133,6 @@ const Profile_doctor = ({ route }) => {
             )}
           </ScrollView>
 
-          {/* Modal for Language Selection */}
           <Modal
             animationType="fade"
             transparent={true}
@@ -1134,9 +1142,7 @@ const Profile_doctor = ({ route }) => {
             <TouchableWithoutFeedback onPress={closeLanguageModal}>
               <View style={styles.modalOverlay}>
                 <TouchableWithoutFeedback
-                  onPress={() => {
-                    /* Залишаємо порожнім, щоб не закривати модалку при натисканні всередині */
-                  }}
+                  onPress={() => {}}
                 >
                   <View style={styles.languageModalContent}>
                     <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
@@ -1157,9 +1163,7 @@ const Profile_doctor = ({ route }) => {
             </TouchableWithoutFeedback>
           </Modal>
 
-          {/* New Modal for Fill Profile Prompt */}
-          {/* Ця модалка з'являється тільки якщо showProfileNotFound = false, тобто основний контент профілю вже відображається */}
-          {(!showLoading && !showErrorMessage && !showProfileNotFound) && currentLoggedInDoctorId === doctorIdFromParams && (
+          {isProfileOwner && !checkProfileCompleteness(doctorData) && (
             <Modal
               animationType="fade"
               transparent={true}
@@ -1202,7 +1206,7 @@ const Profile_doctor = ({ route }) => {
 
           <TabBar_doctor activeTab={activeTab} onTabPress={handleTabPress} />
         </>
-      )}
+      ) : null }
     </SafeAreaView>
   );
 };
@@ -1218,6 +1222,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F0F2F5',
+    padding: 20,
   },
   loadingContainer: {
     justifyContent: "center",
@@ -1303,7 +1308,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   noDoctorContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 25,
@@ -1713,6 +1717,17 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(25),
     textAlign: "center",
     lineHeight: moderateScale(22),
+  },
+  modalCancelButton: {
+    marginTop: moderateScale(10),
+  },
+  modalCancelButtonText: {
+    color: '#6c757d',
+    fontSize: moderateScale(14),
+    fontFamily: 'Mont-Regular',
+  },
+  modalIcon: {
+    marginBottom: moderateScale(15),
   },
 });
 

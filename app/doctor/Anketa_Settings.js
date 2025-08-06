@@ -107,7 +107,9 @@ const specializations = [
 
 const experienceYearsOptions = Array.from({ length: 51 }, (_, i) => i);
 
-// Оновлений список країн з IANA Time Zone
+const consultationCostOptions = Array.from({ length: 20 }, (_, i) => (i + 1) * 5); // 5, 10, 15... 200
+
+// --- FIX: Повернено відсутній список країн ---
 const countries = [
   {
     name: "Ukraine",
@@ -1827,6 +1829,7 @@ const Anketa_Settings = () => {
   const [workLocation, setWorkLocation] = useState("");
   const [achievements, setAchievements] = useState("");
   const [aboutMe, setAboutMe] = useState("");
+  const [consultationCost, setConsultationCost] = useState("");
   const [searchTags, setSearchTags] = useState("");
   const [bankDetails, setBankDetails] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -1838,6 +1841,7 @@ const Anketa_Settings = () => {
   const [isSpecializationModalVisible, setIsSpecializationModalVisible] = useState(false);
   const [isExperienceYearsModalVisible, setIsExperienceYearsModalVisible] = useState(false);
   const [isBankInfoModalVisible, setBankInfoModalVisible] = useState(false);
+  const [isCostModalVisible, setIsCostModalVisible] = useState(false);
 
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
@@ -1942,6 +1946,7 @@ const Anketa_Settings = () => {
           setWorkLocation(data.work_location || "");
           setAchievements(data.achievements || "");
           setAboutMe(data.about_me || "");
+          setConsultationCost(data.consultation_cost ? String(data.consultation_cost) : "");
           setSearchTags(data.search_tags || "");
           setBankDetails(data.bank_details || "");
           setAgreedToTerms(data.agreed_to_terms || false);
@@ -1999,6 +2004,13 @@ const Anketa_Settings = () => {
     setExperienceYears(years);
     closeExperienceYearsModal();
   };
+  
+  const openCostModal = () => setIsCostModalVisible(true);
+  const closeCostModal = () => setIsCostModalVisible(false);
+  const selectConsultationCost = (cost) => {
+    setConsultationCost(String(cost));
+    closeCostModal();
+  };
 
   const openImageModal = (uri) => {
     setSelectedImageUri(uri);
@@ -2053,6 +2065,10 @@ const Anketa_Settings = () => {
       setProfileSaveError(t("specialization_required"));
       return;
     }
+    if (!consultationCost.trim() || isNaN(parseFloat(consultationCost))) {
+      setProfileSaveError(t("consultation_cost_required"));
+      return;
+    }
     if (!bankDetails.trim()) {
       setProfileSaveError(t("paymentInfoIBANRequired"));
       return;
@@ -2100,6 +2116,7 @@ const Anketa_Settings = () => {
         work_location: workLocation.trim() || null,
         achievements: achievements.trim() || null,
         about_me: aboutMe.trim() || null,
+        consultation_cost: parseFloat(consultationCost),
         search_tags: searchTags.trim() || null,
         bank_details: bankDetails.trim(),
         avatar_url: avatarUrl,
@@ -2341,6 +2358,13 @@ const Anketa_Settings = () => {
             <View style={styles.inputContainer(width)}>
               <TextInput style={styles.input} placeholder={t("about_me_placeholder")} value={aboutMe} onChangeText={setAboutMe} multiline numberOfLines={4} />
             </View>
+            
+            <Text style={styles.inputLabel}>{t("consultation_cost")}</Text>
+            <TouchableOpacity style={styles.selectButton(width)} onPress={openCostModal}>
+              <Text style={styles.selectButtonText}>
+                {consultationCost ? `$${consultationCost}` : t("select_consultation_cost_placeholder")}
+              </Text>
+            </TouchableOpacity>
 
             <Text style={styles.inputLabel}>{t("search_tags")}</Text>
             <View style={styles.inputContainer(width)}>
@@ -2374,7 +2398,6 @@ const Anketa_Settings = () => {
         )}
       </ScrollView>
 
-  {/* --- Модальні вікна --- */}
       <Modal animationType="slide" transparent={true} visible={isCountryModalVisible} onRequestClose={closeCountryModal}>
         <TouchableWithoutFeedback onPress={closeCountryModal}>
           <View style={styles.centeredView}><View style={[styles.modalView(width), styles.modalBorder]}><ScrollView style={styles.modalScrollView}>{countries.map(item => (<Pressable key={item.code} style={[styles.countryItem, country?.code === item.code && styles.countryItemSelected]} onPress={() => selectCountry(item)}><Text style={styles.countryEmoji}>{item.emoji}</Text><Text style={[styles.countryName, country?.code === item.code && styles.countryItemTextSelected]}>{item.name}</Text></Pressable>))}</ScrollView><Pressable style={[styles.button, styles.buttonClose]} onPress={closeCountryModal}><Text style={styles.textStyle}>{t("close")}</Text></Pressable></View></View>
@@ -2429,6 +2452,31 @@ const Anketa_Settings = () => {
         <TouchableWithoutFeedback onPress={closeExperienceYearsModal}><View style={styles.centeredView}><View style={[styles.modalContentYears, styles.modalBorder]}><ScrollView style={styles.pickerScrollView}>{experienceYearsOptions.map(year => (<Pressable key={year} style={[styles.pickerOption, experienceYears === year && styles.pickerOptionSelected]} onPress={() => selectExperienceYears(year)}><Text style={[styles.pickerOptionText, experienceYears === year && styles.countryItemTextSelected]}>{formatYearsText(year)}</Text></Pressable>))}</ScrollView><Pressable style={[styles.button, styles.buttonClose]} onPress={closeExperienceYearsModal}><Text style={styles.textStyle}>{t("close")}</Text></Pressable></View></View></TouchableWithoutFeedback>
       </Modal>
 
+      <Modal animationType="slide" transparent={true} visible={isCostModalVisible} onRequestClose={closeCostModal}>
+        <TouchableWithoutFeedback onPress={closeCostModal}>
+          <View style={styles.centeredView}>
+            <View style={[styles.modalContentYears, styles.modalBorder]}>
+              <ScrollView style={styles.pickerScrollView}>
+                {consultationCostOptions.map(cost => (
+                  <Pressable 
+                    key={cost} 
+                    style={[styles.pickerOption, String(consultationCost) === String(cost) && styles.pickerOptionSelected]} 
+                    onPress={() => selectConsultationCost(cost)}
+                  >
+                    <Text style={[styles.pickerOptionText, String(consultationCost) === String(cost) && styles.countryItemTextSelected]}>
+                      ${cost}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable style={[styles.button, styles.buttonClose]} onPress={closeCostModal}>
+                <Text style={styles.textStyle}>{t("close")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <Modal animationType="fade" transparent={true} visible={isBankInfoModalVisible} onRequestClose={() => setBankInfoModalVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setBankInfoModalVisible(false)}><View style={styles.centeredView}><TouchableWithoutFeedback><View style={[styles.modalView(width), styles.modalBorder]}><Text style={styles.modalTitle}>{t("paymentInfoTitle")}</Text><Text style={styles.infoModalText}>• {t("ibanInstruction")}</Text><Text style={styles.infoModalText}>• {t("commissionInfo")}</Text><Text style={styles.infoModalText}>• {t("paymentCondition")}</Text><Pressable style={[styles.button, styles.buttonClose, { marginTop: 20 }]} onPress={() => setBankInfoModalVisible(false)}><Text style={styles.textStyle}>{t("close")}</Text></Pressable></View></TouchableWithoutFeedback></View></TouchableWithoutFeedback>
       </Modal>
@@ -2437,7 +2485,6 @@ const Anketa_Settings = () => {
         <TouchableWithoutFeedback onPress={closeImageModal}><View style={styles.fullScreenImageModalOverlay}>{selectedImageUri && <Image source={{ uri: selectedImageUri }} style={styles.fullScreenImage} resizeMode="contain" />}<TouchableOpacity style={styles.closeImageModalButton} onPress={closeImageModal}><Ionicons name="close-circle" size={40} color="white" /></TouchableOpacity></View></TouchableWithoutFeedback>
       </Modal>
       
-      {/* Модальне вікно для підтвердження видалення профілю */}
       <Modal animationType="fade" transparent={true} visible={isDeleteConfirmationModalVisible} onRequestClose={() => setIsDeleteConfirmationModalVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setIsDeleteConfirmationModalVisible(false)}>
           <View style={styles.centeredView}>

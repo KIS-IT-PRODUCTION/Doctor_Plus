@@ -351,7 +351,7 @@
   "registering": "Registering...",
   "register": "Register",
   "already_registered": "Already registered?",
-  "success_registration_message": "Registration successful! Please log in.",
+  "success_registration_message": "Registration successful! Please confirm your email by following the link we sent to your email.",
   "error_general_registration_failed": "A general error occurred during registration.",
 
   "countries": {
@@ -871,7 +871,6 @@
   "details":"Go to",
   "paymentInfoIBANRequired": "Please enter your IBAN account.",
   "paymentInfoIBANInvalid": "Invalid IBAN account entered. A Ukrainian IBAN has the format 'UA' followed by 27 digits. Please check your input.",
-
   "statusInfoTitle": "Profile Status",
   "statusConfirmedTitle": "Profile Confirmed",
   "statusPendingTitle": "Profile Under Review",

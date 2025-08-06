@@ -251,6 +251,7 @@ const ChooseSpecial = () => {
       case "popularity":
       default:
         // Сортуємо за початковим порядком (адмін-сортування)
+        // Присвоюємо високий індекс лікарям без display_order
         return sorted.sort((a, b) => (a.display_order || 9999) - (b.display_order || 9999));
     }
   }, []);
@@ -265,7 +266,7 @@ const ChooseSpecial = () => {
         .from("anketa_doctor")
         .select("*, profile_doctor(doctor_points), display_order")
         .eq("doctor_check", true)
-        .order('display_order', { ascending: true }); // Сортування за порядком адміна
+        .order('display_order', { ascending: true, nullsFirst: false }); // <--- ЗМІНА ТУТ
 
       if (initialSpecialization) {
         query = query.filter("specialization", "cs", `["${initialSpecialization}"]`);
