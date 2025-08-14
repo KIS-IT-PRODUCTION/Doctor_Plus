@@ -23,7 +23,6 @@ import Icon from '../assets/icon.svg';
 import FeedbackModal from "../components/FeedbackModal.js"
 import { parseISO, format, isPast } from 'date-fns';
 import { uk, enUS } from 'date-fns/locale';
-
 const { width, height } = Dimensions.get("window");
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
@@ -39,6 +38,8 @@ Notifications.setNotificationHandler({
 
 const LIQPAY_INIT_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/init-liqpay-payment';
 const LIQPAY_CALLBACK_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/liqpay-callback';
+// Новий URL для вашої функції підтвердження консультації та виплати
+const CONFIRM_AND_PAYOUT_FUNCTION_URL = 'https://yslchkbmupuyxgidnzrb.supabase.co/functions/v1/confirm-and-payout';
 
 export default function PatientMessages() {
   const { t, i18n } = useTranslation();
@@ -87,7 +88,6 @@ export default function PatientMessages() {
     }
     setLoading(true);
     try {
-      // 1. Отримуємо всі повідомлення
       const { data: notificationData, error: notificationError } = await supabase
         .from('patient_notifications')
         .select(`id, title, body, created_at, is_read, notification_type, data, booking_id`)
@@ -96,10 +96,8 @@ export default function PatientMessages() {
 
       if (notificationError) throw notificationError;
 
-      // 2. Визначаємо, які повідомлення непрочитані, щоб позначити їх
       const unreadMessageIds = notificationData.filter(msg => !msg.is_read).map(msg => msg.id);
 
-      // 3. Позначаємо всі непрочитані повідомлення як прочитані в базі даних
       if (unreadMessageIds.length > 0) {
         const { error: markAsReadError } = await supabase
           .from('patient_notifications')
@@ -108,11 +106,9 @@ export default function PatientMessages() {
         
         if (markAsReadError) {
           console.error("PatientMessages: Error marking messages as read:", markAsReadError.message);
-          // Не зупиняємо процес, бо повідомлення все одно потрібно відобразити
         }
       }
 
-      // 4. Отримуємо деталі бронювань (логіка без змін)
       const bookingIds = notificationData
         .filter(msg => msg.booking_id && msg.notification_type !== 'admin_announcement')
         .map(msg => msg.booking_id);
@@ -121,7 +117,7 @@ export default function PatientMessages() {
       if (bookingIds.length > 0) {
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('patient_bookings')
-          .select('id, doctor_id, status, has_feedback_patient, consultation_conducted, booking_date, booking_time_slot, is_paid, meet_link')
+          .select('id, doctor_id, status, has_feedback_patient, consultation_occurred_patient, booking_date, booking_time_slot, is_paid, meet_link')
           .in('id', bookingIds);
         if (bookingsError) console.error("PatientMessages: Error fetching booking details:", bookingsError.message);
         else bookingsData.forEach(booking => bookingDetails[booking.id] = booking);
@@ -146,7 +142,7 @@ export default function PatientMessages() {
         const currentMessage = {
           id: msg.id, title: msg.title, body: msg.body, created_at: msg.created_at,
           date: formattedDate, time: formattedTime,
-          is_read: true, // Всі повідомлення, що завантажуються на цей екран, вважаються прочитаними
+          is_read: true,
           type: msg.notification_type,
           rawData: msg.data || {}, 
           is_paid: bookingInfo.is_paid || msg.data?.is_paid || false,
@@ -155,12 +151,12 @@ export default function PatientMessages() {
           meet_link: bookingInfo.meet_link || msg.data?.meet_link || null,
           booking_status: bookingInfo.status || null,
           has_feedback_patient: bookingInfo.has_feedback_patient === true,
-          consultation_conducted: bookingInfo.consultation_conducted === true,
+          // Оновлене поле
+          consultation_occurred_patient: bookingInfo.consultation_occurred_patient === true,
           booking_date: bookingInfo.booking_date, 
           booking_time_slot: bookingInfo.booking_time_slot,
         };
 
-        // Логіка фільтрації, яка була раніше, без змін
         if (currentMessage.type === 'admin_announcement') {
             finalProcessedMessages.set(`admin_${currentMessage.id}`, currentMessage); 
         } else if (currentMessage.booking_id) {
@@ -202,7 +198,7 @@ export default function PatientMessages() {
       const finalMessages = Array.from(finalProcessedMessages.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
       setMessages(finalMessages);
-      await updateAppBadge(0); // Встановлюємо бейдж в 0, бо всі повідомлення тепер прочитані
+      await updateAppBadge(0);
     } catch (error) {
       Alert.alert(t('error'), `${t('failed_to_load_messages')}: ${error.message}`);
     } finally {
@@ -219,29 +215,6 @@ export default function PatientMessages() {
     setRefreshing(true);
     fetchMessagesFromSupabase();
   }, [fetchMessagesFromSupabase]);
-
-  // Функція markSingleAsRead тепер не потрібна для автоматичного прочитання
-  // але залишаємо її, якщо є ручні кнопки "Прочитати" на картці повідомлення.
-  const markSingleAsRead = useCallback(async (messageId) => {
-    if (!messageId) return;
-    setMessages(prev => {
-      const updated = prev.map(msg => msg.id === messageId ? { ...msg, is_read: true } : msg);
-      updateAppBadge(updated.filter(m => !m.is_read).length); // Оновлюємо бейдж, якщо є інші непрочитані
-      return updated;
-    });
-    try {
-      const { error } = await supabase.from('patient_notifications').update({ is_read: true }).eq('id', messageId);
-      if (error) throw error;
-    } catch (error) {
-      Alert.alert(t('error'), `${t('failed_to_mark_as_read')}: ${error.message}`);
-      // Відкат стану, якщо сталася помилка
-      setMessages(prev => {
-        const reverted = prev.map(msg => msg.id === messageId ? { ...msg, is_read: false } : msg);
-        updateAppBadge(reverted.filter(m => !m.is_read).length);
-        return reverted;
-      });
-    }
-  }, [t, updateAppBadge]);
 
   const handleLiqPayPayment = useCallback(async (bookingId, amount, description, doctorName) => {
     if (!bookingId || !amount || !description || !currentPatientId) {
@@ -282,14 +255,11 @@ export default function PatientMessages() {
       const supported = await Linking.canOpenURL(fullUrl);
       if (supported) {
           await Linking.openURL(fullUrl);
-          // Після відкриття LiqPay, оновлюємо стан, щоб повідомлення про підтвердження бронювання
-          // відображалося як прочитане або приховане, поки не прийде payment_update.
           setMessages(prevMessages => prevMessages.map(msg =>
               (msg.booking_id === bookingId && msg.type === 'booking_confirmed' && !msg.is_read)
-                  ? { ...msg, is_read: true } // Позначаємо як прочитане, щоб зникло з лічильника
+                  ? { ...msg, is_read: true }
                   : msg
           ));
-          // Оновлюємо лічильник бейджів після зміни стану
           updateAppBadge(messages.filter(m => !(m.booking_id === bookingId && m.type === 'booking_confirmed')).filter(m => !m.is_read).length);
 
       } else {
@@ -311,12 +281,60 @@ export default function PatientMessages() {
     }
   }, [t]);
 
-  const handleDeepLink = useCallback(({ url }) => {
-    // Надаємо невелику затримку, щоб бекенд встиг оновити статус оплати
-    // і потім оновлюємо повідомлення, які автоматично позначаться прочитаними
-    setTimeout(() => fetchMessagesFromSupabase(), 1000);
-  }, [fetchMessagesFromSupabase]);
+  // Нова функція для підтвердження консультації та ініціації виплати
+  const handleConfirmConsultation = useCallback(async (bookingId) => {
+    if (!bookingId) return;
+    
+    Alert.alert(
+      t('confirm_consultation_title'),
+      t('confirm_consultation_message'),
+      [
+        {
+          text: t('cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('confirm'),
+          onPress: async () => {
+            try {
+              const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+              if (sessionError || !session?.access_token) {
+                throw new Error(t('auth_error'));
+              }
+                    console.log('Sending bookingId:', bookingId); 
 
+              const response = await fetch(CONFIRM_AND_PAYOUT_FUNCTION_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ bookingId })
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || t('unknown_error'));
+              }
+
+              Alert.alert(t('success'), t('consultation_confirmed_success'));
+              // Оновлюємо список повідомлень, щоб відобразити зміну статусу
+              fetchMessagesFromSupabase();
+
+            } catch (error) {
+              console.error("Error confirming consultation:", error);
+              Alert.alert(t('error'), `${t('consultation_confirmed_error')}: ${error.message}`);
+            }
+          },
+        },
+      ]
+    );
+  }, [t, fetchMessagesFromSupabase]);
+const handleDeepLink = useCallback(({ url }) => {
+    // Цей обробник потрібен для оновлення стану повідомлень
+    // після того, як користувач повертається з оплати LiqPay
+    setTimeout(() => fetchMessagesFromSupabase(), 1000);
+}, [fetchMessagesFromSupabase]);
   const handleSubmitFeedback = useCallback(async (bookingId, consultationOccurred, consultationOnTime, starRating, feedbackText) => {
     try {
       if (!bookingId) throw new Error("Booking ID is required.");
@@ -340,13 +358,12 @@ export default function PatientMessages() {
           if (rpcError) console.error(`Error updating points:`, rpcError.message);
         }
       }
-      // Оновлюємо стан локально, щоб відобразити зміни без повторного запиту
-      setMessages(prev => prev.map(msg => msg.booking_id === bookingId ? { ...msg, has_feedback_patient: true, is_read: true } : msg)); // Позначаємо прочитаним після фідбеку
-      updateAppBadge(messages.filter(m => !(m.booking_id === bookingId)).filter(m => !m.is_read).length); // Оновлюємо бейдж
+      setMessages(prev => prev.map(msg => msg.booking_id === bookingId ? { ...msg, has_feedback_patient: true, is_read: true } : msg));
+      updateAppBadge(messages.filter(m => !(m.booking_id === bookingId)).filter(m => !m.is_read).length);
     } catch (error) {
       Alert.alert(t('error'), `${t('failed_to_submit_feedback')}: ${error.message}`);
     }
-  }, [t, messages, updateAppBadge]); // markSingleAsRead is no longer directly called here
+  }, [t, messages, updateAppBadge]);
 
   useEffect(() => {
     if (!currentPatientId) return;
@@ -394,7 +411,12 @@ export default function PatientMessages() {
               const showPayButton = !isAdminAnnouncement && message.type === 'booking_confirmed' && !message.is_paid && message.booking_id && message.amount > 0;
               const isPaid = !isAdminAnnouncement && message.is_paid;
               const showJoinMeetButton = !isAdminAnnouncement && isPaid && message.meet_link;
-              const showFeedbackButton = !isAdminAnnouncement && message.booking_id && message.booking_status === 'confirmed' && message.consultation_conducted && !message.has_feedback_patient;
+              const isConsultationPast = message.booking_date && message.booking_time_slot && isPast(new Date(`${message.booking_date}T${message.booking_time_slot}`));
+              
+              // Логіка для нової кнопки
+              const showConfirmConsultationButton = isPaid && isConsultationPast && !message.consultation_occurred_patient;
+              // Логіка для кнопки відгуку
+              const showFeedbackButton = !isAdminAnnouncement && message.booking_id && message.booking_status === 'confirmed' && message.consultation_occurred_patient && !message.has_feedback_patient;
               
               let cardStyle = [styles.messageCard, isAdminAnnouncement ? styles.messageCardAdmin : !message.is_read ? styles.messageCardUnread : styles.messageCardRead];
               if(message.type === 'booking_confirmed') cardStyle.push(styles.messageCardConfirmed)
@@ -404,7 +426,6 @@ export default function PatientMessages() {
               return (
                 <View key={message.id} style={styles.messageGroup}>
                   <View style={styles.dateAndTimestamp}><Text style={styles.dateText}>{message.date}</Text><Text style={styles.timestampText}>{message.time}</Text></View>
-                  {/* Забираємо onPress звідси, оскільки повідомлення вже прочитані при завантаженні */}
                   <TouchableOpacity activeOpacity={1} style={cardStyle}>
                     <Text style={styles.cardTitle}>{message.title}</Text>
                     <Text style={styles.cardText}>{message.body}</Text>
@@ -419,15 +440,27 @@ export default function PatientMessages() {
                         {message.meet_link && <View style={styles.meetLinkContainer}><Ionicons name="videocam-outline" size={moderateScale(18)} color="#34A853" /><Text style={styles.meetLinkText} onPress={() => handleJoinMeet(message.meet_link)}>{t('meet_link')}: {message.meet_link}</Text></View>}
                         {showPayButton && <TouchableOpacity style={styles.payButton} onPress={() => handleLiqPayPayment(message.booking_id, message.amount, `Оплата консультації з ${message.rawData.doctor_name || 'лікарем'}`, message.rawData.doctor_name)}><Text style={styles.payButtonText}>{t('pay_now')} {message.amount} {t('USD')}</Text></TouchableOpacity>}
                         {showJoinMeetButton && <TouchableOpacity style={styles.joinMeetButton} onPress={() => handleJoinMeet(message.meet_link)}><Ionicons name="videocam-outline" size={moderateScale(20)} color="#FFFFFF" style={styles.joinMeetIcon} /><Text style={styles.joinMeetButtonText}>{t('join_meet_call')}</Text></TouchableOpacity>}
+                        
+                        {/* Кнопка "Підтвердити консультацію" */}
+                        {showConfirmConsultationButton && (
+                          <TouchableOpacity
+                              style={styles.confirmButton}
+                              onPress={() => handleConfirmConsultation(message.booking_id)}
+                          >
+                              <Text style={styles.confirmButtonText}>
+                                  {t('confirm_consultation_button')}
+                              </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Кнопка "Залишити відгук" */}
                         {showFeedbackButton && <TouchableOpacity style={styles.feedbackButton} onPress={() => { setCurrentBookingIdForFeedback(message.booking_id); setIsFeedbackModalVisible(true); }}><Text style={styles.feedbackButtonText}>{t('leave_feedback_button')}</Text></TouchableOpacity>}
                         {message.has_feedback_patient && <View style={styles.feedbackLeftButton}><Text style={styles.feedbackLeftButtonText}>{t('feedback_left')}</Text></View>}
                         {isPaid && !showPayButton && !showJoinMeetButton && !showFeedbackButton && !message.has_feedback_patient && message.type !== 'booking_rejected' && <View style={styles.paidButton}><Text style={styles.paidButtonText}>{t('paid')}</Text></View>}
                       </>
                     )}
                     <View style={styles.messageActionsRow}>
-                      {/* Цей рядок тепер показує, що повідомлення прочитане, оскільки воно автоматично позначено так. */}
                       <Text style={styles.readStatusText}>{t('read')}</Text>
-                      {/* Кнопка "Позначити як прочитане" більше не потрібна, якщо повідомлення автоматично прочитані. */}
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -480,6 +513,25 @@ const styles = StyleSheet.create({
   feedbackLeftButtonText: { color: '#757575', fontSize: moderateScale(16), fontFamily: 'Mont-SemiBold' },
   paidButton: { marginTop: verticalScale(15), backgroundColor: '#A5D6A7', paddingVertical: verticalScale(12), borderRadius: moderateScale(10), alignItems: 'center', justifyContent: 'center' },
   paidButtonText: { color: '#1B5E20', fontSize: moderateScale(16), fontFamily: 'Mont-SemiBold' },
+  // Нові стилі для кнопки підтвердження
+  confirmButton: { 
+    marginTop: verticalScale(15), 
+    backgroundColor: '#2E7D32', // Темно-зелений
+    paddingVertical: verticalScale(12), 
+    borderRadius: moderateScale(10), 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    shadowColor: '#2E7D32', 
+    shadowOffset: { width: 0, height: verticalScale(4) }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: moderateScale(5), 
+    elevation: 8 
+  },
+  confirmButtonText: { 
+    color: '#FFFFFF', 
+    fontSize: moderateScale(16), 
+    fontFamily: 'Mont-SemiBold' 
+  },
   messageActionsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: verticalScale(15), borderTopWidth: 1, borderTopColor: '#EEEEEE', paddingTop: verticalScale(10) },
   readStatusText: { fontSize: moderateScale(13), fontFamily: 'Mont-Medium', color: '#757575' },
   markAsReadButton: { backgroundColor: 'rgba(14, 179, 235, 0.1)', paddingVertical: verticalScale(5), paddingHorizontal: moderateScale(10), borderRadius: moderateScale(20) },

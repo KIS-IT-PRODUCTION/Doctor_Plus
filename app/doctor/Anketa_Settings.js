@@ -2167,10 +2167,6 @@ const Anketa_Settings = () => {
       ]
     );
   };
-  
-  const handleDeleteProfile = () => {
-    setIsDeleteConfirmationModalVisible(true);
-  };
 
   const confirmAndDeleteProfile = async () => {
     setIsDeletingProfile(true);
@@ -2383,16 +2379,14 @@ const Anketa_Settings = () => {
 
             <View style={styles.agreementContainer}>
               <Switch trackColor={{ false: "#767577", true: "#0EB3EB" }} thumbColor={"#f4f3f4"} onValueChange={setAgreedToTerms} value={agreedToTerms} />
+              <TouchableOpacity onPress={() => navigation.navigate("PartnershipAgreementScreen")}>
               <Text style={styles.agreementText}>{t("agree_to_terms")}</Text>
+              </TouchableOpacity>
             </View>
 
             {profileSaveError ? <Text style={styles.errorText}>{profileSaveError}</Text> : null}
             <TouchableOpacity style={styles.saveProfileButton(width)} onPress={handleSaveProfile} disabled={isSavingProfile}>
               {isSavingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveProfileButtonText}>{t("save_profile")}</Text>}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.deleteProfileButton(width)} onPress={handleDeleteProfile} disabled={isDeletingProfile}>
-              {isDeletingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.deleteProfileButtonText}>{t("delete_profile")}</Text>}
             </TouchableOpacity>
           </View>
         )}

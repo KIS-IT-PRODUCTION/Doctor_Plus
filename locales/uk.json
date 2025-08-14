@@ -949,5 +949,14 @@
   "confirm_delete": "Підтвердити видалення",
   "error_email_mismatch": "Введена електронна пошта не збігається з вашим обліковим записом.",
   "error_invalid_credentials": "Неправильний пароль. Будь ласка, спробуйте ще раз.",
-  "not_specified_price": "Не вказано"
+  "not_specified_price": "Не вказано",
+  "confirm_consultation_button": "Підтвердити консультацію",
+  "confirm_consultation_message": "Ви впевнені, що хочете підтвердити цю консультацію? Це позначить її як завершену.",
+  "confirm_consultation_title": "Підтвердити консультацію",
+   "warning_title": "Увага",
+  "privacy_policy_agreement_required": "Будь ласка, погодьтеся з політикою конфіденційності, щоб продовжити.",
+  "privacyPolicyHeader": "Політика конфіденційності",
+  "privacyPolicyTitle": "ПОВІДОМЛЕННЯ ПРО ОБРОБКУ ПЕРСОНАЛЬНИХ ДАНИХ",
+  "points": "бали",
+  "partnershipAgreementHeader": "Угода про партнерство"
 }

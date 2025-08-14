@@ -11,14 +11,13 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   PixelRatio,
+  Switch, // ІМПОРТУЄМО КОМПОНЕНТ SWITCH
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 
 import Icon from "../assets/icon.svg";
-import Box from "../assets/Main/check_box.svg";
-import Box2 from "../assets/Main/check_box_outline_blank.svg";
 
 // Отримуємо розміри екрану для адаптивності
 const { width, height } = Dimensions.get("window");
@@ -44,35 +43,41 @@ const HomeScreen = () => {
 
   const [privacyPolicyAgreed, setPrivacyPolicyAgreed] = useState(false);
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
+  const [isWarningModalVisible, setIsWarningModalVisible] = useState(false);
   const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
     i18n.language.toUpperCase()
   );
 
-  // Оновлюємо displayedLanguageCode при зміні мови i18n
   useEffect(() => {
     setDisplayedLanguageCode(i18n.language.toUpperCase());
   }, [i18n.language]);
 
   const handlePatientSelect = () => {
-    console.log("Patient selected");
-    navigation.navigate("RegisterScreen");
+    if (privacyPolicyAgreed) {
+      console.log("Patient selected");
+      navigation.navigate("RegisterScreen");
+    } else {
+      setIsWarningModalVisible(true);
+    }
   };
 
   const handleDoctorSelect = () => {
-    console.log("Doctor selected");
-    navigation.navigate("Register");
+    if (privacyPolicyAgreed) {
+      console.log("Doctor selected");
+      navigation.navigate("Register");
+    } else {
+      setIsWarningModalVisible(true);
+    }
   };
 
-  const handlePrivacyPolicyToggle = () => {
-    setPrivacyPolicyAgreed(!privacyPolicyAgreed);
+  const handlePrivacyPolicyToggle = (value) => {
+    setPrivacyPolicyAgreed(value);
   };
 
   const handlePrivacyPolicyPress = () => {
-    console.log("Privacy Policy Clicked");
-    // Тут можна відкрити WebView або новий екран з текстом політики конфіденційності
+     navigation.navigate("PrivacyPolice");
   };
 
-  // Функції для керування модальним вікном вибору мови
   const openLanguageModal = () => {
     setIsLanguageModalVisible(true);
   };
@@ -86,13 +91,12 @@ const HomeScreen = () => {
     closeLanguageModal();
   };
 
-  // Мови для відображення у модальному вікні
   const languagesForModal = [
-    { nameKey: "english", code: "en", emoji: "🇬🇧" },
-    { nameKey: "ukrainian", code: "uk", emoji: "🇺🇦" },
+    { nameKey: "english", code: "en" },
+    { nameKey: "ukrainian", code: "uk" },
   ];
 
-  const isLargeScreen = width > 768; // Визначення для адаптивного дизайну (наприклад, для планшетів)
+  const isLargeScreen = width > 768;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -104,7 +108,6 @@ const HomeScreen = () => {
         {t("health_treasure_slogan")}
       </Text>
 
-      {/* Кнопка вибору мови - тепер у видному місці в основному потоці */}
       <TouchableOpacity
         style={styles.languageButtonMain}
         onPress={openLanguageModal}
@@ -127,13 +130,14 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
       <View style={styles.privacyPolicyContainer}>
-        <TouchableOpacity onPress={handlePrivacyPolicyToggle}>
-          {privacyPolicyAgreed ? (
-            <Box width={getResponsiveFontSize(24)} height={getResponsiveFontSize(24)} />
-          ) : (
-            <Box2 width={getResponsiveFontSize(24)} height={getResponsiveFontSize(24)} />
-          )}
-        </TouchableOpacity>
+        {/* НОВИЙ ПЕРЕМИКАЧ SWITCH */}
+        <Switch
+          trackColor={{ false: "#A9A9A9", true: "#0EB3EB" }}
+          thumbColor={privacyPolicyAgreed ? "white" : "white"}
+          ios_backgroundColor="#A9A9A9"
+          onValueChange={handlePrivacyPolicyToggle}
+          value={privacyPolicyAgreed}
+        />
         <TouchableOpacity onPress={handlePrivacyPolicyPress}>
           <Text style={styles.privacyPolicyText}>
             <Text>{t("i_agree_with")}</Text>
@@ -142,7 +146,7 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Модальне вікно для вибору мови */}
+      {/* Модальне вікно для вибору мови (повернуто до попереднього стилю) */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -152,9 +156,7 @@ const HomeScreen = () => {
         <TouchableWithoutFeedback onPress={closeLanguageModal}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback
-              onPress={() => {
-                /* Залишаємо порожнім, щоб не закривати модалку при натисканні всередині */
-              }}
+              onPress={() => {}}
             >
               <View style={styles.languageModalContent}>
                 <Text style={styles.modalTitle}>
@@ -176,6 +178,27 @@ const HomeScreen = () => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* Модальне вікно-попередження */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isWarningModalVisible}
+        onRequestClose={() => setIsWarningModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.warningModalContent}>
+            <Text style={styles.warningTitle}>{t("warning_title")}</Text>
+            <Text style={styles.warningText}>{t("privacy_policy_agreement_required")}</Text>
+            <TouchableOpacity 
+              style={styles.warningButton} 
+              onPress={() => setIsWarningModalVisible(false)}
+            >
+              <Text style={styles.warningButtonText}>{t("ok_button")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -190,32 +213,31 @@ const styles = StyleSheet.create({
   logoContainer: {
     marginBottom: getResponsiveHeight(2),
   },
-  // Нові стилі для основної кнопки вибору мови
   languageButtonMain: {
     backgroundColor: "#0EB3EB",
-    borderRadius: 555, // Кругла кнопка
+    borderRadius: 555,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: 'row', // Щоб іконка та текст були поруч
+    flexDirection: 'row',
     paddingVertical: getResponsiveHeight(1.5),
     paddingHorizontal: getResponsiveWidth(5),
-    marginBottom: getResponsiveHeight(3), // Відступ від наступного елемента
-    width: getResponsiveWidth(60), // Адаптивна ширина
-    maxWidth: 250, // Максимальна ширина для великих екранів
-    shadowColor: "#000", // Додаємо тінь для 3D ефекту
+    marginBottom: getResponsiveHeight(3),
+    width: getResponsiveWidth(60),
+    maxWidth: 250,
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 4,
     },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 8, // Для Android
+    elevation: 8,
   },
   languageTextMain: {
-    fontSize: getResponsiveFontSize(18), // Більший розмір шрифту
+    fontSize: getResponsiveFontSize(18),
     fontFamily: "Mont-Bold",
     color: "white",
-    marginLeft: getResponsiveWidth(2), // Відступ між іконкою та текстом
+    marginLeft: getResponsiveWidth(2),
   },
   title: {
     fontSize: getResponsiveFontSize(24),
@@ -230,7 +252,7 @@ const styles = StyleSheet.create({
     color: "#777",
     textAlign: "center",
     fontFamily: "Mont-Regular",
-    marginBottom: getResponsiveHeight(2), // Зменшуємо відступ, якщо кнопка мови буде нижче
+    marginBottom: getResponsiveHeight(2),
     paddingHorizontal: getResponsiveWidth(5),
     lineHeight: getResponsiveFontSize(22),
     marginTop: getResponsiveHeight(1.2),
@@ -249,8 +271,8 @@ const styles = StyleSheet.create({
   buttonContainerLargeScreen: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: getResponsiveWidth(5), // Простір між кнопками для великих екранів
-    flexWrap: 'wrap', // Дозволяє кнопкам переноситися на новий рядок, якщо не вистачає місця
+    gap: getResponsiveWidth(5),
+    flexWrap: 'wrap',
   },
   button: {
     backgroundColor: "#0EB3EB",
@@ -258,15 +280,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: getResponsiveHeight(1.2),
-    width: getResponsiveWidth(65), // Адаптивна ширина
-    maxWidth: 258, // Максимальна ширина
-    height: getResponsiveHeight(7), // Адаптивна висота
-    maxHeight: 58, // Максимальна висота
+    width: getResponsiveWidth(65),
+    maxWidth: 258,
+    height: getResponsiveHeight(7),
+    maxHeight: 58,
   },
   buttonLargeScreen: {
     width: getResponsiveWidth(35),
     maxWidth: 200,
-    marginBottom: 0, // Без нижнього відступу, якщо в рядок
+    marginBottom: 0,
   },
   buttonText: {
     color: "white",
@@ -283,17 +305,24 @@ const styles = StyleSheet.create({
     marginRight: getResponsiveWidth(2.5),
   },
   privacyPolicyText: {
-    fontSize: getResponsiveFontSize(10),
-    color: "#337AB7",
+    fontSize: getResponsiveFontSize(12),
+    color: "black",
     fontFamily: "Mont-SemiBold",
+    textAlign: "center",
+    marginRight: getResponsiveWidth(2.5),
+    paddingHorizontal: getResponsiveWidth(2),
+    lineHeight: getResponsiveFontSize(15),
   },
   privacyPolicyText2: {
-    fontSize: getResponsiveFontSize(10),
-    color: "black",
+    fontSize: getResponsiveFontSize(12),
+    color: "#337AB7",
     textDecorationLine: "underline",
     fontFamily: "Mont-Medium",
+    lineHeight: getResponsiveFontSize(15),
+    textAlign: "center",
+    paddingHorizontal: getResponsiveWidth(2),
+    marginLeft: getResponsiveWidth(1),
   },
-  // Стилі для модального вікна вибору мови
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -327,12 +356,48 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "rgba(14, 179, 235, 0.1)",
   },
   languageOptionText: {
     fontSize: getResponsiveFontSize(18),
     fontFamily: "Mont-Regular",
     color: "#333",
+  },
+  warningModalContent: {
+    backgroundColor: "white",
+    padding: getResponsiveWidth(6),
+    borderRadius: 15,
+    alignItems: "center",
+    maxWidth: getResponsiveWidth(80),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  warningTitle: {
+    fontSize: getResponsiveFontSize(22),
+    fontFamily: "Mont-Bold",
+    color: "#D32F2F",
+    marginBottom: getResponsiveHeight(2),
+  },
+  warningText: {
+    fontSize: getResponsiveFontSize(16),
+    fontFamily: "Mont-Regular",
+    color: "#555",
+    textAlign: "center",
+    marginBottom: getResponsiveHeight(3),
+  },
+  warningButton: {
+    backgroundColor: "#0EB3EB",
+    paddingVertical: getResponsiveHeight(1.5),
+    paddingHorizontal: getResponsiveWidth(10),
+    borderRadius: 50,
+  },
+  warningButtonText: {
+    color: "white",
+    fontSize: getResponsiveFontSize(18),
+    fontFamily: "Mont-SemiBold",
   },
 });
 

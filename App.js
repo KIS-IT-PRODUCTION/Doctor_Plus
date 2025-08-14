@@ -49,10 +49,10 @@ import ConsultationTimePatient from "./app/ConsultationTimePatient";
 import PatientMessages from "./app/PatientMessages";
 import ResetPasswordScreen from "./app/doctor/ResetPasswordScreen";
 import FeedbackModal from "./components/FeedbackModal"
-
+import PrivacyPolice from "./app/PrivacyPolice";
 import { DoctorProfileProvider } from "./components/DoctorProfileContext";
 import { enableScreens } from 'react-native-screens';
-
+import PartnershipAgreementScreen from "./app/PartnershipAgreementScreen";
 enableScreens();
 SplashScreen.preventAutoHideAsync();
 
@@ -173,6 +173,8 @@ function RootNavigator() {
         <Stack.Screen name="Support_doctor" component={Support_doctor} />
         <Stack.Screen name="Rewiew_app" component={Rewiew_app} />
         <Stack.Screen name="ConsultationTime" component={ConsultationTime} />
+        <Stack.Screen name="PrivacyPolice" component={PrivacyPolice} />
+        <Stack.Screen name="PartnershipAgreementScreen" component={PartnershipAgreementScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

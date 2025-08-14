@@ -402,7 +402,7 @@ const Patsient_Home = () => {
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate("PatientMessages")}>
-                <Ionicons name="notifications" size={moderateScale(24)} color="white" />
+                 <Ionicons name="mail-outline" size={moderateScale(24)} color="white" />
                 {unreadMessagesCount > 0 && (
                   <View style={styles.notificationBadge}>
                     <Text style={styles.notificationNumber}>{unreadMessagesCount}</Text>

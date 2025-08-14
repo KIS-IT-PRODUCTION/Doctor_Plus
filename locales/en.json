@@ -883,5 +883,15 @@
   "confirm_delete": "Confirm Delete",
   "error_email_mismatch": "The entered email does not match your account.",
   "error_invalid_credentials": "Invalid password. Please try again.",
-  "not_specified_price": "Not specified"
+  "not_specified_price": "Not specified",
+  "confirm_consultation_button": "Confirm Consultation",
+  "confirm_consultation_message": "Are you sure you want to confirm this consultation? The patient will be notified.",
+  "confirm_consultation_title": "Confirm Consultation",
+   "warning_title": "Warning",
+  "privacy_policy_agreement_required": "Please agree to the privacy policy to continue.",
+  "privacyPolicyHeader": "Privacy Policy",
+  "privacyPolicyTitle": "Messages and Personal Data Processing",
+  "points": "points",
+  "partnershipAgreementHeader": "Partnership Agreement"
+  
 }

@@ -176,10 +176,6 @@ async function registerForPushNotificationsAsync(userId) {
       return;
     }
   } else {
-    // Alert.alert(
-    //   "Помилка",
-    //   "Push-сповіщення працюють лише на фізичних пристроях!"
-    // );
     console.log("Must use physical device for Push Notifications");
     return;
   }
@@ -247,199 +243,199 @@ const ValueBox = ({ children, t }) => {
 const COUNTRY_FLAGS_MAP = {
    "EN": "🇬🇧",
   "UK": "🇺🇦",
-  "DE": "🇩🇪", // Germany/German
-  "PH": "🇵🇭", // Philippines
-  "HR": "🇭🇷", // Croatia
-  "CF": "🇨🇫", // Central African Republic
-  "TD": "🇹🇩", // Chad
-  "CZ": "🇨🇿", // Czechia
-  "CL": "🇨🇱", // Chile
-  "ME": "🇲🇪", // Montenegro
-  "LK": "🇱🇰", // Sri Lanka
-  "JM": "🇯🇲", // Jamaica
-  "UA": "🇺🇦", // Ukraine
-  "GB": "🇬🇧", // United Kingdom
-  "US": "🇺🇸", // United States
-  "CA": "🇨🇦", // Canada
-  "FR": "🇫🇷", // France
-  "PL": "🇵🇱", // Poland
-  "IT": "🇮🇹", // Italy
-  "ES": "🇪🇸", // Spain
-  "JP": "🇯🇵", // Japan
-  "CN": "🇨🇳", // China
-  "IN": "🇮🇳", // India
-  "AU": "🇦🇺", // Australia
-  "BR": "🇧🇷", // Brazil
-  "TR": "🇹🇷", // Turkey
-  "SE": "🇸🇪", // Sweden
-  "CH": "🇨🇭", // Switzerland
-  "NL": "🇳🇱", // Netherlands
-  "NO": "🇳🇴", // Norway
-  "DK": "🇩🇰", // Denmark
-  "FI": "🇫🇮", // Finland
-  "ZA": "🇿🇦", // South Africa
-  "MX": "🇲🇽", // Mexico
-  "KR": "🇰🇷", // South Korea
-  "AR": "🇦🇷", // Argentina
-  "IE": "🇮🇪", // Ireland
-  "NZ": "🇳🇿", // New Zealand
-  "SG": "🇸🇬", // Singapore
-  "IL": "🇮🇱", // Israel
-  "MY": "🇲🇾", // Malaysia
-  "TH": "🇹🇭", // Thailand
-  "VN": "🇻🇳", // Vietnam
-  "ID": "🇮🇩", // Indonesia
-  "EG": "🇪🇬", // Egypt
-  "NG": "🇳🇬", // Nigeria
-  "SA": "🇸🇦", // Saudi Arabia
-  "AE": "🇦🇪", // United Arab Emirates
-  "KW": "🇰🇼", // Kuwait
-  "QA": "🇶🇦", // Qatar
-  "AT": "🇦🇹", // Austria
-  "AZ": "🇦🇿", // Azerbaijan
-  "AL": "🇦🇱", // Albania
-  "DZ": "🇩🇿", // Algeria
-  "AO": "🇦🇴", // Angola
-  "AD": "🇦🇩", // Andorra
-  "AG": "🇦🇬", // Antigua and Barbuda
-  "AF": "🇦🇫", // Afghanistan
-  "BS": "🇧🇸", // Bahamas
-  "BD": "🇧🇩", // Bangladesh
-  "BB": "🇧🇧", // Barbados
-  "BH": "🇧🇭", // Bahrain
-  "BZ": "🇧🇿", // Belize
-  "BE": "🇧🇪", // Belgium
-  "BJ": "🇧🇯", // Benin
-  "BY": "🇧🇾", // Belarus
-  "BG": "🇧🇬", // Bulgaria
-  "BO": "🇧🇴", // Bolivia
-  "BA": "🇧🇦", // Bosnia and Herzegovina
-  "BW": "🇧🇼", // Botswana
-  "BN": "🇧🇳", // Brunei
-  "BF": "🇧🇫", // Burkina Faso
-  "BI": "🇧🇮", // Burundi
-  "BT": "🇧🇹", // Bhutan
-  "VU": "🇻🇺", // Vanuatu
-  "VE": "🇻🇪", // Venezuela
-  "AM": "🇦🇲", // Armenia
-  "GA": "🇬🇦", // Gabon
-  "HT": "🇭🇹", // Haiti
-  "GM": "🇬🇲", // Gambia
-  "GH": "🇬🇭", // Ghana
-  "GY": "🇬🇾", // Guyana
-  "GT": "🇬🇹", // Guatemala
-  "GN": "🇬🇳", // Guinea
-  "GW": "🇬🇼", // Guinea-Bissau
-  "HN": "🇭🇳", // Honduras
-  "GD": "🇬🇩", // Grenada
-  "GR": "🇬🇷", // Greece
-  "GE": "🇬🇪", // Georgia
-  "DJ": "🇩🇯", // Djibouti
-  "DM": "🇩🇲", // Dominica
-  "DO": "🇩🇴", // Dominican Republic
-  "CD": "🇨🇩", // DR Congo
-  "EC": "🇪🇨", // Ecuador
-  "GQ": "🇬🇶", // Equatorial Guinea
-  "ER": "🇪🇷", // Eritrea
-  "SZ": "🇸🇿", // Eswatini
-  "EE": "🇪🇪", // Estonia
-  "ET": "🇪🇹", // Ethiopia
-  "YE": "🇾🇪", // Yemen
-  "ZM": "🇿🇲", // Zambia
-  "ZW": "🇿🇼", // Zimbabwe
-  "IR": "🇮🇷", // Iran
-  "IS": "🇮🇸", // Iceland
-  "IQ": "🇮🇶", // Iraq
-  "JO": "🇯🇴", // Jordan
-  "CV": "🇨🇻", // Cape Verde
-  "KZ": "🇰🇿", // Kazakhstan
-  "KH": "🇰🇭", // Cambodia
-  "CM": "🇨🇲", // Cameroon
-  "KE": "🇰🇪", // Kenya
-  "KG": "🇰🇬", // Kyrgyzstan
-  "CY": "🇨🇾", // Cyprus
-  "KI": "🇰🇮", // Kiribati
-  "CO": "🇨🇴", // Colombia
-  "KM": "🇰🇲", // Comoros
-  "CR": "🇨🇷", // Costa Rica
-  "CI": "🇨🇮", // Ivory Coast
-  "CU": "🇨🇺", // Cuba
-  "LA": "🇱🇦", // Laos
-  "LV": "🇱🇻", // Latvia
-  "LS": "🇱🇸", // Lesotho
-  "LT": "🇱🇹", // Lithuania
-  "LR": "🇱🇷", // Liberia
-  "LB": "🇱🇧", // Lebanon
-  "LY": "🇱🇾", // Libya
-  "LI": "🇱🇮", // Liechtenstein
-  "LU": "🇱🇺", // Luxembourg
-  "MM": "🇲🇲", // Myanmar
-  "MU": "🇲🇺", // Mauritius
-  "MR": "🇲🇷", // Mauritania
-  "MG": "🇲🇬", // Madagascar
-  "MW": "🇲🇼", // Malawi
-  "ML": "🇲🇱", // Mali
-  "MV": "🇲🇻", // Maldives
-  "MT": "🇲🇹", // Malta
-  "MA": "🇲🇦", // Morocco
-  "MH": "🇲🇭", // Marshall Islands
-  "MZ": "🇲🇿", // Mozambique
-  "MD": "🇲🇩", // Moldova
-  "MC": "🇲🇨", // Monaco
-  "MN": "🇲🇳", // Mongolia
-  "NA": "🇳🇦", // Namibia
-  "NR": "🇳🇷", // Nauru
-  "NP": "🇳🇵", // Nepal
-  "NE": "🇳🇪", // Niger
-  "NI": "🇳🇮", // Nicaragua
-  "OM": "🇴🇲", // Oman
-  "PK": "🇵🇰", // Pakistan
-  "PW": "🇵🇼", // Palau
-  "PA": "🇵🇦", // Panama
-  "PG": "🇵🇬", // Papua New Guinea
-  "PY": "🇵🇾", // Paraguay
-  "PE": "🇵🇪", // Peru
-  "SS": "🇸🇸", // South Sudan
-  "KP": "🇰🇵", // North Korea
-  "MK": "🇲🇰", // North Macedonia
-  "PT": "🇵🇹", // Portugal
-  "CG": "🇨🇬", // Republic of the Congo
-  "RU": "🇷🇺", // Russia
-  "RW": "🇷🇼", // Rwanda
-  "RO": "🇷🇴", // Romania
-  "SV": "🇸🇻", // El Salvador
-  "WS": "🇼🇸", // Samoa
-  "SM": "🇸🇲", // San Marino
-  "ST": "🇸🇹", // Sao Tome and Principe
-  "SC": "🇸🇨", // Seychelles
-  "SN": "🇸🇳", // Senegal
-  "VC": "🇻🇨", // Saint Vincent and the Grenadines
-  "KN": "🇰🇳", // Saint Kitts and Nevis
-  "LC": "🇱🇨", // Saint Lucia
-  "RS": "🇷🇸", // Serbia
-  "SY": "🇸🇾", // Syria
-  "SK": "🇸🇰", // Slovakia
-  "SI": "🇸🇮", // Slovenia
-  "SB": "🇸🇧", // Solomon Islands
-  "SO": "🇸🇴", // Somalia
-  "SD": "🇸🇩", // Sudan
-  "SR": "🇸🇷", // Suriname
-  "TL": "🇹🇱", // East Timor
-  "SL": "🇸🇱", // Sierra Leone
-  "TJ": "🇹🇯", // Tajikistan
-  "TZ": "🇹🇿", // Tanzania
-  "TG": "🇹🇬", // Togo
-  "TO": "🇹🇴", // Tonga
-  "TT": "🇹🇹", // Trinidad and Tobago
-  "TV": "🇹🇻", // Tuvalu
-  "TN": "🇹🇳", // Tunisia
-  "TM": "🇹🇲", // Turkmenistan
-  "UG": "🇺🇬", // Uganda
-  "HU": "🇭🇺", // Hungary
-  "UZ": "🇺🇿", // Uzbekistan
-  "UY": "🇺🇾", // Uruguay
-  "FM": "🇫🇲", // Federated States of Micronesia
-  "FJ": "🇫🇯", // Fiji
+  "DE": "🇩🇪",
+  "PH": "🇵🇭",
+  "HR": "🇭🇷",
+  "CF": "🇨🇫",
+  "TD": "🇹🇩",
+  "CZ": "🇨🇿",
+  "CL": "🇨🇱",
+  "ME": "🇲🇪",
+  "LK": "🇱🇰",
+  "JM": "🇯🇲",
+  "UA": "🇺🇦",
+  "GB": "🇬🇧",
+  "US": "🇺🇸",
+  "CA": "🇨🇦",
+  "FR": "🇫🇷",
+  "PL": "🇵🇱",
+  "IT": "🇮🇹",
+  "ES": "🇪🇸",
+  "JP": "🇯🇵",
+  "CN": "🇨🇳",
+  "IN": "🇮🇳",
+  "AU": "🇦🇺",
+  "BR": "🇧🇷",
+  "TR": "🇹🇷",
+  "SE": "🇸🇪",
+  "CH": "🇨🇭",
+  "NL": "🇳🇱",
+  "NO": "🇳🇴",
+  "DK": "🇩🇰",
+  "FI": "🇫🇮",
+  "ZA": "🇿🇦",
+  "MX": "🇲🇽",
+  "KR": "🇰🇷",
+  "AR": "🇦🇷",
+  "IE": "🇮🇪",
+  "NZ": "🇳🇿",
+  "SG": "🇸🇬",
+  "IL": "🇮🇱",
+  "MY": "🇲🇾",
+  "TH": "🇹🇭",
+  "VN": "🇻🇳",
+  "ID": "🇮🇩",
+  "EG": "🇪🇬",
+  "NG": "🇳🇬",
+  "SA": "🇸🇦",
+  "AE": "🇦🇪",
+  "KW": "🇰🇼",
+  "QA": "🇶🇦",
+  "AT": "🇦🇹",
+  "AZ": "🇦🇿",
+  "AL": "🇦🇱",
+  "DZ": "🇩🇿",
+  "AO": "🇦🇴",
+  "AD": "🇦🇩",
+  "AG": "🇦🇬",
+  "AF": "🇦🇫",
+  "BS": "🇧🇸",
+  "BD": "🇧🇩",
+  "BB": "🇧🇧",
+  "BH": "🇧🇭",
+  "BZ": "🇧🇿",
+  "BE": "🇧🇪",
+  "BJ": "🇧🇯",
+  "BY": "🇧🇾",
+  "BG": "🇧🇬",
+  "BO": "🇧🇴",
+  "BA": "🇧🇦",
+  "BW": "🇧🇼",
+  "BN": "🇧🇳",
+  "BF": "🇧🇫",
+  "BI": "🇧🇮",
+  "BT": "🇧🇹",
+  "VU": "🇻🇺",
+  "VE": "🇻🇪",
+  "AM": "🇦🇲",
+  "GA": "🇬🇦",
+  "HT": "🇭🇹",
+  "GM": "🇬🇲",
+  "GH": "🇬🇭",
+  "GY": "🇬🇾",
+  "GT": "🇬🇹",
+  "GN": "🇬🇳",
+  "GW": "🇬🇼",
+  "HN": "🇭🇳",
+  "GD": "🇬🇩",
+  "GR": "🇬🇷",
+  "GE": "🇬🇪",
+  "DJ": "🇩🇯",
+  "DM": "🇩🇲",
+  "DO": "🇩🇴",
+  "CD": "🇨🇩",
+  "EC": "🇪🇨",
+  "GQ": "🇬🇶",
+  "ER": "🇪🇷",
+  "SZ": "🇸🇿",
+  "EE": "🇪🇪",
+  "ET": "🇪🇹",
+  "YE": "🇾🇪",
+  "ZM": "🇿🇲",
+  "ZW": "🇿🇼",
+  "IR": "🇮🇷",
+  "IS": "🇮🇸",
+  "IQ": "🇮🇶",
+  "JO": "🇯🇴",
+  "CV": "🇨🇻",
+  "KZ": "🇰🇿",
+  "KH": "🇰🇭",
+  "CM": "🇨🇲",
+  "KE": "🇰🇪",
+  "KG": "🇰🇬",
+  "CY": "🇨🇾",
+  "KI": "🇰🇮",
+  "CO": "🇨🇴",
+  "KM": "🇰🇲",
+  "CR": "🇨🇷",
+  "CI": "🇨🇮",
+  "CU": "🇨🇺",
+  "LA": "🇱🇦",
+  "LV": "🇱🇻",
+  "LS": "🇱🇸",
+  "LT": "🇱🇹",
+  "LR": "🇱🇷",
+  "LB": "🇱🇧",
+  "LY": "🇱🇾",
+  "LI": "🇱🇮",
+  "LU": "🇱🇺",
+  "MM": "🇲🇲",
+  "MU": "🇲🇺",
+  "MR": "🇲🇷",
+  "MG": "🇲🇬",
+  "MW": "🇲🇼",
+  "ML": "🇲🇱",
+  "MV": "🇲🇻",
+  "MT": "🇲🇹",
+  "MA": "🇲🇦",
+  "MH": "🇲🇭",
+  "MZ": "🇲🇿",
+  "MD": "🇲🇩",
+  "MC": "🇲🇨",
+  "MN": "🇲🇳",
+  "NA": "🇳🇦",
+  "NR": "🇳🇷",
+  "NP": "🇳🇵",
+  "NE": "🇳🇪",
+  "NI": "🇳🇮",
+  "OM": "🇴🇲",
+  "PK": "🇵🇰",
+  "PW": "🇵🇼",
+  "PA": "🇵🇦",
+  "PG": "🇵🇬",
+  "PY": "🇵🇾",
+  "PE": "🇵🇪",
+  "SS": "🇸🇸",
+  "KP": "🇰🇵",
+  "MK": "🇲🇰",
+  "PT": "🇵🇹",
+  "CG": "🇨🇬",
+  "RU": "🇷🇺",
+  "RW": "🇷🇼",
+  "RO": "🇷🇴",
+  "SV": "🇸🇻",
+  "WS": "🇼🇸",
+  "SM": "🇸🇲",
+  "ST": "🇸🇹",
+  "SC": "🇸🇨",
+  "SN": "🇸🇳",
+  "VC": "🇻🇨",
+  "KN": "🇰🇳",
+  "LC": "🇱🇨",
+  "RS": "🇷🇸",
+  "SY": "🇸🇾",
+  "SK": "🇸🇰",
+  "SI": "🇸🇮",
+  "SB": "🇸🇧",
+  "SO": "🇸🇴",
+  "SD": "🇸🇩",
+  "SR": "🇸🇷",
+  "TL": "🇹🇱",
+  "SL": "🇸🇱",
+  "TJ": "🇹🇯",
+  "TZ": "🇹🇿",
+  "TG": "🇹🇬",
+  "TO": "🇹🇴",
+  "TT": "🇹🇹",
+  "TV": "🇹🇻",
+  "TN": "🇹🇳",
+  "TM": "🇹🇲",
+  "UG": "🇺🇬",
+  "HU": "🇭🇺",
+  "UZ": "🇺🇿",
+  "UY": "🇺🇾",
+  "FM": "🇫🇲",
+  "FJ": "🇫🇯",
 };
 
 const LanguageFlags = ({ languages }) => {
@@ -540,8 +536,6 @@ const Profile_doctor = ({ route }) => {
     }
   }, [session]);
 
-  // --- FIX ---
-  // Логіка повністю перероблена згідно з вашим поясненням.
   const fetchDoctorProfile = useCallback(async (userId, isRefresh = false) => {
     if (!isRefresh) {
       setIsLoading(true);
@@ -555,25 +549,17 @@ const Profile_doctor = ({ route }) => {
     setDiplomaError(false);
 
     try {
-      // 1. Спочатку завжди шукаємо повну анкету в `anketa_doctor`
       const { data: anketaData, error: anketaError } = await supabase
         .from('anketa_doctor')
         .select('*')
         .eq('user_id', userId)
         .single();
 
-      // Перевіряємо помилку. Ігноруємо 'PGRST116', яка означає "рядок не знайдено".
       if (anketaError && anketaError.code !== 'PGRST116') {
         throw anketaError;
       }
 
-      if (anketaData) {
-        // 2. Успіх: повна анкета знайдена, використовуємо її
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setDoctorData(anketaData);
-      } else {
-        // 3. Повної анкети немає. Завантажуємо базові дані з `profile_doctor`
-        const { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
           .from('profile_doctor')
           .select(`
             user_id,
@@ -586,37 +572,22 @@ const Profile_doctor = ({ route }) => {
           .eq('user_id', userId)
           .single();
 
-        if (profileError) {
+      if (profileError) {
           throw profileError;
-        }
-        
-        if (profileData) {
-          // 4. Створюємо мінімальний об'єкт профілю.
-          // Поля, що існують тільки в `anketa_doctor`, встановлюються в null.
-          // `checkProfileCompleteness` правильно визначить його як неповний.
-          const minimalProfile = {
-            ...profileData, // Дані з profile_doctor
-            // Явно встановлюємо поля з anketa_doctor в null, щоб UI не показував старі дані
-            avatar_url: null, 
-            communication_languages: null,
-            specialization: null,
-            experience_years: null,
-            education: null,
-            achievements: null,
-            about_me: null,
-            consultation_cost: null,
-            diploma_url: null,
-            certificate_photo_url: null,
-            work_location: null,
-            doctor_check: false, 
-          };
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setDoctorData(minimalProfile);
-        } else {
-          // 5. Не знайдено навіть базового профілю
-          setError('Не вдалося знайти профіль лікаря.');
-        }
       }
+      
+      const combinedData = {
+          ...profileData,
+          ...anketaData,
+      };
+
+      if (anketaData || profileData) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setDoctorData(combinedData);
+      } else {
+        setError('Не вдалося знайти профіль лікаря.');
+      }
+
     } catch (err) {
       console.error("Помилка при завантаженні профілю лікаря:", err);
       setError(err.message);
@@ -627,11 +598,8 @@ const Profile_doctor = ({ route }) => {
     }
   }, [setLoadingAvatar, setLoadingDiploma, setLoadingCertificate]);
 
-
   const checkProfileCompleteness = useCallback((profile) => {
     if (!profile) return false;
-    // Ця перевірка тепер працює коректно, оскільки вона завжди
-    // аналізує дані, що прийшли з `anketa_doctor`.
     const isComplete =
       profile.full_name &&
       profile.avatar_url &&
@@ -650,7 +618,6 @@ const Profile_doctor = ({ route }) => {
   }, []);
 
   useEffect(() => {
-    // Показуємо модальне вікно, тільки якщо це власник профілю і анкета не заповнена
     if (!isLoading && !error && isProfileOwner && !checkProfileCompleteness(doctorData)) {
       setIsProfileCompletionModalVisible(true);
     } else {
@@ -756,7 +723,6 @@ const Profile_doctor = ({ route }) => {
         navigation.navigate("Support_doctor");
         break;
       case "Profile_doctor":
-        // Already here, do nothing
         break;
       default:
         break;
@@ -923,7 +889,7 @@ const Profile_doctor = ({ route }) => {
                 style={styles.notificationButton}
                 onPress={() => navigation.navigate("Messege")}
               >
-                  <Ionicons name="notifications" size={moderateScale(24)} color="white" />
+                 <Ionicons name="mail-outline" size={moderateScale(24)} color="white" />
                   {unreadNotificationsCount > 0 && (
                     <View style={styles.notificationBadge}>
                       <Text style={styles.notificationNumber}>
@@ -980,17 +946,25 @@ const Profile_doctor = ({ route }) => {
                 <Text style={styles.doctorName}>
                   {finalDoctorData.full_name || t("not_specified")}
                 </Text>
+                
+                {/* Нові рядки для відображення рейтингу та балів */}
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("rating")}:</Text>
-                  <ValueBox t={t}>
-                    {Array.from({ length: getStarRating(finalDoctorData.doctor_points) }).map((_, i) => (
-                      <Ionicons key={`star-full-${i}`} name="star" size={18} color="#FFD700" />
-                    ))}
-                    {Array.from({ length: 5 - getStarRating(finalDoctorData.doctor_points) }).map((_, i) => (
-                      <Ionicons key={`star-outline-${i}`} name="star-outline" size={18} color="#ccc" />
-                    ))}
-                  </ValueBox>
+                  <View style={styles.valueBox}>
+                    <Text style={styles.pointsText}>
+                      {finalDoctorData.doctor_points || 0} {t("points")}
+                    </Text>
+                    <View style={styles.starContainer}>
+                      {Array.from({ length: getStarRating(finalDoctorData.doctor_points) }).map((_, i) => (
+                        <Ionicons key={`star-full-${i}`} name="star" size={18} color="#FFD700" />
+                      ))}
+                      {Array.from({ length: 5 - getStarRating(finalDoctorData.doctor_points) }).map((_, i) => (
+                        <Ionicons key={`star-outline-${i}`} name="star-outline" size={18} color="#ccc" />
+                      ))}
+                    </View>
+                  </View>
                 </View>
+
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("communication_language")}:</Text>
                   <ValueBox t={t}>
@@ -1516,6 +1490,17 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontWeight: "400",
   },
+  // Новий стиль для контейнера зірочок та балів
+  starContainer: {
+    flexDirection: 'row',
+    marginLeft: 5,
+  },
+  // Новий стиль для тексту з балами
+  pointsText: {
+    fontSize: 16,
+    color: "#555",
+    fontWeight: "500",
+  },
   flagsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1550,7 +1535,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   buttonIcon: {
-    // Стилі для іконки
   },
   sectionTitleLink: {
     fontSize: 20,
