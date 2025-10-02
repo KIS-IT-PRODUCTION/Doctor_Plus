@@ -2,4 +2,5 @@ node_modules
 # Expo Prebuild / CNG
 android/
 ios/
-.expo/devices.json
+.expo/devices.json.expo/
+.expo/

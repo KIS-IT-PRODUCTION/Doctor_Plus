@@ -756,8 +756,7 @@ export default function Message() {
                     </TouchableOpacity>
                   )}
                   
-                 {isPastConsultation && !isConsultationCompleted && isPaymentSuccessful && message.rawData.meet_link && (
-  <TouchableOpacity
+{!isConsultationCompleted && isPaymentSuccessful && message.rawData.meet_link && (  <TouchableOpacity
     onPress={() => handleCompleteConsultation(message)}
     style={styles.completeConsultationButton}
   >

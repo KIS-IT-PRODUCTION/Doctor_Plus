@@ -29,17 +29,16 @@
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates."
       }
     },
-    
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-       "splash": {
-      "image": "./assets/icon2.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+      "splash": {
+        "image": "./assets/icon2.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      },
       "edgeToEdgeEnabled": true,
       "package": "com.kis_production.DOCTOR",
       "googleServicesFile": "./google-services.json",
@@ -97,7 +96,8 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take profile photos, diplomas, or certificates."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }
