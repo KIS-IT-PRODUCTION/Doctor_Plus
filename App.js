@@ -67,72 +67,84 @@ const SplashPlaceholderScreen = () => (
 
 
 function RootNavigator() {
-  const { session, loading, userRole } = useAuth();
+  // [ЗМІНА] Отримуємо `authError` з useAuth()
+  const { session, loading, userRole, authError } = useAuth();
   const navigationRef = useRef();
   const [isNavigationReady, setNavigationReady] = useState(false);
   const [hasNavigatedInitially, setHasNavigatedInitially] = useState(false);
 
-  // Цей useEffect тепер відповідає виключно за виконання reset навігації
-  // коли всі умови виконані.
   useEffect(() => {
-    // Чекаємо, поки NavigationContainer готовий, AuthProvider завершить завантаження,
-    // і поки ми не виконали початкову навігацію, АБО коли сесія/роль змінюється.
     if (isNavigationReady && !loading && navigationRef.current && navigationRef.current.isReady()) {
+      
+      // [ЗМІНА] Головна логіка виправлення:
+      // Ми повинні "чекати" (тобто нічого не робити), якщо сесія вже є,
+      // але роль ще не визначена (userRole === null).
+      // Ми чекаємо, ТІЛЬКИ якщо немає помилки автентифікації.
+      if (session && session.user && userRole === null && authError === null) {
+        console.log("RootNavigator Effect: Сесія є, але роль 'null' (і немає помилок). Чекаємо на визначення ролі.");
+        // Нічого не робимо і виходимо. useEffect запуститься знову,
+        // коли userRole або authError оновиться.
+        // Це запобігає некоректному "стрибку" на HomeScreen.
+        // Якщо це початкове завантаження, ми просто продовжуємо показувати SplashPlaceholder.
+        return; 
+      }
+
+      // Якщо ми дійшли сюди, це означає:
+      // 1. Немає сесії (session === null)
+      // 2. Є сесія І роль (userRole === 'doctor' або 'patient')
+      // 3. Є сесія, але сталася помилка (authError !== null)
+
       let targetRouteName;
       let targetParams = {};
 
-      if (session && session.user) {
+      // [ЗМІНА] Трохи чистіша логіка визначення маршруту
+      if (session && session.user && authError === null) {
+        // У нас є сесія, роль І немає помилок
         if (userRole === "doctor") {
           targetRouteName = "Profile_doctor";
           targetParams = { doctorId: session.user.id };
         } else if (userRole === "patient") {
           targetRouteName = "Patsient_Home";
         } else {
-          targetRouteName = "HomeScreen"; // Запасний варіант, якщо роль не визначена
+          // Безпечний запасний варіант, якщо роль дивна, але сесія є
+          console.warn(`RootNavigator: Невідома роль (${userRole}), перехід на Patsient_Home.`);
+          targetRouteName = "Patsient_Home";
         }
       } else {
-        targetRouteName = "HomeScreen"; // Неавтентифікований користувач
+        // Немає сесії АБО сталася помилка
+        // У будь-якому випадку, показуємо публічний екран
+        targetRouteName = "HomeScreen";
       }
 
       const currentRoute = navigationRef.current.getCurrentRoute()?.name;
       console.log(`RootNavigator Effect: Current: ${currentRoute}, Target: ${targetRouteName}, Session: ${session ? 'Active' : 'None'}, Loading: ${loading}, Role: ${userRole}, Has Navigated Initially: ${hasNavigatedInitially}`);
 
-      // Виконуємо reset тільки якщо:
-      // 1. Ми ще не навігували спочатку (для першого запуску)
-      // АБО
-      // 2. Цільовий маршрут відрізняється від поточного (для входу/виходу)
-      // І ми не перебуваємо на "безпечних" неавтентифікованих екранах, коли сесія null
       if (
         !hasNavigatedInitially ||
         (currentRoute !== targetRouteName &&
-         !(session === null && (currentRoute === "LoginScreen" || currentRoute === "RegisterScreen" || currentRoute === "Login" || currentRoute === "Register")))
+         !(session === null && (currentRoute === "LoginScreen" || currentRoute === "RegisterScreen" || currentRoute === "Login" || currentRoute === "Register" || currentRoute === "ResetPasswordScreen"))) // [ЗМІНА] Додав ResetPasswordScreen до винятків
       ) {
-        console.log(`RootNavigator Effect: Performing reset to ${targetRouteName}.`);
+        console.log(`RootNavigator Effect: Виконуємо reset на ${targetRouteName}.`);
         navigationRef.current.reset({
           index: 0,
           routes: [{ name: targetRouteName, params: targetParams }],
         });
-        setHasNavigatedInitially(true); // Позначаємо, що початкова навігація виконана
-        SplashScreen.hideAsync(); // Приховуємо сплеш
+        setHasNavigatedInitially(true);
+        SplashScreen.hideAsync();
       } else {
-        // Якщо ми вже на потрібному екрані або на безпечному неавтентифікованому екрані,
-        // просто приховуємо сплеш, якщо він ще не прихований.
-        console.log(`RootNavigator Effect: Already on/near target route (${currentRoute}). Hiding SplashScreen if not already hidden.`);
+        console.log(`RootNavigator Effect: Вже на цільовому маршруті (${currentRoute}). Ховаємо SplashScreen.`);
         SplashScreen.hideAsync();
       }
     } else if (!loading && !isNavigationReady && !hasNavigatedInitially) {
-        console.log("RootNavigator Effect: Waiting for NavigationContainer to be ready.");
+        console.log("RootNavigator Effect: Чекаємо на готовність NavigationContainer.");
     } else if (loading) {
-        console.log("RootNavigator Effect: AuthProvider is still loading.");
+        console.log("RootNavigator Effect: AuthProvider все ще завантажується (loading: true).");
     }
-  }, [session, loading, userRole, isNavigationReady, hasNavigatedInitially]);
+    
+  // [ЗМІНА] Додаємо `authError` до списку залежностей
+  }, [session, loading, userRole, authError, isNavigationReady, hasNavigatedInitially]);
 
 
-  // Ми завжди рендеримо NavigationContainer, як тільки appIsReady і AuthProvider не завантажується
-  // (тобто, коли RootNavigator взагалі рендериться).
-  // Це дозволяє navigationRef і isNavigationReady правильно ініціалізуватися.
-  // Блокуємо рендеринг лише на рівні App.js, поки шрифти не завантажаться.
-  // SplashPlaceholderScreen служить візуальним індикатором, поки відбувається reset.
   return (
     <NavigationContainer
       ref={navigationRef}
@@ -143,7 +155,7 @@ function RootNavigator() {
     >
       <Stack.Navigator
         screenOptions={{ headerShown: false, animation: "fade", animationDuration: 0 }}
-        initialRouteName="SplashPlaceholder" // Завжди починаємо з заглушки
+        initialRouteName="SplashPlaceholder"
       >
         <Stack.Screen name="SplashPlaceholder" component={SplashPlaceholderScreen} />
         {/* Всі інші екрани - їх тут завжди рендеримо, не умовно */}
@@ -179,7 +191,6 @@ function RootNavigator() {
     </NavigationContainer>
   );
 }
-
 
 
 export default function App() {

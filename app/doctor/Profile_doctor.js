@@ -29,6 +29,7 @@ import * as Device from "expo-device";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TabBar_doctor from "../../components/TopBar_doctor";
 import { useAuth } from "../../providers/AuthProvider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get("window");
 const isLargeScreen = width > 768;
@@ -478,9 +479,7 @@ const Profile_doctor = ({ route }) => {
   const [refreshing, setRefreshing] = useState(false);
   
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
-  const [displayedLanguageCode, setDisplayedLanguageCode] = useState(
-    i18n.language.toUpperCase()
-  );
+
 
   const [loadingAvatar, setLoadingAvatar] = useState(true);
   const [loadingCertificate, setLoadingCertificate] = useState(true);
@@ -522,9 +521,6 @@ const Profile_doctor = ({ route }) => {
     outputRange: ['0deg', '360deg'],
   });
 
-  useEffect(() => {
-    setDisplayedLanguageCode(i18n.language.toUpperCase());
-  }, [i18n.language]);
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -567,7 +563,8 @@ const Profile_doctor = ({ route }) => {
             email,
             phone,
             country,
-            doctor_points
+            doctor_points,
+            language
           `)
           .eq('user_id', userId)
           .single();
@@ -687,9 +684,43 @@ const Profile_doctor = ({ route }) => {
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
 
-  const handleLanguageSelect = (langCode) => {
-    i18n.changeLanguage(langCode);
-    closeLanguageModal();
+const handleLanguageSelect = async (langCode) => {
+    try {
+      // 1. Змінюємо мову додатка і ЧЕКАЄМО (це з минулого виправлення)
+      await i18n.changeLanguage(langCode);
+
+      // ✅ КРОК 3: ЗБЕРІГАЄМО МОВУ В LOKALЬНЕ СХОВИЩЕ
+      // Наш i18n.js тепер автоматично це зробить завдяки 'cacheUserLanguage',
+      // але для надійності можна продублювати тут:
+      await AsyncStorage.setItem('user_language', langCode);
+      
+      closeLanguageModal();
+
+      if (!isProfileOwner || !session?.user?.id) {
+        return;
+      }
+
+      // 4. Оновлюємо локальний стан (для кнопки)
+      setDoctorData(prevData => ({
+        ...prevData,
+        language: langCode
+      }));
+
+      // 5. Оновлюємо базу даних (Supabase)
+      const { error } = await supabase
+        .from('profile_doctor')
+        .update({ language: langCode })
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+      
+      console.log("Мову оновлено в БД та AsyncStorage:", langCode);
+
+    } catch (error) {
+      console.error("Помилка під час зміни мови:", error.message);
+      Alert.alert(t("error_title"), t("error_updating_language"));
+      closeLanguageModal();
+    }
   };
 
   const handleProfileDoctorSettingsPress = () => {
@@ -878,7 +909,7 @@ const Profile_doctor = ({ route }) => {
               onPress={openLanguageModal}
             >
                 <Text style={styles.languageButtonText}>
-                  {displayedLanguageCode}
+                  {(finalDoctorData.language || i18n.language).toUpperCase()}
                 </Text>
               <Ionicons name="globe-outline" size={16} color="white" />
             </TouchableOpacity>

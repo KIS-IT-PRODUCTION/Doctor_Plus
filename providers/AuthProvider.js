@@ -53,18 +53,17 @@ userRole
       setUserRole(null);
     }
   }, []);
-
-  useEffect(() => {
+useEffect(() => {
     let authSubscription = null;
 
     const initializeAuth = async () => {
       console.log("AuthProvider: Initializing authentication process...");
-      setLoading(true);
+      setLoading(true); // <-- Початок завантаження
       setAuthError(null);
 
       try {
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
-        console.log("AuthProvider: Initial session check completed. Session found:", initialSession ? "yes" : "no", "Error:", sessionError ? sessionError.message : "none");
+        console.log("AuthProvider: Initial session check completed.");
 
         if (sessionError) {
           console.error("AuthProvider: Error getting initial session:", sessionError.message);
@@ -72,22 +71,29 @@ userRole
         }
 
         setSession(initialSession);
-        // Запускаємо визначення ролі для початкової сесії
-        await fetchUserRole(initialSession);
+        await fetchUserRole(initialSession); // Визначаємо роль
 
-        // Підписуємося на зміни стану авторизації
+        // Підписуємося на зміни
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
           console.log(`\n--- AuthProvider: Auth state changed! Event: ${_event} ---`);
-          console.log("AuthProvider: New Session details:", currentSession ? {
-            user_id: currentSession.user?.id,
-            email: currentSession.user?.email,
-            expires_at: currentSession.expires_at,
-          } : "null");
 
-          setSession(currentSession);
-          await fetchUserRole(currentSession); // <-- Це найважливіше для оновлення ролі!
+          // ✅✅✅ ПОЧАТОК КЛЮЧОВОГО ВИПРАВЛЕННЯ ✅✅✅
+          
+          // 1. Повідомляємо всім, що ми "зайняті".
+          // Це зупинить усі дочірні компоненти (DoctorProfileProvider, Profile_doctor)
+          setLoading(true); 
           setAuthError(null);
+
+          // 2. Атомарно оновлюємо І сесію, І роль
+          setSession(currentSession);
+          await fetchUserRole(currentSession); 
+
+          // 3. ТІЛЬКИ ТЕПЕР повідомляємо, що ми готові
+          // Це спричинить ОДИН ре-рендер з коректними даними
+          setLoading(false); 
           console.log("--- AuthProvider: Auth state change processed. ---\n");
+          
+          // ✅✅✅ КІНЕЦЬ КЛЮЧОВОГО ВИПРАВЛЕННЯ ✅✅✅
         });
         authSubscription = subscription;
 
@@ -95,8 +101,8 @@ userRole
         console.error("AuthProvider: Critical error during auth initialization:", error.message);
         setAuthError(error);
       } finally {
-        setLoading(false);
-        console.log("AuthProvider: Authentication initialization finished. Loading set to false.");
+        setLoading(false); // <-- Завершення початкового завантаження
+        console.log("AuthProvider: Authentication initialization finished.");
       }
     };
 
@@ -108,7 +114,7 @@ userRole
         authSubscription.unsubscribe();
       }
     };
-  }, [fetchUserRole]); // Залежність від fetchUserRole
+  }, [fetchUserRole]);
 
   const signIn = useCallback(async (email, password) => {
     console.log("AuthProvider: Attempting to sign in user:", email);

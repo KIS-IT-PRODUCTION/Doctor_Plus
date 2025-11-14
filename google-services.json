@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "10965752398",
-    "project_id": "doctor-plus-fc96d",
-    "storage_bucket": "doctor-plus-fc96d.firebasestorage.app"
+    "project_number": "140701798035",
+    "project_id": "doctor-plus-cc6c6",
+    "storage_bucket": "doctor-plus-cc6c6.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:10965752398:android:ea35c866815165aecb011f",
+        "mobilesdk_app_id": "1:140701798035:android:dc11b31b053e1b3af3c766",
         "android_client_info": {
-          "package_name": "com.kis_production.DOCTOR"
+          "package_name": "com.kis.production.DOCTOR"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCjU1Ljb_CzhKzCYF89mfGJdDIjrnIj1Bk"
+          "current_key": "AIzaSyBFLaBRBADxYUDP8Gz3fMOcjSiHyFEbgds"
         }
       ],
       "services": {

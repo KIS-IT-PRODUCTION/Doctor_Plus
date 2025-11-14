@@ -22,7 +22,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kis-production.DOCTOR",
+      "bundleIdentifier": ".",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
@@ -40,7 +40,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.kis_production.DOCTOR",
+      "package": "com.kis.production.DOCTOR",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
