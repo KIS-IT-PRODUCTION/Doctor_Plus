@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   Image,
@@ -8,7 +7,6 @@ import {
   Modal,
   Pressable,
   TouchableWithoutFeedback,
-  Dimensions,
   Alert,
   Platform,
   RefreshControl,
@@ -16,7 +14,6 @@ import {
   UIManager,
   View,
   Text,
-  StatusBar,
   Animated,
   Easing,
 } from "react-native";
@@ -30,13 +27,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import TabBar_doctor from "../../components/TopBar_doctor";
 import { useAuth } from "../../providers/AuthProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const { width, height } = Dimensions.get("window");
-const isLargeScreen = width > 768;
-const scale = (size) => (width / 375) * size;
-const verticalScale = (size) => (height / 812) * size;
-const moderateScale = (size, factor = 0.5) =>
-  size + (scale(size) - size) * factor;
+import { specializations } from './constant/specializations.js';
+import styles from "./ProfileDoctorStyles";
 
 if (
   Platform.OS === "android" &&
@@ -52,70 +44,7 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-const specializations = [
-  { value: "general_practitioner", nameKey: "general_practitioner" },
-  { value: "pediatrician", nameKey: "pediatrician" },
-  { value: "cardiologist", nameKey: "cardiologist" },
-  { value: "dermatologist", nameKey: "dermatologist" },
-  { value: "neurologist", nameKey: "neurologist" },
-  { value: "surgeon", nameKey: "surgeon" },
-  { value: "psychiatrist", nameKey: "psychiatrist" },
-  { value: "dentist", nameKey: "dentist" },
-  { value: "ophthalmologist", nameKey: "ophthalmologist" },
-  { value: "ent_specialist", nameKey: "categories.ent_specialist" },
-  { value: "gastroenterologist", nameKey: "gastroenterologist" },
-  { value: "endocrinologist", nameKey: "endocrinologist" },
-  { value: "oncologist", nameKey: "oncologist" },
-  { value: "allergist", nameKey: "allergist" },
-  { value: "physiotherapist", nameKey: "physiotherapist" },
-  { value: "traumatologist", nameKey: "traumatologist" },
-  { value: "gynecologist", nameKey: "gynecologist" },
-  { value: "urologist", nameKey: "urologist" },
-  { value: "pulmonologist", nameKey: "pulmonologist" },
-  { value: "nephrologist", nameKey: "nephrologist" },
-  { value: "rheumatologist", nameKey: "rheumatologist" },
-  { value: "infectiousDiseasesSpecialist", nameKey: "infectiousDiseasesSpecialist" },
-  { value: "psychologist", nameKey: "psychologist" },
-  { value: "nutritionist", nameKey: "nutritionist" },
-  { value: "radiologist", nameKey: "radiologist" },
-  { value: "anesthesiologist", nameKey: "anesthesiologist" },
-  { value: "oncologist_radiation", nameKey: "oncologist_radiation" },
-  { value: "endoscopy_specialist", nameKey: "endoscopy_specialist" },
-  { value: "ultrasound_specialist", nameKey: "ultrasound_specialist" },
-  { value: "laboratory_diagnostician", nameKey: "laboratory_diagnostician" },
-  { value: "immunologist", nameKey: "immunologist" },
-  { value: "genetics_specialist", nameKey: "genetics_specialist" },
-  { value: "geriatrician", nameKey: "geriatrician" },
-  { value: "toxicologist", nameKey: "toxicologist" },
-  { value: "forensic_expert", nameKey: "forensic_expert" },
-  { value: "epidemiologist", nameKey: "epidemiologist" },
-  { value: "pathologist", nameKey: "pathologist" },
-  { value: "rehabilitologist", nameKey: "rehabilitologist" },
-  { value: "manual_therapist", nameKey: "manual_therapist" },
-  { value: "chiropractor", nameKey: "chiropractor" },
-  { value: "reflexologist", nameKey: "reflexologist" },
-  { value: "massage_therapist", nameKey: "massage_therapist" },
-  { value: "dietitian", nameKey: "dietitian" },
-  { value: "sexologist", nameKey: "sexologist" },
-  { value: "phlebologist", nameKey: "phlebologist" },
-  { value: "mammologist", nameKey: "mammologist" },
-  { value: "proctologist", nameKey: "proctologist" },
-  { value: "andrologist", nameKey: "andrologist" },
-  { value: "reproductive_specialist", nameKey: "reproductive_specialist" },
-  { value: "transfusiologist", nameKey: "transfusiologist" },
-  { value: "balneologist", nameKey: "balneologist" },
-  { value: "infectious_disease_specialist_pediatric", nameKey: "infectious_disease_specialist_pediatric" },
-  { value: "pediatric_gastroenterologist", nameKey: "pediatric_gastroenterologist" },
-  { value: "pediatric_cardiologist", nameKey: "pediatric_cardiologist" },
-  { value: "pediatric_neurologist", nameKey: "pediatric_neurologist" },
-  { value: "pediatric_surgeon", nameKey: "pediatric_surgeon" },
-  { value: "neonatologist", nameKey: "neonatologist" },
-  { value: "speech_therapist", nameKey: "speech_therapist" },
-  { value: "ergotherapist", nameKey: "ergotherapist" },
-  { value: "osteopath", nameKey: "osteopath" },
-  { value: "homeopath", nameKey: "homeopath" },
-  { value: "acupuncturist", nameKey: "acupuncturist" },
-];
+
 
 async function registerForPushNotificationsAsync(userId) {
   let token;
@@ -480,7 +409,6 @@ const Profile_doctor = ({ route }) => {
   
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
 
-
   const [loadingAvatar, setLoadingAvatar] = useState(true);
   const [loadingCertificate, setLoadingCertificate] = useState(true);
   const [loadingDiploma, setLoadingDiploma] = useState(true);
@@ -622,15 +550,18 @@ const Profile_doctor = ({ route }) => {
     }
   }, [doctorData, isLoading, error, isProfileOwner, checkProfileCompleteness]);
 
+  useEffect(() => {
+    const targetId = doctorIdFromParams || session?.user?.id;
+    if (targetId && (!doctorData || doctorData.user_id !== targetId)) {
+      fetchDoctorProfile(targetId);
+    }
+  }, [doctorIdFromParams, session?.user?.id, doctorData, fetchDoctorProfile]);
+  
   useFocusEffect(
     useCallback(() => {
       setActiveTab("Profile_doctor");
-      const targetId = doctorIdFromParams || session?.user?.id;
-      if (targetId && (!doctorData || doctorData.user_id !== targetId)) {
-        fetchDoctorProfile(targetId);
-      }
       return () => {};
-    }, [doctorIdFromParams, session?.user?.id, doctorData, fetchDoctorProfile])
+    }, [])
   );
 
   const fetchUnreadNotificationsCount = useCallback(async () => {
@@ -671,6 +602,42 @@ const Profile_doctor = ({ route }) => {
     }, [fetchUnreadNotificationsCount])
   );
 
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || !isProfileOwner) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`doctor_notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*',
+          schema: 'public', 
+          table: 'doctor_notifications',
+          filter: `doctor_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('Realtime: Отримано нове сповіщення!', payload);
+          fetchUnreadNotificationsCount();
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Realtime: Підписано на сповіщення!');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime Error:', err.message);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, isProfileOwner, fetchUnreadNotificationsCount]);
+
+
   const formatYearsText = useCallback(
     (years) => {
       if (years === null || years === undefined || isNaN(years) || years < 0) {
@@ -686,27 +653,19 @@ const Profile_doctor = ({ route }) => {
 
 const handleLanguageSelect = async (langCode) => {
     try {
-      // 1. Змінюємо мову додатка і ЧЕКАЄМО (це з минулого виправлення)
       await i18n.changeLanguage(langCode);
-
-      // ✅ КРОК 3: ЗБЕРІГАЄМО МОВУ В LOKALЬНЕ СХОВИЩЕ
-      // Наш i18n.js тепер автоматично це зробить завдяки 'cacheUserLanguage',
-      // але для надійності можна продублювати тут:
       await AsyncStorage.setItem('user_language', langCode);
-      
       closeLanguageModal();
 
       if (!isProfileOwner || !session?.user?.id) {
         return;
       }
 
-      // 4. Оновлюємо локальний стан (для кнопки)
       setDoctorData(prevData => ({
         ...prevData,
         language: langCode
       }));
 
-      // 5. Оновлюємо базу даних (Supabase)
       const { error } = await supabase
         .from('profile_doctor')
         .update({ language: langCode })
@@ -852,13 +811,12 @@ const handleLanguageSelect = async (langCode) => {
   }, [fetchDoctorProfile, fetchUnreadNotificationsCount, doctorIdFromParams, session?.user?.id]);
 
   const finalDoctorData = doctorData || {};
-  const defaultAvatarUrl = "https://placehold.co/100x100/E3F2FD/3498DB?text=No+Photo";
+  const defaultAvatarUrl = "https://yslchkbmupuyxgidnzrb.supabase.co/storage/v1/object/public/public-images/avatar-default-icon.png";
 
   const showLoading = isLoading && !doctorData;
   const showGenericError = !isLoading && error && !doctorData;
   const showDoctorNotFound = !isLoading && !doctorData && !error && !isProfileOwner;
   const showProfileContent = !isLoading && doctorData;
-
 
   return (
     <SafeAreaView style={styles.container}>
@@ -920,7 +878,7 @@ const handleLanguageSelect = async (langCode) => {
                 style={styles.notificationButton}
                 onPress={() => navigation.navigate("Messege")}
               >
-                 <Ionicons name="mail-outline" size={moderateScale(24)} color="white" />
+                 <Ionicons name="mail-outline" size={24} color="white" />
                   {unreadNotificationsCount > 0 && (
                     <View style={styles.notificationBadge}>
                       <Text style={styles.notificationNumber}>
@@ -950,6 +908,7 @@ const handleLanguageSelect = async (langCode) => {
                     <Image
                       key={finalDoctorData.avatar_url}
                       source={{ uri: finalDoctorData.avatar_url }}
+                      defaultAvatarUrl={defaultAvatarUrl}
                       style={styles.avatar}
                       onLoad={() => setLoadingAvatar(false)}
                       onError={() => {
@@ -978,7 +937,6 @@ const handleLanguageSelect = async (langCode) => {
                   {finalDoctorData.full_name || t("not_specified")}
                 </Text>
                 
-                {/* Нові рядки для відображення рейтингу та балів */}
                 <View style={styles.infoRowDynamic}>
                   <Text style={styles.label}>{t("rating")}:</Text>
                   <View style={styles.valueBox}>
@@ -1185,8 +1143,6 @@ const handleLanguageSelect = async (langCode) => {
                   <View style={styles.modalView}>
                     <Ionicons
                       name="information-circle-outline"
-                      size={scale(60)}
-                      color="#0EB3EB"
                       style={styles.modalIcon}
                     />
                     <Text style={styles.modalTitle}>{t("complete_profile_title")}</Text>
@@ -1216,534 +1172,4 @@ const handleLanguageSelect = async (langCode) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F0F2F5',
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ? 5 : 10) : 0,
-  },
-  fullscreenContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F0F2F5',
-    padding: 20,
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 40,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  loadingText: {
-    marginTop: 20,
-    fontSize: 19,
-    color: "#444",
-    fontFamily: "Mont-Regular",
-    fontWeight: "500",
-  },
-  errorContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-    backgroundColor: "#FFEBEE",
-    borderRadius: 20,
-    marginHorizontal: 25,
-    shadowColor: "#EF5350",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#EF9A9A',
-  },
-  errorText: {
-    fontSize: 19,
-    color: "#D32F2F",
-    textAlign: "center",
-    marginBottom: 30,
-    fontFamily: "Mont-SemiBold",
-    lineHeight: 28,
-  },
-  retryButton: {
-    borderRadius: 30,
-    marginTop: 20,
-    overflow: 'hidden',
-    shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-    backgroundColor: '#0EB3EB',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    minWidth: 150,
-    alignItems: 'center',
-  },
-  retryButtonText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "bold",
-    fontFamily: "Mont-Bold",
-  },
-  goToAnketaButton: {
-    borderRadius: 30,
-    marginTop: 20,
-    overflow: 'hidden',
-    shadowColor: "#28A745",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-    backgroundColor: '#28A745',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    minWidth: 150,
-    alignItems: 'center',
-  },
-  goToAnketaButtonText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  noDoctorContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 25,
-    backgroundColor: "#E0F7FA",
-    borderRadius: 20,
-    margin: 25,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 7,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: '#B2EBF2',
-  },
-  noDoctorText: {
-    fontSize: 20,
-    textAlign: "center",
-    color: "#000000",
-    marginTop: 25,
-    fontWeight: "600",
-    lineHeight: 28,
-  },
-  backToHomeButton: {
-    borderRadius: 30,
-    marginTop: 20,
-    overflow: 'hidden',
-    shadowColor: "#607D8B",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 7,
-    elevation: 7,
-    backgroundColor: '#6c757d',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    minWidth: 150,
-    alignItems: 'center',
-  },
-  backToHomeButtonText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  header: {
-  flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-  },
-  languageSelectButton: {
-    borderRadius: 25,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: "rgb(14, 180, 235)",
-    flexDirection: "row",
-    zIndex: 1,
-    alignItems: "center",
-    shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  languageButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  languageButtonText: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "white",
-    marginRight: 8,
-  },
-  headerTitle: {
-    fontFamily: "Mont-SemiBold",
-    fontSize: moderateScale(22),
-    textAlign: "center",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "absolute",
-    left: 0,
-    paddingVertical: 10,
-    right: 0,
-  },
-  notificationButton: {
-    width: width * 0.12,
-    height: width * 0.12,
-    backgroundColor: "rgb(14, 180, 235)",
-    borderRadius: width * 0.06,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: 5,
-    right: 10,
-    backgroundColor: "#E04D53",
-    borderRadius: 1000,
-    width: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    borderColor: "white",
-    borderWidth: 1,
-  },
-  notificationNumber: {
-    color: "white",
-    fontSize: 10,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingHorizontal: 15,
-    paddingVertical: 25,
-    paddingBottom: 70,
-  },
-  doctorMainInfo: {
-    alignItems: "center",
-    marginBottom: 25,
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 25,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  avatarContainer: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    overflow: "hidden",
-    marginBottom: 20,
-    backgroundColor: "#E3F2FD",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#0EB3EB",
-    shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  avatar: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 65,
-    resizeMode: "cover",
-  },
-  avatarLoadingIndicator: {
-    position: "absolute",
-  },
-  doctorDetails: {
-    width: "100%",
-    paddingHorizontal: 10,
-  },
-  doctorName: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 25,
-    color: "#212121",
-    fontWeight: "bold",
-  },
-  infoRowDynamic: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 15,
-    backgroundColor: "white",
-    borderWidth: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  label: {
-    fontSize: 16,
-    color: "#555",
-    fontWeight: "600",
-    flexShrink: 0,
-    marginRight: 5,
-  },
-  valueBox: {
-    flexShrink: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  valueText: {
-    fontSize: 16,
-    color: "#333",
-    textAlign: "right",
-    fontWeight: "400",
-  },
-  noValueText: {
-    color: "#999",
-    fontStyle: "italic",
-    textAlign: "right",
-    fontWeight: "400",
-  },
-  // Новий стиль для контейнера зірочок та балів
-  starContainer: {
-    flexDirection: 'row',
-    marginLeft: 5,
-  },
-  // Новий стиль для тексту з балами
-  pointsText: {
-    fontSize: 16,
-    color: "#555",
-    fontWeight: "500",
-  },
-  flagsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-  flagText: {
-    fontSize: 22,
-    marginLeft: 8,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 30,
-    height: 60,
-    borderRadius: 18,
-    marginBottom: 18,
-    marginHorizontal: 20,
-    backgroundColor: "#0EB3EB",
-    shadowColor: "#0EB3EB",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  actionButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
-    flex: 1,
-  },
-  buttonIcon: {
-  },
-  sectionTitleLink: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#0EB3EB",
-    textAlign: "center",
-    marginTop: 30,
-    marginBottom: 20,
-    fontWeight: "bold",
-    textDecorationLine: "none",
-  },
-  sectionContainer: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 25,
-    marginBottom: 20,
-    borderWidth: 0,
-    marginHorizontal: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 12,
-    color: "#333",
-    fontWeight: "600",
-    borderBottomWidth: 0,
-    paddingBottom: 0,
-    textAlign: 'center',
-  },
-  sectionContent: {
-    fontSize: 16,
-    color: "#555",
-    lineHeight: 26,
-    fontWeight: "400",
-    marginTop: 10,
-  },
-  imageWrapper: {
-    width: "100%",
-    height: 250,
-    backgroundColor: "#F0F8FF",
-    borderRadius: 15,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#B3E0F2",
-    marginTop: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  documentImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-  imageLoadingIndicator: {
-    position: "absolute",
-  },
-  noImageText: {
-    fontSize: 16,
-    color: "#999",
-    textAlign: "center",
-    fontStyle: "italic",
-    fontWeight: "400",
-    paddingVertical: 25,
-  },
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-
-  modalView: {
-    margin: moderateScale(20),
-    backgroundColor: "white",
-    borderRadius: moderateScale(20),
-    padding: moderateScale(35),
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: isLargeScreen ? "50%" : "90%",
-    maxWidth: 400,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
-  },
-  languageModalContent: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    borderColor: "#0EB3EB",
-    borderWidth: 1,
-    alignItems: "center",
-    width: width * 0.8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
- modalTitle: {
-    fontSize: 22,
-    fontFamily: "Mont-Bold",
-    marginBottom: 20,
-    color: "#0EB3EB",
-    textAlign: 'center',
-    flexWrap: 'wrap',
-  },
-  languageOption: {
-    paddingVertical: 15,
-    width: "100%",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(14, 179, 235, 0.3)",
-  },
-  languageOptionText: {
-    fontSize: 18,
-    fontFamily: "Mont-Regular",
-    color: "#333333",
-    textAlign: 'center',
-    flexWrap: 'wrap',
-  },
-   modalButton: {
-    backgroundColor: "#0EB3EB",
-    borderRadius: moderateScale(10),
-    paddingVertical: moderateScale(5),
-    paddingHorizontal: moderateScale(20),
-    elevation: 2,
-    minWidth: moderateScale(80),
-    marginBottom: moderateScale(10),
-  },
-  modalButtonText: {
-    color: "white",
-    textAlign: "center",
-    fontSize: moderateScale(16),
-    fontFamily: "Mont-SemiBold",
-
-  },
-  modalText: {
-    fontSize: moderateScale(16),
-    fontFamily: "Mont-Regular",
-    color: "#555",
-    marginBottom: moderateScale(25),
-    textAlign: "center",
-    lineHeight: moderateScale(22),
-  },
-  modalCancelButton: {
-    marginTop: moderateScale(10),
-  },
-  modalCancelButtonText: {
-    color: '#6c757d',
-    fontSize: moderateScale(14),
-    fontFamily: 'Mont-Regular',
-  },
-  modalIcon: {
-    marginBottom: moderateScale(15),
-  },
-});
-
-export default Profile_doctor;
+export default React.memo(Profile_doctor);

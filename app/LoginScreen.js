@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,258 +8,330 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  SafeAreaView,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../providers/supabaseClient";
-import { useAuth } from "../providers/AuthProvider"; // Це все ще потрібно для доступу до signIn функції, якщо ми її використовуємо
+import { useAuth } from "../providers/AuthProvider";
 import { useTranslation } from "react-i18next";
+import { MotiView, AnimatePresence } from "moti";
+
+const validateEmail = (email) => {
+  const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  return re.test(String(email).toLowerCase());
+};
 
 const LoginScreen = () => {
   const navigation = useNavigation();
-  // Використовуємо функції signIn з useAuth. Це дозволяє AuthProvider контролювати setLoading та isRoleDetermined
-  const { signIn, loading: authLoading, session, userRole } = useAuth(); // Отримуємо signIn функцію та authLoading
+  const { signIn, loading: authLoading } = useAuth();
   const { t } = useTranslation();
+  const styles = getStyles(Dimensions.get("window").width > 768);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  // isLoggingIn тепер буде синхронізуватися з authLoading з AuthProvider,
-  // або можна залишити окремо для локальних станів UI.
-  // Для простоти та консистентності, давайте покладатися на authLoading.
-  // const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { width } = Dimensions.get("window");
-  const isLargeScreen = width > 768;
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  
+  const [serverError, setServerError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  // *** ВАЖЛИВА ЗМІНА: ВИДАЛЯЄМО ЦЕЙ useEffect ***
-  // Логіка перенаправлення після успішного входу тепер повністю
-  // контролюється RootNavigator на основі `session`, `userRole` та `isRoleDetermined`.
-  // useEffect(() => {
-  //   if (session && session.user) {
-  //     console.log("LoginScreen.js: Сесія активна, перенаправлення на Patsient_Home.");
-  //     navigation.replace("Patsient_Home");
-  //   }
-  // }, [session, navigation]);
+  const validateForm = () => {
+    const newErrors = {};
+    setServerError("");
+    
+    if (!email.trim()) {
+      newErrors.email = t("error_empty_email");
+    } else if (!validateEmail(email.trim())) {
+      newErrors.email = t("error_invalid_email");
+    }
+    
+    if (!password.trim()) {
+      newErrors.password = t("error_empty_password");
+    }
+    
+    setFieldErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleLogin = async () => {
-    setLoginError("");
-
-    if (!email.trim()) {
-      setLoginError(t("error_empty_email"));
-      return;
-    }
-    if (!password.trim()) {
-      setLoginError(t("error_empty_password"));
+    Keyboard.dismiss();
+    if (!validateForm()) {
       return;
     }
 
-    // setIsLoggingIn(true); // Більше не потрібен, якщо використовуємо authLoading
-    console.log("LoginScreen.js: Спроба входу для пацієнта з email:", email);
-
-    // *** ЗМІНА: Використовуємо signIn з AuthProvider ***
-    const { success, error } = await signIn(email, password);
+    const { success, error } = await signIn(email.trim(), password);
 
     if (!success) {
-      console.error("LoginScreen.js: Помилка входу через AuthProvider:", error?.message || "Невідома помилка.");
-      setLoginError(t("error_login_failed", { error: error?.message || "Невідома помилка." }));
+      setServerError(t("error_login_failed", { error: error?.message || "Unknown error" }));
     } else {
-      console.log("LoginScreen.js: Вхід успішний. AuthProvider керує перенаправленням.");
       setEmail("");
       setPassword("");
-      // Після успішного входу AuthProvider оновить `session`, `loading` та `userRole`.
-      // `RootNavigator` потім перенаправить куди потрібно.
-      // Не викликаємо navigation.replace тут!
     }
-    // setIsLoggingIn(false); // Більше не потрібен
   };
 
   const handleForgotPasswordPress = () => {
-    setLoginError("");
-    console.log("LoginScreen.js: Перехід на екран ResetPasswordScreen.");
+    setServerError("");
+    setFieldErrors({});
     navigation.navigate("ResetPasswordScreen", { email: email });
   };
 
-  // Використовуємо authLoading для керування станом кнопки та полів
   const isDisabled = authLoading;
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.container(width)}>
-        <StatusBar style="auto" />
-        <Text style={styles.title(isLargeScreen)}>{t("login_greeting")}</Text>
-        <Text style={styles.subtitle(isLargeScreen)}>
-          {t("login_subtitle")}
-        </Text>
-
-        <Text style={styles.subtitle2}>{t("email")}</Text>
-        <View style={styles.inputContainer(width)}>
-          <Ionicons
-            name="mail-outline"
-            size={20}
-            color="#B0BEC5"
-            style={styles.icon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder={t("placeholder_email")}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!isDisabled} // Деактивуємо поле під час входу
-          />
-        </View>
-
-        <Text style={styles.subtitle2}>{t("password")}</Text>
-        <View style={styles.inputContainer(width)}>
-          <Ionicons
-            name="lock-closed-outline"
-            size={20}
-            color="#B0BEC5"
-            style={styles.icon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder={t("placeholder_password")}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={true}
-            editable={!isDisabled} // Деактивуємо поле під час входу
-          />
-        </View>
-
-        {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
-
-        <TouchableOpacity
-          style={styles.loginButton(width)}
-          onPress={handleLogin}
-          disabled={isDisabled} // Кнопка вимкнена під час завантаження
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingContainer}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
         >
-          {isDisabled ? ( // Використовуємо isDisabled (тобто authLoading)
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.loginButtonText}>
-              {t("login_button")}
-            </Text>
-          )}
-        </TouchableOpacity>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.innerContainer}>
+              <MotiView
+                from={{ opacity: 0, translateY: -30 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: "timing", duration: 400 }}
+              >
+                <Text style={styles.title}>{t("login_greeting")}</Text>
+                <Text style={styles.subtitle}>{t("login_subtitle")}</Text>
+              </MotiView>
 
-        {/* Кнопка "Забули пароль?" */}
-        <TouchableOpacity
-          style={styles.forgotPasswordLink}
-          onPress={handleForgotPasswordPress}
-          disabled={isDisabled} // Деактивуємо під час входу
-        >
-          <Text style={styles.forgotPasswordText}>
-            {t("forgot_password_link")}
-          </Text>
-        </TouchableOpacity>
+              <MotiView
+                from={{ opacity: 0, translateY: -20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: "timing", duration: 400, delay: 100 }}
+              >
+                <Text style={styles.label}>{t("email")}</Text>
+                <View style={[styles.inputContainer, fieldErrors.email && styles.inputError]}>
+                  <Ionicons name="mail-outline" size={22} color="#B0BEC5" style={styles.icon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t("placeholder_email")}
+                    placeholderTextColor="#B0BEC5"
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: null }));
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!isDisabled}
+                  />
+                </View>
+                {fieldErrors.email && <Text style={styles.fieldErrorText}>{fieldErrors.email}</Text>}
 
-        <TouchableOpacity
-          style={styles.registerLink}
-          onPress={() => navigation.navigate("RegisterScreen")}
-          disabled={isDisabled} // Деактивуємо під час входу
-        >
-          <Text style={styles.registerLinkText}>
-            {t("not_registered")}
-            <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+                <Text style={styles.label}>{t("password")}</Text>
+                <View style={[styles.inputContainer, fieldErrors.password && styles.inputError]}>
+                  <Ionicons name="lock-closed-outline" size={22} color="#B0BEC5" style={styles.icon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t("placeholder_password")}
+                    placeholderTextColor="#B0BEC5"
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      if (fieldErrors.password) setFieldErrors(p => ({ ...p, password: null }));
+                    }}
+                    secureTextEntry={!isPasswordVisible}
+                    editable={!isDisabled}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                  >
+                    <Ionicons name={isPasswordVisible ? "eye-off-outline" : "eye-outline"} size={24} color="#B0BEC5" />
+                  </TouchableOpacity>
+                </View>
+                {fieldErrors.password && <Text style={styles.fieldErrorText}>{fieldErrors.password}</Text>}
+              </MotiView>
+              
+              <AnimatePresence>
+                {serverError ? (
+                  <MotiView
+                    from={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                  >
+                    <Text style={styles.errorText}>{serverError}</Text>
+                  </MotiView>
+                ) : null}
+              </AnimatePresence>
+
+              <MotiView
+                from={{ opacity: 0, translateY: 20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: "timing", duration: 400, delay: 200 }}
+              >
+                <TouchableOpacity
+                  style={[styles.loginButton, isDisabled && styles.buttonDisabled]}
+                  onPress={handleLogin}
+                  disabled={isDisabled}
+                >
+                  <AnimatePresence exitBeforeEnter>
+                    {isDisabled ? (
+                      <MotiView key="loader" from={{scale: 0.5}} animate={{scale: 1}} exit={{scale: 0.5}}>
+                        <ActivityIndicator color="#fff" />
+                      </MotiView>
+                    ) : (
+                      <MotiView key="text" from={{scale: 0.5}} animate={{scale: 1}} exit={{scale: 0.5}}>
+                        <Text style={styles.loginButtonText}>{t("login_button")}</Text>
+                      </MotiView>
+                    )}
+                  </AnimatePresence>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.forgotPasswordLink}
+                  onPress={handleForgotPasswordPress}
+                  disabled={isDisabled}
+                >
+                  <Text style={styles.forgotPasswordText}>
+                    {t("forgot_password_link")}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.registerLink}
+                  onPress={() => navigation.navigate("RegisterScreen")}
+                  disabled={isDisabled}
+                >
+                  <Text style={styles.registerLinkText}>
+                    {t("not_registered")}
+                    <Text style={{ fontWeight: "bold" }}> {t("register_link")}</Text>
+                  </Text>
+                </TouchableOpacity>
+              </MotiView>
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  scrollContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  container: (width) => ({
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    paddingTop: Dimensions.get("window").height * 0.2,
-    paddingHorizontal: width * 0.05,
-    width: "100%",
-  }),
-  title: (isLargeScreen) => ({
-    fontSize: isLargeScreen ? 36 : 32,
-    marginBottom: 9,
-    fontFamily: "Mont-Bold",
-    color: "#212121",
-    textAlign: "center",
-  }),
-  subtitle: (isLargeScreen) => ({
-    fontSize: isLargeScreen ? 18 : 16,
-    color: "#757575",
-    fontFamily: "Mont-Regular",
-    marginBottom: 24,
-    textAlign: "center",
-  }),
-  subtitle2: {
-    fontSize: 18,
-    alignSelf: "flex-start",
-    color: "#2A2A2A",
-    fontFamily: "Mont-Medium",
-    paddingHorizontal: 35,
-    marginBottom: 8,
-  },
-  inputContainer: (width) => ({
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
-    borderRadius: 555,
-    paddingHorizontal: 15,
-    marginBottom: 14,
-    width: width * 0.9,
-    height: 52,
-  }),
-  icon: { marginRight: 10 },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: "Mont-Regular",
-  },
-  loginButton: (width) => ({
-    backgroundColor: "#0EB3EB",
-    borderRadius: 555,
-    paddingVertical: 15,
-    width: width * 0.9,
-    height: 52,
-    alignItems: "center",
-    marginTop: 16,
-    justifyContent: "center",
-  }),
-  loginButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  errorText: {
-    color: "red",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  forgotPasswordLink: {
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: "#757575",
-    textDecorationLine: "underline",
-  },
-  registerLink: {
-  },
-  registerLinkText: {
-    fontSize: 16,
-    color: "#757575",
-    fontFamily: "Mont-Regular",
-  },
-});
+const getStyles = (isLargeScreen) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#fff",
+    },
+    keyboardAvoidingContainer: {
+      flex: 1,
+    },
+    scrollContainer: {
+      flexGrow: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    innerContainer: {
+      width: "100%",
+      maxWidth: isLargeScreen ? 400 : "90%",
+      padding: 20,
+    },
+    title: {
+      fontSize: isLargeScreen ? 36 : 32,
+      marginBottom: 9,
+      fontFamily: "Mont-Bold",
+      color: "#212121",
+      textAlign: "center",
+    },
+    subtitle: {
+      fontSize: isLargeScreen ? 18 : 16,
+      color: "#757575",
+      fontFamily: "Mont-Regular",
+      marginBottom: 32,
+      textAlign: "center",
+    },
+    label: {
+      fontSize: 16,
+      color: "#2A2A2A",
+      fontFamily: "Mont-Medium",
+      marginBottom: 8,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "rgba(14, 179, 235, 0.1)",
+      borderRadius: 12,
+      paddingHorizontal: 15,
+      marginBottom: 4,
+      height: 52,
+      borderWidth: 1,
+      borderColor: "transparent",
+    },
+    inputError: {
+      borderColor: "#D32F2F",
+    },
+    icon: {
+      marginRight: 10,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      fontFamily: "Mont-Regular",
+      color: "#000",
+    },
+    eyeIcon: {
+      padding: 5,
+    },
+    loginButton: {
+      backgroundColor: "#0EB3EB",
+      borderRadius: 12,
+      paddingVertical: 15,
+      width: "100%",
+      height: 52,
+      alignItems: "center",
+      marginTop: 16,
+      justifyContent: "center",
+    },
+    buttonDisabled: {
+      backgroundColor: "#A0A0A0",
+    },
+    loginButtonText: {
+      color: "#fff",
+      fontSize: 18,
+      fontWeight: "bold",
+      textAlign: "center",
+    },
+    errorText: {
+      color: "#D32F2F",
+      textAlign: "center",
+      marginTop: 10,
+      fontFamily: "Mont-Bold",
+      fontSize: 14,
+    },
+    fieldErrorText: {
+      color: "#D32F2F",
+      fontSize: 13,
+      fontFamily: "Mont-Regular",
+      marginBottom: 10,
+      marginLeft: 5,
+    },
+    forgotPasswordLink: {
+      marginTop: 16,
+      alignSelf: "center",
+    },
+    forgotPasswordText: {
+      fontSize: 14,
+      color: "#757575",
+      textDecorationLine: "underline",
+      fontFamily: "Mont-Regular",
+    },
+    registerLink: {
+      marginTop: 24,
+      alignSelf: "center",
+    },
+    registerLinkText: {
+      fontSize: 16,
+      color: "#757575",
+      fontFamily: "Mont-Regular",
+    },
+  });
 
 export default LoginScreen;

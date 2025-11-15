@@ -1,4 +1,3 @@
-// AuthProvider.js - НЕ МІНЯЙТЕ ЦЕЙ КОД, ВІН ПРАВИЛЬНИЙ. Просто ще раз перевірте:
 import React, {
   createContext,
   useState,
@@ -58,7 +57,7 @@ useEffect(() => {
 
     const initializeAuth = async () => {
       console.log("AuthProvider: Initializing authentication process...");
-      setLoading(true); // <-- Початок завантаження
+      setLoading(true); 
       setAuthError(null);
 
       try {
@@ -71,29 +70,20 @@ useEffect(() => {
         }
 
         setSession(initialSession);
-        await fetchUserRole(initialSession); // Визначаємо роль
+        await fetchUserRole(initialSession); 
 
-        // Підписуємося на зміни
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
           console.log(`\n--- AuthProvider: Auth state changed! Event: ${_event} ---`);
 
-          // ✅✅✅ ПОЧАТОК КЛЮЧОВОГО ВИПРАВЛЕННЯ ✅✅✅
-          
-          // 1. Повідомляємо всім, що ми "зайняті".
-          // Це зупинить усі дочірні компоненти (DoctorProfileProvider, Profile_doctor)
-          setLoading(true); 
+        
           setAuthError(null);
 
-          // 2. Атомарно оновлюємо І сесію, І роль
           setSession(currentSession);
           await fetchUserRole(currentSession); 
 
-          // 3. ТІЛЬКИ ТЕПЕР повідомляємо, що ми готові
-          // Це спричинить ОДИН ре-рендер з коректними даними
           setLoading(false); 
           console.log("--- AuthProvider: Auth state change processed. ---\n");
           
-          // ✅✅✅ КІНЕЦЬ КЛЮЧОВОГО ВИПРАВЛЕННЯ ✅✅✅
         });
         authSubscription = subscription;
 
@@ -101,7 +91,7 @@ useEffect(() => {
         console.error("AuthProvider: Critical error during auth initialization:", error.message);
         setAuthError(error);
       } finally {
-        setLoading(false); // <-- Завершення початкового завантаження
+        setLoading(false); 
         console.log("AuthProvider: Authentication initialization finished.");
       }
     };
@@ -128,7 +118,6 @@ useEffect(() => {
         return { success: false, error };
       }
       console.log("AuthProvider: signIn successful. Data:", data ? "present" : "absent");
-      // Роль буде визначена через onAuthStateChange
       return { success: true, data };
     } catch (error) {
       setAuthError(error);
@@ -199,8 +188,8 @@ useEffect(() => {
         return { success: false, error };
       }
       console.log("AuthProvider: signOut successful.");
-      setSession(null); // Явно обнуляємо сесію
-      setUserRole(null); // Явно обнуляємо роль
+      setSession(null); 
+      setUserRole(null); 
       return { success: true };
     } catch (error) {
       setAuthError(error);
@@ -213,7 +202,7 @@ useEffect(() => {
 
   const value = {
     session,
-    loading, // Передаємо 'loading'
+    loading, 
     userRole,
     authError,
     signIn,

@@ -1,4 +1,6 @@
-{
+import 'dotenv/config';
+
+export default {
   "expo": {
     "name": "Doctor Plus",
     "slug": "DOCTOR",
@@ -14,8 +16,8 @@
       "backgroundColor": "#ffffff"
     },
     "extra": {
-      "supabaseUrl": "https://yslchkbmupuyxgidnzrb.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6bnd6c3JwZ29va2d4aGZneXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc1MDI1MjIsImV4cCI6MjA2MzA3ODUyMn0.b-tQQWpOe4EeoUHa1dAO23iDy5QjdUihrYEGqVey5vY",
+      "supabaseUrl": process.env.SUPABASE_URL,
+      "supabaseAnonKey": process.env.SUPABASE_ANON_KEY,
       "eas": {
         "projectId": "e2619b61-6ef5-4958-90bc-a400bbc8c50a"
       }
@@ -47,18 +49,10 @@
           "action": "VIEW",
           "autoVerify": false,
           "data": [
-            {
-              "scheme": "doctor"
-            },
-            {
-              "scheme": "doctor",
-              "host": "payment_result"
-            }
+            { "scheme": "doctor" },
+            { "scheme": "doctor", "host": "payment_result" }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ],
       "permissions": [
@@ -72,10 +66,6 @@
     "web": {
       "favicon": "./assets/icon.png"
     },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "iosDisplayInForeground": true
-    },
     "plugins": [
       "expo-localization",
       "expo-secure-store",
@@ -83,6 +73,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "ios": {
             "allowBadge": true,
             "allowSound": true,
@@ -100,4 +91,4 @@
       "expo-web-browser"
     ]
   }
-}
+};

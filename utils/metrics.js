@@ -2,7 +2,6 @@ import { Dimensions } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-// Базові розміри, наприклад, з iPhone 11 Pro (приблизно 375x812)
 const guidelineBaseWidth = 375;
 const guidelineBaseHeight = 812;
 

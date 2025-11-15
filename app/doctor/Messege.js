@@ -601,8 +601,8 @@ export default function Message() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f0f2f5" />
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={moderateScale(24)} color="#000" />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Profile_doctor")}>
+          <Ionicons name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("messages_screen.header_title")}</Text>
         <View>
@@ -825,8 +825,9 @@ export default function Message() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f0f2f5", paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10, },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: moderateScale(16), paddingVertical: verticalScale(5), backgroundColor: "#f0f2f5", },
-  backButton: { backgroundColor: "rgba(14, 179, 235, 0.2)", borderRadius: moderateScale(25), width: moderateScale(48), height: moderateScale(48), justifyContent: "center", alignItems: "center", },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: moderateScale(16), paddingVertical: verticalScale(2), backgroundColor: "#f0f2f5", },
+  backButton: { backgroundColor: "#FFFFFF", borderRadius: moderateScale(25),     width: 48,
+    height: 48, justifyContent: "center", alignItems: "center", },
   headerTitle: { fontFamily: "Mont-SemiBold", fontSize: moderateScale(20), color: "#333", },
   messageList: { padding: moderateScale(16), paddingBottom: verticalScale(100), },
   messageGroup: { marginBottom: verticalScale(20), },

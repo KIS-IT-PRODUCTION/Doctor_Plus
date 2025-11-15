@@ -6,25 +6,18 @@ import {
   View,
   ActivityIndicator,
   StyleSheet,
-  Platform, // Імпортуємо Platform
+  Platform,
+  AppState, 
 } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
-// import * as Linking from "expo-linking"; // Linking не використовується безпосередньо тут, можна видалити якщо не використовується ніде в App.js
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import "./i18n";
-import * as Notifications from 'expo-notifications'; // Імпортуємо Notifications
+import * as Notifications from 'expo-notifications';
+import { useTranslation } from "react-i18next"; 
 
-// ВАЖЛИВО: Для коректної роботи Intl API (який використовується для часових зон),
-// якщо ви орієнтуєтеся на старіші Android або деякі JS-двигуни, можливо, знадобиться
-// розкоментувати наступні рядки. Для більшості сучасних Expo SDK це може бути не потрібно.
-// import 'intl';
-// import 'intl/locale-data/jsonp/en'; // Додайте локалі, які ви використовуєте, наприклад, 'uk'
-// import 'intl/locale-data/jsonp/uk'; // Приклад для української локалі
-
-// Імпорти екранів (переконайтеся, що всі шляхи правильні)
 import ChooseSpecial from "./app/ChooseSpecial";
 import LoginScreen from "./app/LoginScreen";
 import Patsient_Home from "./app/Patsient_Home";
@@ -58,61 +51,64 @@ SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 
-const SplashPlaceholderScreen = () => (
-  <View style={styles.centeredContainer}>
-    <ActivityIndicator size="large" color="#0EB3EB" />
-    <Text style={{ marginTop: 10, fontFamily: "Mont-Regular" }}>Завантаження даних...</Text>
-  </View>
-);
-
+const SplashPlaceholderScreen = () => {
+  const { t } = useTranslation(); 
+  return (
+    <View style={styles.centeredContainer}>
+      <ActivityIndicator size="large" color="#0EB3EB" />
+      <Text style={{ marginTop: 10, fontFamily: "Mont-Regular" }}>{t("splash_loading")}</Text>
+    </View>
+  );
+}
 
 function RootNavigator() {
-  // [ЗМІНА] Отримуємо `authError` з useAuth()
   const { session, loading, userRole, authError } = useAuth();
   const navigationRef = useRef();
   const [isNavigationReady, setNavigationReady] = useState(false);
   const [hasNavigatedInitially, setHasNavigatedInitially] = useState(false);
+  const appState = useRef(AppState.currentState); 
 
   useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+
+    if (isNavigationReady && appState.current.match(/inactive|background/) && !hasNavigatedInitially) {
+        if (hasNavigatedInitially) {
+             console.log("RootNavigator Effect: Повернення з фону, навігацію не змінюємо.");
+             return;
+        }
+    }
+
     if (isNavigationReady && !loading && navigationRef.current && navigationRef.current.isReady()) {
       
-      // [ЗМІНА] Головна логіка виправлення:
-      // Ми повинні "чекати" (тобто нічого не робити), якщо сесія вже є,
-      // але роль ще не визначена (userRole === null).
-      // Ми чекаємо, ТІЛЬКИ якщо немає помилки автентифікації.
       if (session && session.user && userRole === null && authError === null) {
         console.log("RootNavigator Effect: Сесія є, але роль 'null' (і немає помилок). Чекаємо на визначення ролі.");
-        // Нічого не робимо і виходимо. useEffect запуститься знову,
-        // коли userRole або authError оновиться.
-        // Це запобігає некоректному "стрибку" на HomeScreen.
-        // Якщо це початкове завантаження, ми просто продовжуємо показувати SplashPlaceholder.
         return; 
       }
-
-      // Якщо ми дійшли сюди, це означає:
-      // 1. Немає сесії (session === null)
-      // 2. Є сесія І роль (userRole === 'doctor' або 'patient')
-      // 3. Є сесія, але сталася помилка (authError !== null)
 
       let targetRouteName;
       let targetParams = {};
 
-      // [ЗМІНА] Трохи чистіша логіка визначення маршруту
       if (session && session.user && authError === null) {
-        // У нас є сесія, роль І немає помилок
         if (userRole === "doctor") {
           targetRouteName = "Profile_doctor";
           targetParams = { doctorId: session.user.id };
         } else if (userRole === "patient") {
           targetRouteName = "Patsient_Home";
         } else {
-          // Безпечний запасний варіант, якщо роль дивна, але сесія є
           console.warn(`RootNavigator: Невідома роль (${userRole}), перехід на Patsient_Home.`);
           targetRouteName = "Patsient_Home";
         }
       } else {
-        // Немає сесії АБО сталася помилка
-        // У будь-якому випадку, показуємо публічний екран
         targetRouteName = "HomeScreen";
       }
 
@@ -122,7 +118,7 @@ function RootNavigator() {
       if (
         !hasNavigatedInitially ||
         (currentRoute !== targetRouteName &&
-         !(session === null && (currentRoute === "LoginScreen" || currentRoute === "RegisterScreen" || currentRoute === "Login" || currentRoute === "Register" || currentRoute === "ResetPasswordScreen"))) // [ЗМІНА] Додав ResetPasswordScreen до винятків
+         !(session === null && (currentRoute === "LoginScreen" || currentRoute === "RegisterScreen" || currentRoute === "Login" || currentRoute === "Register" || currentRoute === "ResetPasswordScreen")))
       ) {
         console.log(`RootNavigator Effect: Виконуємо reset на ${targetRouteName}.`);
         navigationRef.current.reset({
@@ -133,7 +129,10 @@ function RootNavigator() {
         SplashScreen.hideAsync();
       } else {
         console.log(`RootNavigator Effect: Вже на цільовому маршруті (${currentRoute}). Ховаємо SplashScreen.`);
-        SplashScreen.hideAsync();
+        if (!hasNavigatedInitially) {
+           SplashScreen.hideAsync();
+           setHasNavigatedInitially(true); 
+        }
       }
     } else if (!loading && !isNavigationReady && !hasNavigatedInitially) {
         console.log("RootNavigator Effect: Чекаємо на готовність NavigationContainer.");
@@ -141,7 +140,6 @@ function RootNavigator() {
         console.log("RootNavigator Effect: AuthProvider все ще завантажується (loading: true).");
     }
     
-  // [ЗМІНА] Додаємо `authError` до списку залежностей
   }, [session, loading, userRole, authError, isNavigationReady, hasNavigatedInitially]);
 
 
@@ -158,14 +156,12 @@ function RootNavigator() {
         initialRouteName="SplashPlaceholder"
       >
         <Stack.Screen name="SplashPlaceholder" component={SplashPlaceholderScreen} />
-        {/* Всі інші екрани - їх тут завжди рендеримо, не умовно */}
         <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="LoginScreen" component={LoginScreen} />
         <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
         <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="Register" component={Register} />
         <Stack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
-
         <Stack.Screen name="Patsient_Home" component={Patsient_Home} />
         <Stack.Screen name="Search" component={Search} />
         <Stack.Screen name="Faq" component={Faq} />
@@ -177,7 +173,6 @@ function RootNavigator() {
         <Stack.Screen name="ConsultationTimePatient" component={ConsultationTimePatient} />
         <Stack.Screen name="PatientMessages" component={PatientMessages} />
         <Stack.Screen name="FeedbackModal" component={FeedbackModal} />
-
         <Stack.Screen name="Anketa_Settings" component={Anketa_Settings} />
         <Stack.Screen name="Profile_doctor" component={Profile_doctor} />
         <Stack.Screen name="Messege" component={Messege} />
@@ -199,7 +194,6 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Завантаження шрифтів
         await Font.loadAsync({
           "Mont-Regular": require("./assets/Font/static/Montserrat-Regular.ttf"),
           "Mont-Medium": require("./assets/Font/static/Montserrat-Medium.ttf"),
@@ -208,14 +202,13 @@ export default function App() {
         });
         console.log("App.js: Шрифти завантажені.");
 
-        // Ініціалізація каналів сповіщень для Android
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
             name: 'Загальні сповіщення',
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#FF231F7C',
-            sound: 'default', // Використовувати системний звук за замовчуванням
+            sound: 'default',
           });
           console.log("App.js: Android канал сповіщень 'default' налаштовано.");
         }
@@ -232,7 +225,6 @@ export default function App() {
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      // Тут не ховаємо сплеш-екран, це робить RootNavigator
     }
   }, [appIsReady]);
 
@@ -245,7 +237,6 @@ export default function App() {
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <AuthProvider>
         <ConditionalDoctorProfileProvider>
-          {/* RootNavigator тепер завжди рендериться, якщо appIsReady */}
           <RootNavigator />
         </ConditionalDoctorProfileProvider>
       </AuthProvider>
