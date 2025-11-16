@@ -16,8 +16,9 @@ import {
   TextInput,
   RefreshControl,
   Modal,
+  Image,
+  FlatList,
   Animated,
-  Image, // Залишаємо Image для растрових зображень
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,26 +28,20 @@ import { supabase } from "../providers/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import SvgUri from 'react-native-svg';
 
-// Імпорт для SVG з URL
-import SvgUri from 'react-native-svg'; // <--- ДОДАЙТЕ ЦЕЙ ІМПОРТ
-
-// Імпорт кастомних компонентів
 import Icon from "../assets/icon.svg";
 import Doctor from "../assets/Main/doctor.svg";
 import TabBar from "../components/TopBar.js";
 
-// Отримання розмірів екрану
 const { width, height } = Dimensions.get("window");
 
-// Функції для адаптивного масштабування елементів
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) =>
   size + (scale(size) - size) * factor;
 
 const containerWidth = width * 0.9;
-
 const TAB_BAR_HEIGHT = verticalScale(90);
 const SEARCH_BAR_BOTTOM_OFFSET = verticalScale(40);
 
@@ -123,7 +118,6 @@ const Patsient_Home = () => {
   const [activeTab, setActiveTab] = useState("Home");
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isSpecializationModalVisible, setSpecializationModalVisible] = useState(false);
-  const [displayedLanguageCode, setDisplayedLanguageCode] = useState(i18n.language.toUpperCase());
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   
@@ -277,7 +271,6 @@ const Patsient_Home = () => {
   }, [session, authLoading, registerForPushNotificationsAsync, fetchUnreadMessagesCount]);
   
   useEffect(() => {
-    setDisplayedLanguageCode(i18n.language.toUpperCase());
     fetchIntroMottoText();
   }, [i18n.language, fetchIntroMottoText]);
 
@@ -308,7 +301,7 @@ const Patsient_Home = () => {
     ]);
     setRefreshing(false);
   }, [session, isSignOutVisible, fetchUnreadMessagesCount, fetchAvailableSpecializations, fetchMainScreenImage, fetchIntroMottoText]);
-
+  
   const toggleSignOutButton = () => {
     const toValue = isSignOutVisible ? 0 : 1;
     setIsSignOutVisible(!isSignOutVisible);
@@ -362,16 +355,28 @@ const Patsient_Home = () => {
     { nameKey: "ukrainian", code: "uk" },
     { nameKey: "english", code: "en" },
   ];
-  
+
   const signOutButtonAnimatedStyle = {
     opacity: signOutAnimation,
     transform: [{
       translateY: signOutAnimation.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }),
     }],
   };
+
+  const renderSpecializationItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.specializationGridItem}
+      onPress={() => handleSpecializationSelect(item)}
+    >
+      <Text style={styles.specializationGridText} numberOfLines={2}>
+        {t(item.nameKey)}
+      </Text>
+    </TouchableOpacity>
+  );
   
   return (
     <View style={styles.rootContainer}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <SafeAreaView style={styles.safeAreaContent}>
         <ScrollView
           contentContainerStyle={styles.scrollContentContainer}
@@ -379,6 +384,7 @@ const Patsient_Home = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
+            
             <View style={styles.header}>
               <View>
                 <TouchableOpacity onPress={toggleSignOutButton} style={styles.logoTouchArea}>
@@ -396,13 +402,13 @@ const Patsient_Home = () => {
 
               <TouchableOpacity style={styles.languageButton} onPress={openLanguageModal}>
                 <View style={styles.languageButtonContent}>
-                  <Text style={styles.languageText}>{displayedLanguageCode}</Text>
-                  <Ionicons name="globe-outline" size={moderateScale(16)} color="white" />
+                  <Text style={styles.languageText}>{i18n.language.toUpperCase()}</Text>
+          <Ionicons name="globe-outline" size={moderateScale(16)} color="#0EB3EB" />
                 </View>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate("PatientMessages")}>
-                 <Ionicons name="mail-outline" size={moderateScale(24)} color="white" />
+                  <Ionicons name="mail-outline" size={moderateScale(24)} color="#0EB3EB" />
                 {unreadMessagesCount > 0 && (
                   <View style={styles.notificationBadge}>
                     <Text style={styles.notificationNumber}>{unreadMessagesCount}</Text>
@@ -411,61 +417,63 @@ const Patsient_Home = () => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.mainContent}>
-              <TouchableOpacity style={styles.specializationButton} onPress={openSpecializationModal}>
-                <Text style={styles.specializationText} numberOfLines={1} adjustsFontSizeToFit>
-                  {t("chooseDoctorSpecialization")}
-                </Text>
-              </TouchableOpacity>
-              <View style={styles.doctorsImageContainer}>
-                {imageLoading ? (
-                  <ActivityIndicator size="large" color="#0EB3EB" style={styles.imageLoader} />
-                ) : imageError ? (
-                  <Text style={styles.imageErrorText}>{imageError}</Text>
-                ) : mainScreenImageUrl ? (
-                  // Умовний рендеринг для SVG або растрових зображень
-                  mainScreenImageUrl.endsWith('.svg') ? (
-                    <SvgUri
-                      width={styles.peopleImage.width}
-                      height={styles.peopleImage.height}
-                      source={{ uri: mainScreenImageUrl }}
-                      style={styles.peopleImage} // Передаємо стилі для SvgUri
-                    />
-                  ) : (
-                    <Image
-                      source={{ uri: mainScreenImageUrl }}
-                      style={styles.peopleImage}
-                      resizeMode="cover" // Змінено на cover для растрових зображень
-                    />
-                  )
-                ) : (
-                  <Text style={styles.imageErrorText}>{t("no_image_available")}</Text>
-                )}
-              </View>
-
-              <Text style={styles.introMottoText}>
-                {introMottoText}
-              </Text>
-
+            <View style={styles.welcomeHeader}>
+              <Text style={styles.welcomeTitle}>{t("hello")}!</Text>
+              <Text style={styles.welcomeSubtitle}>{t("how_are_you_feeling")}</Text>
             </View>
+            
+            <TouchableOpacity style={styles.ctaCard} onPress={openSpecializationModal} activeOpacity={0.8}>
+              <Doctor width={moderateScale(40)} height={moderateScale(40)} color="#0EB3EB" />
+              <Text style={styles.ctaText}>{t("chooseDoctorSpecialization")}</Text>
+              <Ionicons name="chevron-forward" size={moderateScale(24)} color="#0EB3EB" />
+            </TouchableOpacity>
+
+            <View style={styles.doctorsImageContainer}>
+              {imageLoading ? (
+                <ActivityIndicator size="large" color="#0EB3EB" style={styles.imageLoader} />
+              ) : imageError ? (
+                <Text style={styles.imageErrorText}>{imageError}</Text>
+              ) : mainScreenImageUrl ? (
+                mainScreenImageUrl.endsWith('.svg') ? (
+                  <SvgUri
+                    width="100%"
+                    height="100%"
+                    source={{ uri: mainScreenImageUrl }}
+                    style={styles.peopleImage}
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: mainScreenImageUrl }}
+                    style={styles.peopleImage}
+                    resizeMode="cover"
+                  />
+                )
+              ) : (
+                <Text style={styles.imageErrorText}>{t("no_image_available")}</Text>
+              )}
+            </View>
+
+            <Text style={styles.introMottoText}>
+              {introMottoText}
+            </Text>
           </View>
         </ScrollView>
-
-        <TouchableOpacity
-          style={styles.searchContainer}
-          onPress={() => navigation.navigate("Search")}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="search" size={moderateScale(20)} color="#BDBDBD" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t("search_placeholder")}
-            placeholderTextColor="#BDBDBD"
-            editable={false}
-            pointerEvents="none"
-          />
-        </TouchableOpacity>
       </SafeAreaView>
+
+      <TouchableOpacity
+        style={styles.searchContainer}
+        onPress={() => navigation.navigate("Search")}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="search" size={moderateScale(20)} color="#828282" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={t("search_placeholder")}
+          placeholderTextColor="#828282"
+          editable={false}
+          pointerEvents="none"
+        />
+      </TouchableOpacity>
 
       <TabBar activeTab={activeTab} onTabPress={setActiveTab} i18n={i18n} />
 
@@ -506,35 +514,24 @@ const Patsient_Home = () => {
             <TouchableWithoutFeedback>
               <View style={styles.specializationModalContent}>
                 <View style={styles.specializationModalHeader}>
-                                  <Doctor style={{margin:5}} size={moderateScale(24)} color="#0EB3EB" />
-
                   <Text style={styles.specializationModalTitle} numberOfLines={1} adjustsFontSizeToFit>
                     {t("selectSpecialization")}
                   </Text>
                   <TouchableOpacity style={styles.modalCloseButton} onPress={closeSpecializationModal}>
-                    <Ionicons name="close-circle-outline" size={moderateScale(28)} color="#0EB3EB" />
+                    <Ionicons name="close-circle" size={moderateScale(30)} color="#E0E0E0" />
                   </TouchableOpacity>
                 </View>
                 {loadingSpecializations ? (
                   <ActivityIndicator size="large" color="#0EB3EB" />
                 ) : (
-                  <ScrollView style={styles.specializationScrollView}>
-                    {availableSpecializations.map((spec) => (
-                      <TouchableOpacity
-                        key={spec.value}
-                        style={styles.specializationItem}
-                        onPress={() => handleSpecializationSelect(spec)}
-                      >
-                        <Text style={styles.specializationItemText} numberOfLines={2}>
-                          {t(spec.nameKey)}
-                        </Text>
-                        <View style={styles.goToButton}>
-                          <Text style={styles.goToButtonText}>{t("goTo")}</Text>
-                          <Ionicons name="play" size={moderateScale(14)} color="white" style={{ marginLeft: scale(5) }}/>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                  <FlatList
+                    data={availableSpecializations}
+                    renderItem={renderSpecializationItem}
+                    keyExtractor={(item) => item.value}
+                    numColumns={2}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.specializationGridContainer}
+                  />
                 )}
               </View>
             </TouchableWithoutFeedback>
@@ -557,17 +554,17 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     flexGrow: 1,
     alignItems: "center",
-    paddingBottom: TAB_BAR_HEIGHT + SEARCH_BAR_BOTTOM_OFFSET + verticalScale(52 + 10),
+    paddingBottom: TAB_BAR_HEIGHT + SEARCH_BAR_BOTTOM_OFFSET + verticalScale(52 + 20),
   },
   container: {
-    width: "100%",
+    width: containerWidth,
     alignItems: "center",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    width: containerWidth,
+    width: "100%",
     paddingVertical: verticalScale(10),
     zIndex: 10,
   },
@@ -577,7 +574,6 @@ const styles = StyleSheet.create({
   signOutContainer: {
     position: 'absolute',
     top: moderateScale(60),
-    transform: [{ translateX: -moderateScale(65) }],
     width: moderateScale(180),
     alignItems: 'center',
     justifyContent: 'center',
@@ -608,26 +604,30 @@ const styles = StyleSheet.create({
     marginLeft: scale(8),
   },
   languageButton: {
-    backgroundColor: "#0EB3EB",
-    borderRadius: moderateScale(10),
     paddingVertical: verticalScale(5),
     alignSelf: 'center',
     paddingHorizontal: scale(10),
+    backgroundColor: "#F0F0F0",
+    borderRadius: 555,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: 'row',
   },
   languageButtonContent: {
     flexDirection: "row",
     alignItems: "center",
+    color: "#0EB3EB",
   },
   languageText: {
     fontSize: moderateScale(14),
     fontFamily: "Mont-Bold",
-    color: "white",
     marginRight: scale(5),
+    color: "#0EB3EB",
   },
   notificationButton: {
     width: moderateScale(48),
     height: moderateScale(48),
-    backgroundColor: "rgba(14, 179, 235, 0.69)",
+    backgroundColor: "#F0F0F0",
     borderRadius: moderateScale(24),
     justifyContent: "center",
     alignItems: "center",
@@ -651,52 +651,63 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(10),
     fontFamily: 'Mont-Bold',
   },
-  mainContent: {
-    flex: 1,
-    alignItems: "center",
-    width: containerWidth,
+  welcomeHeader: {
+    width: '100%',
     paddingTop: verticalScale(20),
+    paddingBottom: verticalScale(20),
   },
-  specializationButton: {
-    backgroundColor: "#0EB3EB",
-    borderRadius: moderateScale(30),
-    paddingVertical: verticalScale(15),
-    paddingHorizontal: scale(20),
-    width: "90%",
-    alignItems: "center",
-    justifyContent: 'space-between',
-    flexDirection: "row",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  specializationText: {
-    fontSize: moderateScale(18),
+  welcomeTitle: {
+    fontSize: moderateScale(32),
     fontFamily: "Mont-Bold",
-    color: "white",
-    textAlign: 'center',
+    color: "#212121",
+  },
+  welcomeSubtitle: {
+    fontSize: moderateScale(18),
+    fontFamily: "Mont-Regular",
+    color: "#616161",
+    marginTop: verticalScale(4),
+  },
+  ctaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    padding: moderateScale(20),
+    borderRadius: moderateScale(20),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  ctaText: {
+    flex: 1,
+    fontSize: moderateScale(16),
+    fontFamily: "Mont-SemiBold",
+    color: "#212121",
+    marginLeft: scale(15),
   },
   doctorsImageContainer: {
-    marginTop: verticalScale(20),
+    marginTop: verticalScale(25),
     width: "100%",
-    aspectRatio: 14 / 10,
+    aspectRatio: 16 / 10,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    borderRadius: moderateScale(20), // Перенесено сюди
-    backgroundColor: "#F0F0F0", // Додано для кращого вигляду
+    borderRadius: moderateScale(20),
+    backgroundColor: "#E0E0E0",
   },
   peopleImage: {
     width: "100%",
     height: "100%",
   },
-  imageLoader: {
-  },
+  imageLoader: {},
   imageErrorText: {
     fontSize: moderateScale(16),
-    color: 'red',
+    color: '#616161',
     textAlign: 'center',
     fontFamily: 'Mont-Regular',
   },
@@ -705,10 +716,10 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Medium",
     color: "#424242",
     textAlign: "center",
-    marginHorizontal: scale(25),
+    marginHorizontal: scale(10),
     marginTop: verticalScale(25),
     marginBottom: verticalScale(30),
-    lineHeight: verticalScale(25),
+    lineHeight: verticalScale(26),
   },
   searchContainer: {
     position: 'absolute',
@@ -717,16 +728,20 @@ const styles = StyleSheet.create({
     transform: [{ translateX: -(width * 0.9) / 2 }],
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
+    backgroundColor: "#FFFFFF",
     borderRadius: moderateScale(30),
-    paddingHorizontal: scale(15),
+    paddingHorizontal: scale(20),
     width: width * 0.9,
     height: verticalScale(52),
     zIndex: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
   searchIcon: {
     marginRight: scale(10),
-    color: "#BDBDBD",
   },
   searchInput: {
     flex: 1,
@@ -738,15 +753,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(14, 179, 235, 0.1)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
   },
   languageModalContent: {
     backgroundColor: "white",
     borderRadius: moderateScale(20),
-    padding: moderateScale(20),
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(20),
     width: width * 0.8,
-    borderColor: "#0EB3EB",
-    borderWidth: 1,
     alignItems: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -755,9 +769,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalTitle: {
-    fontSize: moderateScale(22),
+    fontSize: moderateScale(20),
     fontFamily: "Mont-Bold",
-    marginBottom: verticalScale(20),
+    marginVertical: verticalScale(15),
     color: "#333",
   },
   languageOption: {
@@ -765,7 +779,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(14, 179, 235, 0.1)",
+    borderBottomColor: "#F0F0F0",
   },
   noBorder: {
     borderBottomWidth: 0,
@@ -775,7 +789,6 @@ const styles = StyleSheet.create({
     fontFamily: "Mont-Regular",
     color: "#333333",
   },
-   
   specializationModalContent: {
     backgroundColor: "white",
     borderRadius: moderateScale(20),
@@ -792,47 +805,47 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingBottom: verticalScale(15),
+    paddingBottom: verticalScale(10),
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#F0F0F0',
+    marginBottom: verticalScale(15),
   },
   specializationModalTitle: {
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(20),
     fontFamily: "Mont-Bold",
     color: "#333",
     flex: 1,
-    textAlign: 'center',
-    marginHorizontal: moderateScale(10),
+    textAlign: 'left',
+    marginLeft: moderateScale(10),
   },
   modalCloseButton: {
     padding: moderateScale(5),
   },
-  specializationScrollView: {
-    marginTop: verticalScale(10),
+  specializationGridContainer: {
+    paddingBottom: verticalScale(20),
   },
-  specializationItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F9F9F9",
-    borderRadius: moderateScale(10),
+  specializationGridItem: {
+    flex: 1,
+    margin: moderateScale(5),
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(15),
     padding: moderateScale(15),
-    marginBottom: verticalScale(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#EFEFEF'
+    borderColor: '#F0F0F0',
+    minHeight: verticalScale(80),
   },
-  goToButton: {
-    backgroundColor: "#0EB3EB",
-    borderRadius: moderateScale(20),
-    paddingVertical: verticalScale(8),
-    paddingHorizontal: scale(15),
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  goToButtonText: {
-    color: "white",
+  specializationGridText: {
     fontSize: moderateScale(14),
-    fontFamily: "Mont-Bold",
+    fontFamily: "Mont-SemiBold",
+    color: "#424242",
+    textAlign: 'center',
   },
 });
 

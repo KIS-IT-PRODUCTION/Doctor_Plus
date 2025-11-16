@@ -34,8 +34,7 @@ import { specializations } from './constant/specializations.js';
 import { Image } from 'expo-image';
 import { MotiView, AnimatePresence } from 'moti';
 import { getStyles } from './Anketa_Settings.styles.js';
-import { da } from "date-fns/locale";
-
+import { COLORS } from "./Anketa_Settings.styles.js";
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -623,7 +622,7 @@ useEffect(() => {
       <StatusBar barStyle="dark-content" backgroundColor="#F4F7F8" />
       <View style={styles.headerContainer}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Profile_doctor")}>
-          <Ionicons name="arrow-back" size={24} color="#212121" />
+          <Ionicons name="arrow-back" size={24} color="#0EB3EB" />
         </TouchableOpacity>
         <Text style={styles.title}>{t("doctor_profile_title")}</Text>
         <TouchableOpacity style={styles.languageDisplayContainer} onPress={openGeneralLanguageModal}>
@@ -820,12 +819,13 @@ useEffect(() => {
               </AnimatePresence>
             </Section>
 
-            <MotiView
+           <MotiView
               from={{ opacity: 0, translateY: 20 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{ type: 'timing', duration: 400, delay: 600 }}
               style={{width: '100%'}}
             >
+              {/* --- ПОЧАТОК ЗМІН (Умови використання) --- */}
               <View style={[styles.agreementContainer, fieldErrors.agreedToTerms && styles.inputError]}>
                 <Switch 
                   trackColor={{ false: "#767577", true: "#0EB3EB" }} 
@@ -836,10 +836,13 @@ useEffect(() => {
                   }} 
                   value={agreedToTerms} 
                 />
-                <Text style={styles.privacyPolicyText}>{t("i_agree_to")}</Text>
-                <Text style={styles.agreementText} onPress={() => navigation.navigate("PartnershipAgreementScreen")}> {t("terms_of_use")}</Text>
-                
+                <View style={styles.agreementTextContainer}>
+                  <Text style={styles.privacyPolicyText}>{t("i_agree_to")}</Text>
+                  <Text style={styles.agreementText} onPress={() => navigation.navigate("PartnershipAgreementScreen")}>{t("terms_of_use")}</Text>
+                </View>
               </View>
+              {/* --- КІНЕЦЬ ЗМІН --- */}
+              
               <AnimatePresence>
                 {fieldErrors.agreedToTerms && 
                   <MotiView from={{opacity: 0, translateY: -5}} animate={{opacity: 1, translateY: 0}}>
@@ -875,9 +878,9 @@ useEffect(() => {
               </TouchableOpacity>
             </MotiView>
             
-            <View style={{marginTop: 30, gap: 10, width: '100%'}}>
+           <View style={styles.buttonRowContainer}>
               <TouchableOpacity style={styles.signOutButton} onPress={confirmSignOut}>
-                <Ionicons name="log-out-outline" size={24} color="white" />
+                <Ionicons name="log-out-outline" size={22} color="#424242" />
                 <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
               </TouchableOpacity>
               
@@ -885,6 +888,7 @@ useEffect(() => {
                 style={styles.deleteProfileButton} 
                 onPress={handleOpenDeleteModal}
               >
+                <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
                 <Text style={styles.deleteProfileButtonText}>{t("deleteProfile_title")}</Text>
               </TouchableOpacity>
             </View>

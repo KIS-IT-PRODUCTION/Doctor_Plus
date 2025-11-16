@@ -29,15 +29,6 @@ import ConsultationCompletionModal from "../../components/ConsultationCompletion
 
 const { width, height } = Dimensions.get("window");
 
-// РЕКОМЕНДАЦІЯ: Перенесіть цей блок у ваш головний файл App.js для глобального налаштування
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) =>
@@ -58,7 +49,6 @@ export default function Message() {
     useState(null);
 
   const notificationReceivedListener = useRef(null);
-  const notificationResponseListener = useRef(null);
   const locale = i18n.language === "uk" ? uk : enUS;
 
   const handleBackPress = () => {
@@ -199,21 +189,10 @@ export default function Message() {
         }
       });
 
-    notificationResponseListener.current =
-      Notifications.addNotificationResponseReceivedListener(() => {
-        if (currentDoctorUserId) {
-          fetchMessagesFromSupabase(currentDoctorUserId, true);
-        }
-      });
-
     return () => {
       if (notificationReceivedListener.current)
         Notifications.removeNotificationSubscription(
           notificationReceivedListener.current
-        );
-      if (notificationResponseListener.current)
-        Notifications.removeNotificationSubscription(
-          notificationResponseListener.current
         );
     };
   }, [currentDoctorUserId, fetchMessagesFromSupabase]);
@@ -348,7 +327,6 @@ export default function Message() {
             : t("booking_rejected_successfully_message")
         );
         
-        // Оновлення стану повідомлення в UI та Supabase
         const updatedRawData = { ...message.rawData, status: newStatus, patient_id: patientId, booking_date: bookingDate, booking_time_slot: bookingTimeSlot, consultation_duration_minutes: consultationDurationMinutes };
         setMessages((prev) =>
           prev.map((msg) =>
@@ -470,7 +448,6 @@ export default function Message() {
 
       Alert.alert(t("success"), t("meet_link_sent_successfully"));
       
-      // Оновлення стану повідомлення в UI та Supabase
       const updatedData = { ...message.rawData, meet_link: meetLink, patient_id: patientId, booking_id: bookingId };
       setMessages((prev) =>
         prev.map((msg) =>
@@ -549,14 +526,13 @@ export default function Message() {
         const responseText = await response.text();
         if (!response.ok) throw new Error(`Edge Function error: ${responseText}`);
         
-        // Оновлення стану повідомлення в UI та Supabase
         const updatedRawData = {
             ...message.rawData,
             status_meet: true, 
             consultation_conducted: consultationConducted,
             consultation_started_on_time: consultationStartedOnTime,
             doctor_feedback: doctorFeedback,
-            patient_id: patientId, // Ensure patient_id is included for consistency
+            patient_id: patientId,
             booking_date: bookingDate,
             booking_time_slot: bookingTimeSlot,
         };
@@ -602,7 +578,7 @@ export default function Message() {
       <StatusBar barStyle="dark-content" backgroundColor="#f0f2f5" />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate("Profile_doctor")}>
-          <Ionicons name="arrow-back" size={24} color="#212121" />
+          <Ionicons name="arrow-back" size={24} color="#0EB3EB" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("messages_screen.header_title")}</Text>
         <View>
@@ -822,11 +798,11 @@ export default function Message() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f0f2f5", paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10, },
+  safeArea: { flex: 1, backgroundColor: "#f0f2f5",     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+ },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: moderateScale(16), paddingVertical: verticalScale(2), backgroundColor: "#f0f2f5", },
-  backButton: { backgroundColor: "#FFFFFF", borderRadius: moderateScale(25),     width: 48,
+  backButton: { backgroundColor: "#F0F0F0", borderRadius: moderateScale(25),     width: 48,
     height: 48, justifyContent: "center", alignItems: "center", },
   headerTitle: { fontFamily: "Mont-SemiBold", fontSize: moderateScale(20), color: "#333", },
   messageList: { padding: moderateScale(16), paddingBottom: verticalScale(100), },

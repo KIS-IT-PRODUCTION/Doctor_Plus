@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: "rgb(14, 180, 235)",
+    backgroundColor: "#F0F0F0",
     flexDirection: "row",
     zIndex: 1,
     alignItems: "center",
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   languageButtonText: {
     fontSize: 15,
     fontWeight: "bold",
-    color: "white",
+    color: "#0EB3EB",
     marginRight: 8,
   },
   headerTitle: {
@@ -194,10 +194,10 @@ const styles = StyleSheet.create({
     right: 0,
   },
   notificationButton: {
-    width: width * 0.12,
-    height: width * 0.12,
-    backgroundColor: "rgb(14, 180, 235)",
-    borderRadius: width * 0.06,
+    width: moderateScale(48),
+    height: moderateScale(48),
+    backgroundColor: "#F0F0F0",
+    borderRadius: moderateScale(24),
     justifyContent: "center",
     alignItems: "center",
   },

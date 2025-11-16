@@ -946,7 +946,7 @@
     "status_paid_title": "Оплачено",
     "status_confirmed_title": "Підтверджено",
     "status_rejected_title": "Відхилено",
-  "deleteProfile_title": "Видалити профіль",
+  "deleteProfile_title": "Видалити",
   "pay_and_hold_funds": "Підьвердити",
   "funds_are_held": "Кошти утримуються",
   "paid_successfully": "Оплачено успішно",
@@ -990,5 +990,7 @@
   "error_user_not_found": "Користувача не знайдено",
   "error_too_many_requests": "Забагато спроб входу. Спробуйте пізніше",
   "error_network_failed": "Помилка мережі",
-  "error_unknown_login": "Невідома помилка"
+  "error_unknown_login": "Невідома помилка",
+  "hello": "Привіт",
+  "how_are_you_feeling": "Як ви себе почуваєте?"
 }

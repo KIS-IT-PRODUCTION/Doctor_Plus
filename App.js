@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Platform,
   AppState, 
+  Alert,
 } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -17,6 +18,7 @@ import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import "./i18n";
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from "react-i18next"; 
+import Constants from 'expo-constants'; 
 
 import ChooseSpecial from "./app/ChooseSpecial";
 import LoginScreen from "./app/LoginScreen";
@@ -68,12 +70,114 @@ function RootNavigator() {
   const [hasNavigatedInitially, setHasNavigatedInitially] = useState(false);
   const appState = useRef(AppState.currentState); 
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
+  const notificationListener = useRef();
+  const responseListener = useRef();
 
-      appState.current = nextAppState;
+  const handleNotificationNavigation = (response) => {
+    console.log("RootNavigator: Обробка натискання сповіщення. Роль:", userRole);
+    if (!navigationRef.current || !userRole) {
+      console.log("RootNavigator: Навігація не готова або роль невідома. Навігацію скасовано.");
+      return;
+    }
+    
+    if (userRole === 'doctor') {
+      console.log("RootNavigator: Перехід на 'Messege' (лікар)");
+      navigationRef.current.navigate('Messege');
+    } else if (userRole === 'patient') {
+      console.log("RootNavigator: Перехід на 'PatientMessages' (пацієнт)");
+      navigationRef.current.navigate('PatientMessages');
+    }
+  };
+
+  async function registerForPushNotificationsAsync() {
+    let token;
+    
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Загальні сповіщення',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        sound: 'default',
+      });
+    }
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      Alert.alert('Помилка', 'Не вдалося отримати дозвіл на push-сповіщення!');
+      return;
+    }
+
+    try {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      if (!projectId) {
+        console.error("Push Notifications: projectId не знайдено в extra.eas.projectId");
+        Alert.alert("Помилка конфігурації", "Не вдалося знайти projectId для сповіщень.");
+        return;
+      }
+
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      console.log("RootNavigator: Отримано ExpoPushToken:", token);
+
+    } catch (e) {
+      console.error("RootNavigator: Помилка отримання ExpoPushToken:", e);
+      Alert.alert("Помилка", "Не вдалося отримати токен для сповіщень.");
+    }
+
+    return token;
+  }
+
+  useEffect(() => {
+    if (session && session.user && userRole) {
+      console.log("RootNavigator: Користувач увійшов. Реєстрація для push-сповіщень...");
+      registerForPushNotificationsAsync();
+    }
+  }, [session, userRole]); 
+
+  useEffect(() => {
+    if (!isNavigationReady || !userRole) {
+      return;
+    }
+    console.log("RootNavigator: Налаштування слухачів сповіщень для ролі:", userRole);
+
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) {
+        console.log("RootNavigator: Додаток запущено з закритого стану сповіщенням.");
+        handleNotificationNavigation(response);
+      }
     });
 
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log("RootNavigator: Отримано відповідь на сповіщення (додаток у фоні/відкритий).");
+      handleNotificationNavigation(response);
+    });
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log("RootNavigator: Сповіщення отримано, коли додаток відкритий:", notification.request.content.title);
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, [isNavigationReady, userRole]); 
+
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      appState.current = nextAppState;
+    });
     return () => {
       subscription.remove();
     };
@@ -201,6 +305,14 @@ export default function App() {
           "Mont-SemiBold": require("./assets/Font/static/Montserrat-SemiBold.ttf"),
         });
         console.log("App.js: Шрифти завантажені.");
+
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+          }),
+        });
 
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {

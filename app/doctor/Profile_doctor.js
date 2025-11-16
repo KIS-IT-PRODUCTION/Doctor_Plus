@@ -869,7 +869,7 @@ const handleLanguageSelect = async (langCode) => {
                 <Text style={styles.languageButtonText}>
                   {(finalDoctorData.language || i18n.language).toUpperCase()}
                 </Text>
-              <Ionicons name="globe-outline" size={16} color="white" />
+              <Ionicons name="globe-outline" size={16} color="#0EB3EB" />
             </TouchableOpacity>
 
             <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
@@ -878,7 +878,7 @@ const handleLanguageSelect = async (langCode) => {
                 style={styles.notificationButton}
                 onPress={() => navigation.navigate("Messege")}
               >
-                 <Ionicons name="mail-outline" size={24} color="white" />
+                 <Ionicons name="mail-outline" size={24} color="#0EB3EB" />
                   {unreadNotificationsCount > 0 && (
                     <View style={styles.notificationBadge}>
                       <Text style={styles.notificationNumber}>

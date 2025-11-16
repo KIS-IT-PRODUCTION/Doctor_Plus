@@ -960,5 +960,7 @@
   "profile_deleted": "Profile Deletion",
   "select_consultation_cost_placeholder": "Select consultation cost",
   "statusDraftTitle": "Profile Draft",
-  "statusDraftDetails": "Your profile is currently in draft status. Please complete all required fields and submit it for review to make it visible to patients."
+  "statusDraftDetails": "Your profile is currently in draft status. Please complete all required fields and submit it for review to make it visible to patients.",
+  "hello": "Hello!",
+  "how_are_you_feeling": "How are you feeling today?"
 }

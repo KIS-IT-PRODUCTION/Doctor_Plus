@@ -18,13 +18,12 @@ import { useTranslation } from "react-i18next";
 import { useNavigation } from "@react-navigation/native";
 import Icon from "../assets/icon.svg";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "../providers/supabaseClient"; // *** Перевірте цей шлях ***
+import { supabase } from "../providers/supabaseClient";
 
 const WriteReview = () => {
   const { t } = useTranslation();
   const navigation = useNavigation();
 
-  // Змінено 'title' на 'userFullName' для вводу ПІБ
   const [userFullName, setUserFullName] = useState("");
   const [reviewText, setReviewText] = useState("");
   const [rating, setRating] = useState(0);
@@ -45,7 +44,6 @@ const WriteReview = () => {
   };
 
   const handleSubmit = async () => {
-    // Валідація: перевіряємо, що ПІБ та відгук не порожні, і оцінка поставлена
     if (!userFullName.trim() || !reviewText.trim() || rating === 0) {
       Alert.alert(t("writeReview.validationErrorTitle"), t("writeReview.validationErrorMessage"));
       return;
@@ -62,11 +60,6 @@ const WriteReview = () => {
         return;
       }
 
-      // Отримання імені користувача з профілю, але його ми вже не використовуємо для відображення
-      // Це може бути корисно для внутрішніх перевірок, але не обов'язково зберігати в user_name
-      // оскільки userFullName буде використовуватись для відображення
-      // Якщо ви все ще хочете зберігати full_name з таблиці profiles в user_name, залиште цей блок.
-      // Якщо ні, його можна видалити, і user_name буде просто user.id
       let userNameFromProfile = null;
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -81,12 +74,11 @@ const WriteReview = () => {
       }
 
       const { data, error } = await supabase
-        .from('app_reviews') // Ваша таблиця відгуків
+        .from('app_reviews')
         .insert([
           {
             user_id: user.id,
-            // user_name: userNameFromProfile || user.email || `User_${user.id.substring(0, 8)}`, // Це поле тепер може бути необов'язковим або використовуватись для іншого
-            user_name: userFullName.trim(), // Зберігаємо введене користувачем ПІБ в user_name
+            user_name: userFullName.trim(),
             description: reviewText.trim(),
             rating: rating,
           },
@@ -98,7 +90,6 @@ const WriteReview = () => {
       } else {
         console.log("Review submitted successfully:", data);
         Alert.alert(t("writeReview.success"), t("writeReview.submitSuccess"));
-        // Очистити форму
         setUserFullName("");
         setReviewText("");
         setRating(0);
@@ -124,13 +115,12 @@ const WriteReview = () => {
     >
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress} disabled={loading}>
-          <Ionicons name="arrow-back" size={24} color="black" />
+          <Ionicons name="arrow-back" size={24} color="#0EB3EB" />
         </TouchableOpacity>
         <Icon width={50} height={50} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        {/* Поле для вводу ПІБ */}
         <Text style={styles.label}>{t("writeReview.fullNameLabel")}</Text>
         <TextInput
           style={styles.input}
@@ -141,7 +131,6 @@ const WriteReview = () => {
           editable={!loading}
         />
 
-        {/* Поле для опису відгуку */}
         <Text style={styles.label}>{t("writeReview.reviewTextLabel")}</Text>
         <TextInput
           style={styles.textArea}
@@ -155,7 +144,6 @@ const WriteReview = () => {
           editable={!loading}
         />
 
-        {/* Поле для рейтингу */}
         <Text style={styles.label}>{t("writeReview.yourRatingLabel")}</Text>
         {renderStars()}
 
@@ -195,7 +183,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 15,
-    backgroundColor: "rgba(14, 179, 235, 0.2)",
+    backgroundColor: "#F0F0F0",
     borderRadius: 25,
     width: 48,
     height: 48,

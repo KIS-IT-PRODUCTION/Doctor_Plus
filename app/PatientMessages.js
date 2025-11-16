@@ -280,7 +280,7 @@ const handleConfirmConsultation = useCallback(async (bookingId) => {
       <StatusBar barStyle="dark-content" backgroundColor="#F5F7FA" />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={moderateScale(24)} color="#000" />
+          <Ionicons name="arrow-back" size={moderateScale(24)} color="#0EB3EB" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('header_title')}</Text>
         <View style={styles.headerIconContainer}>
@@ -418,7 +418,7 @@ const handleConfirmConsultation = useCallback(async (bookingId) => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 10, backgroundColor: '#F5F7FA' },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: moderateScale(15), paddingVertical: verticalScale(5) },
-  backButton: { backgroundColor: "rgba(14, 179, 235, 0.2)", borderRadius: moderateScale(25), width: moderateScale(48), height: moderateScale(48), justifyContent: "center", alignItems: "center" },
+  backButton: { backgroundColor: "#F0F0F0", borderRadius: moderateScale(25), width: moderateScale(48), height: moderateScale(48), justifyContent: "center", alignItems: "center" },
   headerTitle: { fontFamily: "Mont-SemiBold", fontSize: moderateScale(20), color: "#333" },
   headerIconContainer: { width: moderateScale(50), height: moderateScale(50), justifyContent: 'center', alignItems: 'center' },
   loadingOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7FA' },

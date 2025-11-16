@@ -1,6 +1,6 @@
 import { StyleSheet, Platform, StatusBar } from 'react-native';
 
-const COLORS = {
+ export const COLORS = {
   primary: '#0EB3EB',
   background: '#F4F7F8',
   card: '#FFFFFF',
@@ -23,7 +23,7 @@ export const getStyles = () => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 1 : 10,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -280,14 +280,21 @@ export const getStyles = () => StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.transparent,
   },
+  agreementTextContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    flex: 1,
+    marginLeft: 8,
+    alignItems: 'center',
+  },
   agreementText: {
     fontSize: 14,
     lineHeight: 18,
     fontFamily: "Mont-Regular",
     color: "#337AB7",
-    flexShrink: 1,
+    marginLeft: 4, 
   },
-  privacyPolicyText: {
+privacyPolicyText: {
     fontSize: 14,
     lineHeight: 18,
     color: "black",
@@ -309,43 +316,7 @@ export const getStyles = () => StyleSheet.create({
     fontSize: 18,
     fontFamily: "Mont-Bold",
   },
-  signOutButton: {
-    backgroundColor: COLORS.darkRed,
-    borderRadius: 30,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    marginTop: 16,
-  },
-  signOutButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontFamily: "Mont-Bold",
-    marginLeft: 8,
-  },
-  deleteProfileButton: {
-    backgroundColor: COLORS.transparent,
-    borderRadius: 555,
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.danger,
-  },
-  deleteProfileButtonText: {
-    color: COLORS.danger,
-    fontSize: 18,
-    fontFamily: "Mont-Bold",
-  },
+
   centeredView: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -525,8 +496,50 @@ export const getStyles = () => StyleSheet.create({
     borderRadius: 8,
     fontSize: 16,
     lineHeight: 28,
+  },signOutButton: {
+    flex: 1,
+    backgroundColor: COLORS.transparent,
+    borderRadius: 30,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#B0BEC5', 
+  },
+  signOutButtonText: {
+    color: '#424242',
+    fontSize: 16,
+    fontFamily: "Mont-Bold",
+    marginLeft: 8,
+  },
+  deleteProfileButton: {
+    flex: 1,
+    backgroundColor: COLORS.transparent,
+    borderRadius: 30,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    flexDirection: 'row',
   },
   deleteButton: {
     backgroundColor: COLORS.darkRed,
-  }
+  },
+  deleteProfileButtonText: {
+    color: COLORS.danger,
+    fontSize: 16, 
+    fontFamily: "Mont-Bold",
+    marginLeft: 8,
+  },
+  buttonRowContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 30,
+    marginBottom: 70,
+    gap: 15,
+  },
 });

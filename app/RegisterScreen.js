@@ -388,6 +388,7 @@ const getStyles = (insets) => StyleSheet.create({
     alignItems: 'center',
     paddingTop: insets.top + 60,
     paddingBottom: insets.bottom + 20,
+    justifyContent: 'center', // Додано для центрування
   },
   backButton: {
     position: 'absolute',
