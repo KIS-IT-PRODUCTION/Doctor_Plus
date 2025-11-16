@@ -5,7 +5,7 @@ export default {
     "name": "Doctor Plus",
     "slug": "DOCTOR",
     "scheme": "doctor",
-    "version": "1.0.1",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
