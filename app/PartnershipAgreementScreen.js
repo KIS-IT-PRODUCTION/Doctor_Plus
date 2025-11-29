@@ -1,5 +1,4 @@
-
-    import React from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -36,7 +35,7 @@ const PartnershipAgreementScreen = () => {
     navigation.goBack();
   };
 
-  // --- УВАГА: ЗАМІНІТЬ ЦІ ЗНАЧЕННЯ НА РЕАЛЬНІ ДАНІ ВАШОЇ КОМПАНІЇ ---
+  // --- ДАНІ КОМПАНІЇ ---
   const appName = "DoctorPlus App"; 
   const companyNameUk = "ТОВ «МЕДИЧНИЙ ЦЕНТР «ДОВІРА»";
   const companyNameEn = "LLC «DOVIRA MEDICAL CENTER»";
@@ -63,15 +62,14 @@ const PartnershipAgreementScreen = () => {
       .replace(/____________________/g, currentCompanyAddress)
       .replace(/Support@_________.me/g, companyEmail)
       .replace(/адресу___________/g, companyEmail)
-      .replace(/за телефоном за номером __________/g, companyPhone)
-      .replace(/співвіднести мовну/g, 'співвіднести мовну')
-      .replace(/виключно в межах, дозволених/g, 'виключно в межах, дозволених')
-      .replace(/Зоофільні/g, 'зоофільні');
+      .replace(/за телефоном за номером __________/g, companyPhone);
   };
 
+  // --- ТЕКСТ ДОГОВОРУ ---
+  // Використовуйте **текст** щоб зробити його жирним
   const agreementText = {
     uk: `
-  Будь ласка, уважно прочитайте всі положення даного Договору та переконайтеся, що Ви їх зрозуміли. Вам буде запропоновано погодитися (акцептувати) з даним публічним Договором, перш ніж зареєструватися у Застосунку. Якщо Ви відмовляєтесь прийняти умови Договору, Ви не зможете зареєструватися і використовувати Застосунок. Компанія залишає за собою право змінювати положення даного Договору в порядку, передбаченому даним Договором. Компанія вважає, що безпека та конфіденційність Вашої інформації є найважливішою.
+Будь ласка, уважно прочитайте всі положення даного Договору та переконайтеся, що Ви їх зрозуміли. Вам буде запропоновано погодитися (акцептувати) з даним публічним Договором, перш ніж зареєструватися у Застосунку. Якщо Ви відмовляєтесь прийняти умови Договору, Ви не зможете зареєструватися і використовувати Застосунок. Компанія залишає за собою право змінювати положення даного Договору в порядку, передбаченому даним Договором. Компанія вважає, що безпека та конфіденційність Вашої інформації є найважливішою.
   
   **ДОГОВІР ПУБЛІЧНОЇ ОФЕРТИ**
   Цей документ є пропозицією укласти Договір на викладених нижче умовах з будь-якою особою, якою прийняті (акцептовані) умови цієї публічної оферти. Особа беззаперечно приймає умови Договору, шляхом проставлення нею відповідної відмітки на сторінці реєстрації. Фактичне використання Застосунку також є згодою особи із цим Договором та прийняттям його умов. Договір має характер публічної оферти відповідно до чинного законодавства України (ст. ст. 633, 634, 641, 642 Цивільного Кодексу України), умови даного Договору є однаковими та обов’язковими для всіх та застосовуються до всіх послуг, які надаються у Застосунку та усіх відносин між Користувачами та Виконавцями, а також між Користувачами, Виконавцями та Компанією.
@@ -316,259 +314,230 @@ const PartnershipAgreementScreen = () => {
   12.8. Усі повідомлення до Компанії повинні бути надані Користувачем в письмовій формі на адресу, зазначену в Договорі. Компанія може направляти повідомлення Користувачеві на вказану ним електронну або поштову адресу, яку він зазначає під час реєстрації у Застосунку.
   12.9. Якщо будь-яке положення Договору визнано недійсним, всі інші положення залишаються незмінними та дійсними.
   12.10. Будь-які питання щодо Договору або використання Застосунку Користувачі можуть надіслати електронною поштою на адресу ${companyEmail}, або зв’язавшись за телефоном ${companyPhone} сім днів на тиждень з 9:00 до 20:00.
-  
   `,
     en: `
-  Please read all the terms of this Agreement carefully and make sure you understand them. You will be asked to agree to (accept) this Public Agreement before registering in the Application. If you refuse to accept the terms of the Agreement, you will not be able to register and use the Application. The Company reserves the right to change the terms of this Agreement in the manner prescribed by this Agreement. The Company believes that the security and confidentiality of your information is of the utmost importance.
-  
-  **PUBLIC OFFER AGREEMENT**
-  This document is an offer to conclude an Agreement on the terms set forth below with any person who accepts the terms of this public offer. A person unconditionally accepts the terms of the Agreement by making a corresponding mark on the registration page. The actual use of the Application is also the person's consent to this Agreement and acceptance of its terms. The Agreement is a public offer in accordance with the current legislation of Ukraine (Articles 633, 634, 641, 642 of the Civil Code of Ukraine), the terms of this Agreement are the same and binding for everyone and apply to all services provided in the Application and all relations between Users and Performers, as well as between Users, Performers and the Company.
-  
-  **1. TERMS AND DEFINITIONS**
-  In this Agreement, concepts and definitions have the meanings set out below:
-  "APPLICATION" - a set of software, data, payment tools and access to information contained in the Application to meet the needs of Patients in the Services provided by the Performers.
-  "AGREEMENT" - this public agreement, including all annexes, changes and additions to it that may be added to the Agreement after the User joins it.
-  "GENERAL DATABASE" - a set of data of all Users who have registered in the Application. The General Database can be used for statistical reporting, but without violating the confidentiality of Users' data.
-  "REQUEST" - a Patient's request for the provision of a Service.
-  "SERVICE" - any Information, Medical and other service provided by the Performer to the Patient under the Agreement.
-  "INFORMATION SERVICES" - services provided by the Performer to the Patient, including, but not limited to: providing information about Doctors, their qualifications, their work schedule, the address of the Doctor's office, the cost of medical services, the cost of medical insurance, the terms of medical insurance; making an electronic appointment, etc.
-  "USER" - a person, including a Patient and/or Performer, who has voluntarily registered in the Application, and accepted all terms and conditions.
-  "PATIENT" - a fully capable individual who voluntarily uses the Application to meet his/her needs or the needs of an incapacitated person represented by such person, for the purpose of receiving Information, Medical and other services provided by the Performers.
-  "PERFORMER" - a Doctor or a Health Care Institution who provides Services to the Patient using the Application.
-  "HCI" (Health Care Institution) - a Performer who is a legal entity of any form of ownership and organizational and legal form or its separate subdivision that provides medical care to the population on the basis of a relevant license and the professional activities of medical (pharmaceutical) workers.
-  "DOCTOR" - an individual or an individual entrepreneur who has the qualification of a medical specialist, is engaged in the maintenance or restoration of human health by preventing (prophylaxis), recognizing (diagnosing) and treating diseases and injuries, provides Medical, Information and other types of services to Patients using the Application, and who is in an employment (or civil law) relationship with a certain HCI, or is a registered individual entrepreneur and has obtained a license to practice medical practice in the manner prescribed by law.
-  "MEDICAL SERVICES" - services that are directly or indirectly related to medical consultation and/or treatment of the Patient, using the means of the Application in the Telemedicine format in accordance with the legislation governing the relationship of the parties in this area, while ensuring the preservation of medical secrecy and confidentiality, the integrity of medical information about the Patient's health and other information provided by the Patient.
-  "OTP" (One Time Password) - is a one-time password that provides a level of security when working with the Application, is valid only for one User identification session and whose validity may be limited to a certain period of time.
-  "PATIENT'S PERSONAL ACCOUNT" - an electronic interface for accessing the Application, which the Patient accesses using personal access identifiers (login, password, ECP, OTP, SMS messages). The patient's personal account does not contain the Personal Data of the Patient and other persons (if necessary). The Application does not have access to Information (documents) that are provided from the Patient to the Performer.
-  "DOCTOR'S PERSONAL ACCOUNT" - an electronic interface for accessing the Application, which the Doctor accesses using personal access identifiers (login, password, ECP, OTP, SMS messages). The Doctor's personal account contains the Doctor's Personal Data and may contain other data (information about the cost of providing Services, the address of the patient's reception location, etc.), which are entered by the Doctor himself/herself.
-  "PD" - personal data of the Users of the Application.
-  "TELEMEDICINE" - a set of actions, technologies and measures that are used to provide medical care using remote communication tools such as telephone, audio, video or in the form of exchanging electronic messages, including using the Application.
-  "TELEMEDICINE CONSULTATION" - the provision of medical care to a Patient by a Doctor using Telemedicine. When providing Medical Services, including using Telemedicine, compliance with the requirements of the legislation of Ukraine on the protection of Personal Data and adherence to the norms of ethics and deontology of providing medical care is ensured.
-  "PAYMENT SERVICE" - a set of contractual relationships for the provision of payment services, which consist in ensuring the settlements for Services. The Payment Service is provided by a licensed financial institution with which Users independently enter into relevant agreements. The Company is not bound by obligations with such a financial institution to ensure and/or control the Payment Service and is not responsible for the performance of its obligations.
-  "LEGISLATION" - the legislation of Ukraine in force at the time the User joins the Agreement, with subsequent changes at the time of the User's authentication when the User makes the next connection (login) to the Application or at the time a dispute arises.
-  "RIGHTS" - the exclusive intellectual property rights of the Company regarding the Application.
-  "OBJECTS" - objects of exclusive intellectual property rights, including, but not limited to, the following: objects of copyright (program code, texts, images, videos), objects of industrial property (trademarks for goods and services, layouts, labels, design), which are contained, presented, will be presented, used in the Application and related to its functioning.
-  "COMPANY" - LLC "MEDICAL CENTER "DOVIRA", USREOU code: 37195461, legal address: Ukraine, 04213, Kyiv city, HEROIV STALINGRADU PROSPECT, building 44, apartment 423, registered in accordance with the current legislation of Ukraine, the owner of the Rights to the Application, who acts independently or with the involvement of third parties and provides Users with a license (permission) to use the Application.
-  The concepts and definitions listed in this section are used in the specified meanings, regardless of whether they are used in the singular or plural, whether they are written in capital or lowercase letters, except in cases where the content of a specific article or paragraph of the Agreement does not directly imply a different meaning. Other concepts and terms used in the Agreement have a meaning based on generally accepted interpretations or in accordance with the meanings established by the Legislation.
-  
-  **2. SUBJECT OF THE AGREEMENT**
-  2.1. The Company grants the User a non-exclusive license (permission) to use the Application for its functional purpose as an end user, and the User uses the Application in accordance with the terms of the Agreement.
-  2.2. Scope of the Patient's rights to use the Application.
-  The Patient has the right to use the Application within the limits permitted by the Company, including:
-  - entering the Application after downloading it to a device;
-  - using the functionality of the Application in compliance with the terms of the Agreement;
-  - creating a Patient's Personal Account, entering his/her data into it and changing it;
-  - receiving Services from Performers through the Application, including medical care using Telemedicine;
-  - using other functionality that is designated as available to Patients in the Application.
-  2.3. Scope of the Performer's rights to use the Application.
-  The Performer has the right to use the Application within the limits permitted by the Company, including:
-  - entering the Application after downloading it to a device;
-  - using the functionality of the Application in compliance with the terms of the Agreement;
-  - creating a Doctor's Personal Account, entering his/her data into it and changing it;
-  - providing Services to Patients through the Application, including medical care using Telemedicine;
-  - using other functionality that is designated as available to Performers in the Application.
-  
-  **3. SPECIAL PROVISIONS**
-  3.1. The Application is a communication platform between Performers and Patients, which is designed to facilitate and ensure the provision of Services by Performers with the consent and at the request of the Patient. The responsibility for the quality, effectiveness, compliance, results, and cost of providing the Services rests solely with the Performers and Patients who use the Application at their own risk and discretion.
-  3.2. The Company does not provide any Medical Services, medical care, treatment, emergency, urgent medical care or any services that result in the provision of medical care and/or diagnosis to the Patient or any third party and has no relation to, and is not responsible for, any Services received by the Patient from the Performer.
-  3.3. The Company is not responsible for the consequences caused by the User providing incomplete, inaccurate information; or by the Users disclosing their confidential information to third parties (including providing their password, login).
-  3.4. The Patient understands that, given the specifics of the Telemedicine format, the Services are provided by the Performer based on the symptoms described and transmitted by the Patient. An inaccurate or incomplete description of the symptoms by the Patient may lead to a level of effectiveness of the Services that may not meet the Patient's expectations.
-  3.5. The Application provides the opportunity to use and receive Medical Services in the form of Telemedicine, taking into account the technical capabilities of the Performer, within the framework of the Legislation.
-  3.6. The Company is not responsible for the consequences caused by differences between the rules of the healthcare system in Ukraine and the healthcare systems in other countries. The Company is not responsible for the use of the Application or access to the Application by Performers and/or Patients in a country where it is illegal.
-  3.7. Any interaction of the User with the Application means the unconditional consent of the User to all points of this Agreement. Such interaction with the Application is a full and unconditional acceptance of this Agreement. Incomplete awareness of the terms of this Agreement does not exempt the User from liability for non-compliance with its terms.
-  3.8. The Company reserves the right to change and supplement the procedure for providing Services in the Application, the list and sequence of actions of Users for using the Application, etc. The specified changes and additions are made to the Agreement, of which the User is notified in advance by posting a corresponding message in the Application. The User's access to the Application after the posting of such changes and additions in the relevant section of the Application is an indication that the User agrees to the amended terms.
-  3.9. If the User does not agree with any of the terms of this Agreement and/or does not agree to comply with the terms of this Agreement (or a new version of the Agreement), he/she is obliged to immediately stop using the Application.
-  3.10. The User is responsible for obtaining access to the data transmission network required to use the Application. When using the Application via a wireless device, the relevant communication service providers may charge a fee for sending SMS and data transmission at the rates of the mobile network, as well as a fee for telecommunication services, communication services, etc.
-  3.11. The Application is intended for use by persons located on the territory of Ukraine. The Company does not guarantee the compliance of the Application and the procedure for its use with the legislation of other countries or international (interstate) organizations that are not part of the legislation of Ukraine, in case the Application is used by Users who are permanently or temporarily on the territory of countries other than Ukraine.
-  
-  **4. GRANTING ACCESS TO THE APPLICATION**
-  **REGISTRATION AND ACCESS**
-  4.1. User registration is free, voluntary and is carried out in the Application after the Application is downloaded to a device.
-  4.2. The right to use the Application for the purpose of receiving Services is granted to persons who have reached the age of 18 and have full legal capacity.
-  4.3. If the User is not a citizen of Ukraine, he/she understands that the Company provides access to the Application to Doctors who have the appropriate qualifications, and it may refuse access to the Application if there are doubts about the qualifications of the relevant foreign specialist.
-  4.4. The Patient may use the Application and receive Services for the benefit of persons for whom he/she acts as a legal representative (one of the parents of a minor/underage person, guardian, trustee). In such a case, such a Patient, when using the Application, including during the registration of such persons, guarantees and confirms that he/she has all the rights of a legal representative, including the right to provide, enter, and disseminate personal information about these persons, and is responsible for such actions in accordance with the current legislation. The Company is not responsible for any consequences in the event of illegal provision/dissemination/disclosure of such information by persons who did not have the right to do so.
-  4.5. After the User registers in the Application, he/she will be provided with a user identification code, password or other part of the information as part of the security procedure of the Application and User data. The User understands and agrees that such information is confidential and is not subject to disclosure to any third parties.
-  4.6. In order to access the Patient's Personal Account, the Patient is obliged to perform the identification actions requested by the Application by entering an email address and mobile phone number and confirming them using an OTP.
-  4.7. In order to access the Doctor's Personal Account, the Doctor is obliged to perform the identification actions requested by the Application by entering an email address and mobile phone number and confirming them using an OTP.
-  4.8. The Company may establish the following methods of accessing the Patient's Personal Account and the Doctor's Personal Account (after registering in the Application): by entering a login and password, or by entering an OTP via SMS message (according to the rates of the Patient's mobile operator), or in another way at the discretion of the Company.
-  4.9. The Company authorizes and grants access to the Application to the Performer only if there is evidence of proper qualifications or a license. For the purpose of the relevant verification of the Performer, the Company has the right, during the registration/authorization process of the Performer, to require him/her to provide copies of licenses, certificates, diplomas and any other documents. The Company has the right to verify the validity of the documents provided by the Performer during registration/authorization. The Company has the right to verify the qualifications of the Performer during the period of his/her use of the Application. The Company has the right to block the access of any Performer to the Application at any time without warning if there are doubts about the validity and/or sufficiency of the evidence of the Performer's education and qualifications. The Company is not obliged, but has the right to require the Performer to provide information about his/her legal status (the existence of employment relations of the Doctor with the HCI, the status of an individual entrepreneur, the availability of a license, certificates, etc.).
-  4.10. The Company has the right at any time without warning and without explaining such actions, to revoke the license (access) to use the Application by the User and to disable any User identification code or password chosen by the User or assigned by the Application to access the Application, if the Company has any doubts or is convinced that the User is violating the terms of the Agreement or is using the Application in violation of the legislation and/or the terms of the Agreement.
-  **ACCURACY AND COMPLETENESS OF INFORMATION**
-  4.11. The User is responsible for the accuracy, relevance and completeness of the information provided by him/her during registration, as well as its compliance with the Legislation and respect for the rights of third parties when providing such information. In the event that the User enters inaccurate data, the Company is not responsible for the functioning of the Application, except for the obligations to maintain the confidentiality of Personal Data.
-  4.12. The Company is not obliged to verify and change the information entered by Users during registration and use of the Application.
-  4.13. If the information provided by the User in the Application does not comply with the requirements of the established and posted form in the Application or the provisions of the Legislation, or is knowingly inaccurate, the Company has the right to refuse such a User access to the Application.
-  4.14. By adding personal data on behalf of another person, the User confirms, guarantees and agrees that he/she is responsible for the fact that: the User has the right to provide this data, including by posting it in the Application, and the provided data is accurate and up-to-date.
-  **PASSWORDS AND ACCOUNT**
-  4.15. The User is solely responsible for the security of passwords and the use of the User's account by third parties, through the fault of the User (in case of loss or disclosure of the password by the User, hacking of access by hardware or the User's Internet provider). In the event of unauthorized use of the User's account in the Application by third parties, through the fault of the User, the User is solely and fully responsible for the damage caused by such unauthorized use to third parties.
-  4.16. If the User knows or suspects that his/her identification data for accessing the Application (login and/or password) is known to any third party, the User must immediately notify the technical support services of the Application by sending a corresponding message to the email address: ${companyEmail}.
-  4.17. By registering in the Application (creating an account), the User agrees to receive text messages (SMS), which are an integral part of the process of using the Application. The User can refuse to receive SMS from the Company at any time by sending an email to: ${companyEmail}. In this case, the User acknowledges that the refusal to receive SMS may lead to a refusal to grant access to the Application.
-  4.18. The exchange of any personal and contact data, including phone numbers, emails, messengers, social networks, etc., between Users without the consent of the Application's technical support service is strictly prohibited.
-  
-  **5. PROCEDURE FOR PROVIDING SERVICES**
-  **GENERAL TERMS**
-  5.1. Patients receive Services provided by Performers using the means of the Application.
-  5.2. Services include Medical Services, Information Services and any other services. Services are provided at the price and on the terms determined by the Performer, in compliance with the provisions of the Agreement.
-  5.3. In the event that a fee is established for the use of the Application by Patients, the specifics of such use will be regulated by a separate agreement concluded between the Company and the Patient, which will be provided to him/her for review upon registration in the Application.
-  5.4. Communication between the Patient and the Performer in the Application must be based on mutual respect for each other's personal and professional qualities.
-  5.5. It is strictly forbidden to use words, expressions or any audiovisual manifestations in communication that have an obscene or vulgar meaning, contain illegal, threatening, offensive, indecent, racist, chauvinistic messages, and/or that are discriminatory on linguistic, gender, age or other grounds, or may otherwise violate human rights and freedoms in accordance with the current legislation of Ukraine.
-  5.6. The provision of Services by the Performer is recommended to be carried out in the state language. By mutual agreement, another language may be used in communication between the Patient and the Performer, which can ensure a more accurate and complete transmission of medical information (symptoms, course of the disease and/or treatment, etc.). The Performer must inform about the possibility of providing services in another language by posting the relevant information in his/her Cabinet.
-  5.7. If it becomes clear before (or during) the provision of the Service that the Performer and the Patient cannot understand each other due to a language barrier, the provision of the Service is terminated and the Service is considered not to have been provided, regardless of the time and effort spent by the Performer.
-  5.8. The quality of the Services provided by the Performer and the terms of their provision must comply with the requirements of the Legislation.
-  5.9. Claims regarding the Services provided by the Performer are accepted exclusively by the Performer.
-  5.10. The Company is not responsible for the quality and any other terms of the Services provided by the Performer, as well as for any consequences of the provision of such Services by the Performer.
-  **REQUEST**
-  5.11. In order to receive the Service, the Patient forms and submits a Request using the established form. When forming the Request, the Patient sets the scope of access to the information and data that he/she has posted in the Application, and to which the Performer, using the Application, may have access.
-  5.12. The Request is subject to registration in the Application in the relevant section/category (Patient's account), or in the section of the specified Performer (if such a Performer is specified by the Patient in the Request form).
-  5.13. After the Request is registered, it is sent to the Performer according to the category of the Request, the necessary specialization of the Performer specified in the Request, in the scope of information necessary for the provision of the Service, within the framework of the access to such information and data provided by the Patient.
-  **MEDICAL SERVICES**
-  5.14. Medical services must be provided exclusively by Doctors who have the appropriate qualifications and are registered as business entities, have obtained a license to practice medical practice, or are officially employed in an HCI that has a license to practice medical practice.
-  5.15. Medical services are provided using the means of the Application, including in the form of Telemedicine.
-  5.16. Medical services are provided in a form that is ensured by the technical means of the Performer (hardware and software used by the Doctor) and the Patient.
-  5.17. The Patient may be given a Doctor's prescription while using the Application.
-  5.18. The Company is not responsible for:
-  - the consequences of the Patient's performance or improper performance of the Doctor's recommendations, including taking medications, undergoing medical procedures, tests and performing any other instructions and recommendations of Doctors provided to the Patient in the Application;
-  - the consequences of the Patient taking medications prescribed to him/her by a prescription received through the Application;
-  - the compliance of the medications that the Patient decided to take with those prescribed by the Doctor's prescription received by the Patient through the Application;
-  - any information provided by the Doctor through the Application regarding the characteristics of the medications, the ways they can be purchased and/or certain pharmacists or any other persons who are related to the services for the provision/purchase of the medications prescribed to the Patient.
-  **INFORMATION AND OTHER SERVICES**
-  5.19. Information services and any other services may be provided by both Doctors and other Performers.
-  5.20. Information services are provided exclusively for the purpose of providing the Patient with the information necessary to organize the process of medical care.
-  **RESULTS OF SERVICES**
-  5.21. Based on the results of the provision of the Services, the Performer makes a corresponding entry in the relevant section of the Application about the completion, indicating the date of the provision of the Service or the refusal/redirection (with an indication of the reasons) to provide the Service, and the scope of possible recommendations. The Performer's access to such information is subsequently granted without restriction.
-  **FEATURES OF PROVIDING SERVICES BY INDIVIDUAL ENTREPRENEURS**
-  5.22. A Performer who has registered in the Application as an individual entrepreneur has the right to start providing Services only after concluding an agreement on the Payment Service as a merchant.
-  5.23. The Application is not entitled to receive and store the login and password that the Performer uses in the Payment Service as a merchant.
-  5.24. The activation and deactivation of the Performer - individual entrepreneur as a merchant is performed by the administration of the Application using the login and password from the Payment Service.
-  5.25. In the event of any changes to any Personal Data used by the Performer during registration in the Application and/or concluding the agreement on the Payment Service, the Performer is obliged to notify the administration of the Application and the company that provides the Payment Service within 3 (three) days from the date of registration of such changes.
-  5.26. Settlements for the provided Services with the Performer - individual entrepreneur are carried out on the terms of the Payment Service.
-  **FEATURES OF PROVIDING SERVICES BY LEGAL ENTITIES - HCIs**
-  5.27. In the event of an HCI registering in the Application as a Performer, it has the right to start providing Services only after concluding an agreement on the Payment Service as a merchant.
-  5.28. When registering in the Application and concluding an agreement on the Payment Service, the HCI must provide a list of specialists for their registration in the Application as Doctors, and documents at the request of the Company to verify their Personal Data and qualifications, as well as the following documents:
-  - a copy of all filled pages of the passport of the head of the HCI;
-  - RNOCPP (TIN) of the head of the HCI;
-  - charter (other constituent document) of the HCI or a description of the documents submitted to the state registrar;
-  - a decision/protocol on the appointment of the head of the HCI;
-  - an order on the beginning of the performance of the duties of the head;
-  - a schematic representation of the ownership structure of the HCI;
-  - the last annual financial statements (forms № 1-m, 2-m) with receipt № 2;
-  - a license from the Ministry of Health for the practice of medical practice;
-  - other documents at the request of the financial monitoring service of the Payment Service.
-  5.29. The Application is not entitled to receive and store the login and password that the HCI uses in the Payment Service as a merchant.
-  5.30. The activation and deactivation of the HCI and the Doctors specified in paragraphs 5.27, 5.28 of this Agreement in the Application is performed by the administration of the Application using the login and password provided by the Payment Service for the HCI as a merchant.
-  5.31. In the event of any changes to any Personal Data used by the HCI and Doctors during registration on the Application and/or concluding an agreement on the Payment Service, the HCI and the relevant Doctor must notify the administration of the Application and the company that provides the Payment Service within 3 (three) days from the date of registration of such changes.
-  5.32. Settlements for the Services provided by the Doctors are carried out taking into account the terms and deadlines specified in the agreement on the Payment Service.
-  5.33. Performers (Doctors) who will register in the Application as employees of an HCI will receive payment for the Services they provide within the framework of their relationship with the HCI. The Application does not provide for the payment for Services to such Doctors and ceases to provide for such payment from the moment the HCI registers in the Application and in the Payment Service.
-  
-  **6. USE OF THE APPLICATION**
-  6.1. The Company makes every effort to avoid interruptions in the operation or unavailability of the Application. The Company does not guarantee that the Application or any information posted on it will always be available and that the connection will be continuous. Access to the Application within one session (one initiation of a Service; login to the Patient's Personal Account or the Doctor's Personal Account) is allowed to the User temporarily (for the period of direct use of the Application, taking into account additional time, the duration of which the Company determines independently).
-  6.2. The User is responsible for the proper performance of all actions necessary for successful access to the Application, the information about which is posted in the Application.
-  6.3. Any information, including medical information, that is posted and displayed by Performers for visual review in the Application is of a general informational nature, for the content of which the Company is not responsible.
-  6.4. The statistics of effectiveness and User reviews regarding the Services provided and the use of the Application, provided in the Application, are based on internal and/or third-party surveys, and may (or may not) be displayed by the Company in whole or in part at its own discretion.
-  6.5. By using the Application, the User confirms that any information provided by him/her is correct, accurate and reliable, does not mislead, and the User has the right to provide, disseminate, and post it in the Application.
-  6.6. The Company grants Users access to the Application for the purpose of providing/receiving Services for their own consumption or in the interests of incapacitated/partially incapacitated persons whom they represent. Users are obliged not to use the Application for any commercial purposes that are not directly related to the provision/receipt of Services, using the Application as an end user.
-  6.7. The Company does not guarantee the User that his/her use of the Application will ensure that he/she achieves any specific goals or results.
-  6.8. By using the Application, Users undertake not to engage in the distribution of medicines, biologically active additives, escort services and other services of a sexual nature, online gambling, narcotic and psychotropic drugs, tobacco products, alcohol, and also not to carry out any illegal activities, including, but not limited to, such activities: terrorist activities and financing of terrorism, production/distribution of: pornography, child pornography, goods that promote zoophilic relations, violence and hatred, weapons, copies of original products made by a third-party manufacturer without a relevant license from the original manufacturer, etc.
-  **VIRUSES**
-  6.9. The Company does not guarantee the User that the Application will be safe or free from errors, viruses or external attacks or their consequences.
-  6.10. The User is fully responsible for setting up information technologies, computer programs and equipment for his/her access to the Application. The User must use his/her own antivirus protection.
-  6.11. By using the Application, the User guarantees and confirms that he/she will not take actions to knowingly introduce and/or disseminate any viruses, "Trojans", logic bombs and other materials that are harmful or technologically harmful, threatening the correct operation of the Application. The User undertakes not to take actions aimed at obtaining unauthorized access to the Application, to the equipment, databases and programs that ensure the functioning of the Application or its elements. The User undertakes not to take any actions aimed at using a computer attack to access the Application in connection with a denial of service or a "denial of service" attack. By violating this provision, the User understands that he/she is committing a crime, the responsibility for which is provided for by the Criminal Code of Ukraine. The Company has the right to report any such cases to the relevant law enforcement agencies of Ukraine. The User gives his/her consent that the Application has the right to provide institutions/organizations/enterprises with access to the User's data, for the purpose of detecting and identifying Users who violate the obligations set forth in this paragraph of the Agreement. In the event that the Company has reasonable suspicions of the User committing violations of the terms of the Agreement, or in the event that such violations are detected, the Company immediately terminates the User's access to the Application.
-  **LINKS TO THE APPLICATION**
-  6.12. The User has the right to link to the Application, provided that the User provides correct data and such actions do not violate the Legislation and do not harm the reputation of the Application.
-  6.13. The User does not have the right to set up a link to the Application in such a way as to suggest any form of association or approval on the part of the Application, and the User does not have the right to link to the pages of the Application on any website that he/she does not own.
-  6.14. If the User intends to use any information posted in the Application, the rights to which belong to the Company, such a User is obliged, before using such information, to obtain the relevant permission from the Company by sending his/her request for the use of the information to the email address: ${companyEmail}.
-  **LIABILITY**
-  6.15. The User is responsible for fulfilling the terms of the Agreement and undertakes to compensate for any damages (both direct and indirect, lost profits) incurred by the Company as a result of the User's violation of the provisions of the Agreement, in the manner and amount determined in the relevant written request of the Company.
-  **COMPLAINTS**
-  6.16. The Company accepts all feedback, complaints, suggestions, and the User can contact the Company by phone at ${companyPhone} (the cost of the call is charged at the rates of the User's communication operator), or send his/her request to the email address ${companyEmail}.
-  6.17. In the event of a complaint from the User regarding the functioning of the Application, the Company undertakes to try to resolve the problem in a timely manner by conducting negotiations and eliminating misunderstandings.
-  6.18. In the event that the User intends to file a complaint, he/she must do so as soon as possible, but no later than 3 (three) days from the moment the User discovered the problem.
-  6.19. The User files a complaint in writing to the email address: ${companyEmail}. The complaint must contain the full last name, first name and patronymic, date of birth, postal address of the User, a full statement of the circumstances of the problem, the User's arguments, and, if possible, the solution to the problem proposed by the User.
-  6.20. In the event that a corresponding complaint is sent on behalf of another person, such a User must also attach a copy of the document confirming his/her authority to do so.
-  6.21. The Company reviews the complaint within 30 calendar days from the date of receipt. When considering this complaint, the Company carefully and thoroughly analyzes the factual circumstances.
-  6.22. No later than the specified period, the Company sends a letter to the User (by the method in which the complaint was received), indicating the result of the review of the complaint.
-  6.23. The User has the right to appeal the response received from the Company in accordance with the Legislation.
-  **7. INFORMATION PROTECTION AND PRIVACY POLICY**
-  7.1. The Personal Data of Users and other data of the Application are stored on cloud servers that have a comprehensive information protection system with confirmed compliance.
-  7.2. The Personal Data of Users and other data of the Application are stored on cloud servers located on the territory of Ukraine.
-  7.3. The Company is not entitled to collect, store and process Personal Data, phone video and chat calls, consultation reports, and other data transmitted/received by the User using the Application.
-  7.4. The Company does not store or transmit Users' payment card data. The information on Users' payment details is entered on a secure page _____, which complies with the PCI DSS Level 1 information security standards and guarantees the complete security of Users' data.
-  7.5. The User fully understands that all information voluntarily provided about him/her in the Application on cloud servers is personal data, i.e., data used to identify the User and to contact him/her. By registering, the User agrees to this Agreement, and also agrees that personal data is stored in the Application's database and is subject to use exclusively in accordance with this Agreement and current legislation. The User's personal data is protected by the Law of Ukraine "On Personal Data Protection".
-  7.6. The User gives his/her consent to the processing of his/her personal data, including any actions such as collection, registration, accumulation, storage, adaptation, modification, restoration, use and dissemination (distribution, sale, transfer), depersonalization, destruction of personal data, including using information (automated) systems. The processing of personal data includes any actions and/or set of actions related to the collection, registration, accumulation, storage, adaptation, modification, renewal, use and deletion of the User's personal data in order to ensure the operation of the Application's services.
-  7.7. The scope of the User's personal data for which processing is carried out and which can be included in the personal data databases is defined as any information about the User that is voluntarily posted in his/her account on the Application.
-  7.8. The User also consents to other actions that the Company may perform with his/her personal data in written (paper), electronic and other forms. The User's personal data database is registered in the manner prescribed by law in accordance with the Law of Ukraine "On Personal Data Protection".
-  7.9. User files sent during consultation booking and in chats are stored for 30 days, after which they are automatically deleted from the server.
-  7.10. The dialogue between the User and the Performer in the chat is stored for 6 months from the moment the consultation ends, after which it is deleted.
-  **8. USE OF COOKIE FILES**
-  8.1. Cookie files are pieces of information that are stored by a web browser (or the Application) directly in the memory of the User's device. When the Application is used again, the web browser sends these pieces of information from the User's device to the Application to automatically configure the Application's interface to the User's interests and preferences or to facilitate the User's login process to the account to use the Application's services.
-  8.2. The cookie files used by the Application allow for the identification of repeated use of the Application, which makes it possible to avoid re-entering certain User identifiers, which increases the convenience of using the Application's services.
-  8.3. The Company, with the help of the Application, also uses cookies to collect statistical information in order to increase the effectiveness of the User's interaction with the Application, as well as to receive information related to marketing offers.
-  8.4. The use of cookie files is aimed at improving the quality and speed of services received by the User in the Application, including:
-  - providing the User with access to secure areas of the Application without the need to re-enter the User's account data;
-  - keeping in memory the User's previous actions (for example, filling out online forms) when returning to the page within the same transaction;
-  - managing the objects of selected paid services of the Application;
-  - analyzing errors that occur in the Application to improve the quality of the Application's services;
-  - keeping in memory the User's settings from previous use of the Application (for example, the country or language, your interests);
-  - keeping in memory identifiers in the Application (for example, whether the User is willing to participate in a survey dedicated to the quality of customer service);
-  - tracking whether a service has been offered to the User (for example, providing support online).
-  8.5. The use of cookie files may be aimed at displaying advertising messages in the Application that correspond to the interests of the Users. With the help of cookie files, detailed information about the User's actions when using the Application is collected (for example, which products and services you choose).
-  8.6. The information obtained when using cookie files does not contain Users' personal data.
-  8.7. The Company has the right to store cookie files in the Application and provides access to them.
-  8.8. The Company has the right to provide third parties with information from the Application's cookie files if required by law to protect legal rights or take measures against potentially illegal activity.
-  8.9. The User has the right to use the capabilities of the Application (taking into account their messages) to prohibit the creation of cookie files, or to delete cookie files that are stored in the memory of his/her device, by performing the following actions:
-  - in the Application settings, set "I do not accept cookies";
-  - in the Application settings, set "Delete cookies".
-  8.10. The User understands and agrees that in cases of disabling cookie files, setting a ban on their storage or deleting cookie files, the possibilities of working in the Application with the User's parameters and advantages, as well as the possibilities of setting up the User's personal interface, may be significantly limited.
-  
-  **9. SETTLEMENTS BETWEEN PERFORMERS AND PATIENTS**
-  9.1. The Patient makes settlements with the Performer for the provided Services through the Patient's Personal Account using the relevant payment service. The Company does not directly accept funds from Patients for the Services provided to them by Performers using access to the Application.
-  9.2. Information about the cost of the Services is posted in the Application by the Performers and can be changed by them at any time. The Company is not responsible for the specified information about the price of the Services, does not influence or change the price of the Services.
-  9.3. The Patient tops up his/her personal account in the Patient's Personal Account with an amount not less than the cost of the Service determined by the Performer in the Application. After the Performer's recommendation letter is posted in the Patient's Personal Account, the Service is considered to have been performed and is subject to payment in the corresponding amount.
-  9.4. The Patient has the right to cancel the consultation appointment and return the funds paid for the Service to his/her account. In the event that the cancellation of the consultation appointment at the initiative of the Patient occurred less than 3 hours before the start of the consultation, the funds paid for the Service are not subject to return to the Patient's account.
-  9.5. The Company is not responsible for:
-  - the discrepancy between the price of the Services specified by the Performer in the Application and the price that this Performer requires for the provided Service;
-  - the completeness and timing of the return of overpaid funds, or compensation for improperly provided Services;
-  - non-payment, untimely or incomplete payment for Services by Patients;
-  - the content and result of the resolution of any disputes that may arise between the Performer and the Patient regarding the payment and quality of the Services.
-  9.6. The Performer receives payment for the provided Service after providing a recommendation letter to the Patient. The payment is credited to the Performer after the payment service withholds a commission of 30% of the cost of the Service specified by the Performer in the Application.
-  9.7. Any disputes that may arise between Performers and Patients must be resolved directly between them, without the involvement of the Company in any stage of the process and on any side of the dispute, regardless of the use of the Application in resolving such disputes.
-  9.8. The Company is not a tax agent with respect to the Performer. The Company does not perform any actions to calculate, withhold from the income accrued (paid, provided) to the Performer, and to transfer taxes on behalf of and at the expense of the Performer's funds to the budget and any funds.
-  9.9. Performers are personally responsible for complying with the norms of tax Legislation regarding the income received when providing Services to Patients.
-  9.10. Users understand, confirm and agree that the Company is not responsible if the issuer of the Patient's payment card refuses to authorize (make) the payment for any reason. If such a payment is not authorized, the Patient is not entitled to use the relevant paid function of the Application or to receive the relevant Service. The User's card issuer may charge the latter a commission for processing the payment online. The Company is not responsible for such commissions, their existence and size.
-  9.11. The User is solely responsible for familiarizing him/herself with the terms of service of the payment service, the issuer of the bank card and other persons who provide services in the field of money transfers, and for complying with the relevant terms. The Company is not responsible for the functioning of the payment service, the money transfers made with its help or the debiting of funds from the Users' bank cards, as well as for maintaining the confidentiality of the data provided by Users when using the payment service.
-  9.12. Users (Patients and Performers) are obliged to provide their personal data (RNOCPP, etc.) at the request of the payment service during any transactions using payment cards in accordance with the current legislation of Ukraine and the resolutions of the National Bank of Ukraine.
-  9.13. When paying for a consultation, a commission for the payment may be charged by the issuing bank from the User's payment card in accordance with the bank's tariffs.
-  
-  **10. INTELLECTUAL PROPERTY RIGHTS**
-  10.1. All intellectual property rights (hereinafter - Rights) to any Objects related to the Application belong exclusively to the Company.
-  10.2. Users unconditionally undertake not to violate the Rights of the Company, to immediately notify the Company in any possible way of any violations of the Rights, including, but not limited to, such violations: unauthorized use of the Objects, copying of the Objects or their parts, etc.
-  10.3. None of the terms of the Agreement should be interpreted as a transfer of any Rights or part of the Rights to any User or other person, regardless of whether such person has registered in the Application or not, except in fulfillment of the terms of the Agreement.
-  10.4. The User does not have the right to change, reproduce, copy or otherwise use the Objects or their parts, and any unauthorized use of the Objects entails the consequences provided for by the current Legislation. In the case of actions provided for by this paragraph, the User undertakes to compensate for all direct/indirect damages of the Company, in the amount and within the time specified in the relevant written request of the Company.
-  10.5. The obligations established in this article of the Agreement regarding the observance of the Company's Rights are valid both during the term of the Agreement and for three years after its termination.
-  
-  **11. CHANGES TO THE AGREEMENT**
-  11.1. The Company reserves the right to review and change the terms of the Agreement.
-  11.2. In the event of changes to the terms of the Agreement, the Company notifies Users of such changes and the updated version of the Agreement when Users access the Application. Continued use of the Application will be considered acceptance of such revised terms, and the User is responsible for complying with such terms when using the Application. The User's access to the Application after notification of changes to the Agreement is an indication that the User agrees to the amended terms.
-  11.3. Changes to the Agreement come into force from the moment they are published in the Application and from the moment the User accepts the amended terms.
-  11.4. The Company has the right to unilaterally introduce certain promotions that may partially and temporarily change the terms of the Agreement, of which the Company notifies all Users by a publicly available method, by posting a corresponding message on the starting (home, main) page of the Application and/or by posting a message about the promotion and its terms in the User's personal account.
-  
-  **12. FINAL PROVISIONS**
-  12.1. The Agreement enters into force on the day of its public posting in the Application and the User's joining its terms by registering the User in the Application, which indicates the full acceptance of the terms of the Agreement. An agreement concluded by accepting a public offer in a certain manner has the legal force of an agreement sealed with the signatures of the parties, and the parties bear the rights and obligations provided for therein.
-  12.2. By concluding the Agreement, the User confirms that he/she unconditionally accepts all the terms of the Agreement without reservation. By registering in the Application, the User agrees to receive notifications about services and updates by email and/or text message, which will contain important information about the Services or the Application.
-  12.3. The Agreement is valid until the Parties fulfill their obligations under the Agreement and may be terminated by disconnecting the User from the Application:
-  at the initiative of the User by sending a corresponding letter to the Company's address;
-  at the initiative of the Company in case the User violates the terms of the Agreement, as well as after the expiration of a two-year period from the last authentication of the User in the Application.
-  12.4. All disputes that arise between the Parties regarding the conclusion, performance, and termination of the Agreement are subject to consideration by the court in accordance with the Legislation.
-  12.5. If the Application contains links to other websites, services and resources provided by third parties, these links are provided in the Application solely for information. The Company does not control and/or verify the content of these websites or resources, and the Company is not responsible for the use and consequences of the use of such websites, services or resources by Users.
-  12.6. The Company confirms that it is a single tax payer at the rate provided for by the Tax Code of Ukraine.
-  12.7. The User may not transfer any of his/her rights or obligations under the Agreement.
-  12.8. All communications to the Company must be provided by the User in writing to the address specified in the Agreement. The Company may send messages to the User at the email or postal address he/she specifies during registration in the Application.
-  12.9. If any provision of the Agreement is found to be invalid, all other provisions remain unchanged and valid.
-  12.10. Users can send any questions regarding the Agreement or the use of the Application by email to ${companyEmail}, or by contacting the phone number ${companyPhone} seven days a week from 9:00 to 20:00.
-  
-  `
-};
+    Please read all provisions of this Agreement carefully and ensure that you understand them. You will be asked to agree (accept) to this Public Agreement before registering in the Application. If you refuse to accept the terms of the Agreement, you will not be able to register and use the Application. The Company reserves the right to change the provisions of this Agreement in the manner prescribed by this Agreement. The Company considers the security and privacy of your information to be paramount.
 
-  const currentPolicyText = replacePlaceholders(agreementText[i18n.language] || agreementText.uk, i18n.language);
+PUBLIC OFFER AGREEMENT
+
+This document constitutes a proposal to conclude an Agreement on the terms set out below with any person who accepts the terms of this public offer. The person unconditionally accepts the terms of the Agreement by checking the appropriate box on the registration page. Actual use of the Application also constitutes the person's consent to this Agreement and acceptance of its terms.
+
+The Agreement has the nature of a public offer in accordance with the current legislation of Ukraine (Arts. 633, 634, 641, 642 of the Civil Code of Ukraine); the terms of this Agreement are the same and binding for all and apply to all services provided in the Application and all relations between Users and Providers, as well as between Users, Providers, and the Company.
+
+1. TERMS AND DEFINITIONS
+
+In this Agreement, the terms and definitions have the meanings set forth below:
+
+"APPLICATION" — a set of software, data, payment means, and access to information contained in the Application to satisfy the needs of Patients in the Services provided by Providers.
+
+"AGREEMENT" — this public agreement, including all annexes, changes, and additions thereto, which may be made to the Agreement after the User joins it.
+
+"GENERAL DATABASE" — a collection of data of all Users who have registered in the Application. The general database may be used for statistical reporting, but without violating the confidentiality of Users' data.
+
+"REQUEST" — a request from a Patient for the provision of a Service.
+
+"SERVICE" — any Informational, Medical, and other service provided by the Provider to the Patient under the Agreement.
+
+"INFORMATIONAL SERVICES" — services provided by the Provider to the Patient, including but not limited to: providing information about Doctors, their qualifications, their work schedule, the address of the Doctor's office, the cost of medical services, the cost of medical insurance, the terms of medical insurance; making electronic appointments, etc.
+
+"USER" — a person, including a Patient and/or Provider, who has knowingly registered in the Application and accepted all terms and conditions.
+
+"PATIENT" — a fully capable natural person who voluntarily uses the Application to satisfy their own needs or the needs of an incapacitated person represented by such a person, for the purpose of receiving Informational, Medical, and other services provided by Providers.
+
+"PROVIDER" — a Doctor or Healthcare Facility providing Services to the Patient using the Application.
+
+"HCF" (Healthcare Facility) — a Provider that is a legal entity of any form of ownership and organizational-legal form or its separate subdivision, providing medical care to the population on the basis of a relevant license and professional activity of medical (pharmaceutical) workers.
+
+"DOCTOR" — a natural person or a sole proprietor who has the qualification of a medical specialist, is engaged in the manner prescribed by law in maintaining or restoring human health through prevention (prophylaxis), recognition (diagnosis), and treatment of diseases and injuries, provides Medical, Informational, and other types of services to Patients using the Application, and who is in an employment (or civil law) relationship with a specific HCF, or is a registered sole proprietor and has obtained a license to practice medicine in the manner prescribed by law.
+
+"MEDICAL SERVICES" — services directly or indirectly related to medical consulting and/or treatment of the Patient, using the means of the Application in the format of Telemedicine in accordance with the legislation regulating the relations of the parties in this sphere, ensuring the preservation of medical secrecy and confidentiality, integrity of medical information about the Patient's health status and other information provided by the Patient.
+
+"OTP" (One Time Password) — a one-time password that ensures a level of security when working with the Application, is valid only for one User identification session, and the validity of which may be limited to a certain period of time.
+
+"PATIENT'S PERSONAL ACCOUNT" — an electronic interface for access to the Application, accessed by the Patient using personal access identifiers (login, password, digital signature, OTP, SMS message). The Patient's Personal Account does not contain PD of the Patient and other persons (if necessary). The Application does not have access to Information (documents) provided by the Patient to the Provider.
+
+"DOCTOR'S PERSONAL ACCOUNT" — an electronic interface for access to the Application, accessed by the Doctor using personal access identifiers (login, password, digital signature, OTP, SMS message). The Doctor's Personal Account contains the Doctor's PD and may contain other data (information on the cost of Services, address of the place of reception of patients, etc.) entered by the Doctor themself.
+
+"PD" — personal data of Users of the Application.
+
+"TELEMEDICINE" — a complex of actions, technologies, and measures applied in the provision of medical care using means of remote communication (telephone, audio, video, or in the form of electronic message exchange), in particular using the Application.
+
+"TELEMEDICAL CONSULTING" — provision of medical care to a Patient by a Doctor using Telemedicine. During the provision of Medical Services, including using Telemedicine, compliance with the requirements of the legislation of Ukraine regarding the protection of PD and compliance with the norms of ethics and deontology of medical care provision is ensured.
+
+"PAYMENT SERVICE" — a complex of contractual relations regarding the provision of payment services, which consist in ensuring the settlement for Services. The provision of the Payment Service is carried out by a licensed financial institution with which Users independently conclude relevant agreements. The Company is not bound to such a financial institution by obligations to ensure and/or control the Payment Service and is not responsible for the fulfillment of its obligations by it.
+
+"LEGISLATION" — the legislation of Ukraine effective at the time of the User's accession to the Agreement, with subsequent changes at the time of User authentication during the User's next connection (login) to the Application or at the time of a dispute.
+
+"RIGHTS" — exclusive property rights of intellectual property of the Company regarding the Application.
+
+"OBJECTS" — objects of exclusive property rights of intellectual property, including but not limited to the following: copyright objects (program code, texts, images, video), industrial property objects (trademarks for goods and services, layouts, labels, design) contained, set out, to be set out, used in the Application and related to its functioning.
+
+"COMPANY" — LLC "MEDICAL CENTER 'DOVIRA'", EDRPOU code: 37195461, legal address: Ukraine, 04213, Kyiv, Heroiv Stalinhradu Avenue, building 44, apartment 423, registered in accordance with the current legislation of Ukraine, owner of the Rights to the Application, acting independently or involving third parties and providing Users with a license (permission) to use the Application.
+
+The terms and definitions listed in this section apply in the indicated meanings, regardless of whether they are used in the singular or plural, written in upper or lower case letters, unless strictly another meaning arises from the content of a specific article or clause in the Agreement. Other concepts and terms used in the Agreement have meanings based on generally accepted interpretations or in accordance with the meanings established by Legislation.
+
+2. SUBJECT OF THE AGREEMENT
+
+2.1. The Company grants the User a non-exclusive license (permission) to use the Application for its functional purpose as an end user, and the User uses the Application in accordance with the terms of the Agreement. 2.2. Scope of the Patient's rights to use the Application. The Patient has the right to use the Application within the limits permitted by the Company, including:
+
+accessing the Application after downloading it to a device;
+
+using the functionality of the Application in compliance with the terms of the Agreement;
+
+creating a Patient's Personal Account, entering their data into it, and modifying them;
+
+receiving Services from Providers through the Application, including medical care using Telemedicine;
+
+using other functionality designated as available for Patients in the Application.
+
+2.3. Scope of the Provider's rights to use the Application. The Provider has the right to use the Application within the limits permitted by the Company, including:
+
+accessing the Application after downloading it to a device;
+
+using the functionality of the Application in compliance with the terms of the Agreement;
+
+creating a Doctor's Personal Account, entering their data into it, and modifying them;
+
+providing Services to Patients through the Application, including medical care using Telemedicine;
+
+using other functionality designated as available for Providers in the Application.
+
+3. SPECIAL DISCLAIMERS
+
+3.1. The Application is a communication platform between Providers and Patients, intended to facilitate and ensure the provision of Services by Providers upon the consent and Request of the Patient. Responsibility for the quality, effectiveness, compliance, effectiveness, and cost of providing Services lies solely with Providers and Patients, who use the Application at their own risk and discretion. 3.2. The Company does not provide any Medical Services, medical care, treatment, emergency medical care, or any services resulting in the provision of medical care and/or diagnostics to the Patient or any third party, and has no relation to and bears no responsibility for any Services received by the Patient from the Provider. 3.3. The Company is not responsible for consequences caused by the User providing information that is incomplete or inaccurate; or by Users disclosing their confidential information to third parties (including providing their password, login). 3.4. The Patient is aware that, taking into account the specifics of the Telemedicine form, Services are provided by the Provider based on and regarding the symptoms described and broadcast by the Patient. Inaccurate or incomplete description of symptoms by the Patient may determine a level of effectiveness of Services that may not satisfy the Patient's expectations. 3.5. The Application provides an opportunity to use and receive Medical Services in the form of Telemedicine, taking into account the technical capabilities of the Provider, within the framework of Legislation. 3.6. The Company is not responsible for consequences caused by differences between healthcare system rules in Ukraine and healthcare systems in other countries. The Company is not responsible in case of use of the Application or access to the Application by Providers and/or Patients in a country where this is illegal. 3.7. Any interaction of the User with the Application implies the User's unconditional agreement with all clauses of this Agreement. Such interaction with the Application constitutes a full and unconditional acceptance of this Agreement. Incomplete awareness of the terms of this Agreement does not exempt the User from liability for non-fulfillment of its terms. 3.8. The Company reserves the right to change, supplement the procedure for providing Services in the Application, the list and sequence of Users' actions regarding the use of the Application, etc. Such changes and additions are entered into the Agreement, of which the User is notified in advance by placing a corresponding notice in the Application. The User's access to the Application after the placement of such changes and additions in the relevant section of the Application is evidence that the User agrees with the changed terms. 3.9. In case the User does not agree with any terms of this Agreement and/or does not agree to comply with the terms of this Agreement (or a new version of the Agreement), they are obliged to immediately stop using the Application. 3.10. The User is responsible for obtaining access to the data transmission network necessary for using the Application. When using the Application via a wireless device, relevant communication service providers may charge fees for sending SMS and data transmission according to mobile network tariffs, as well as fees for telecommunication services, communication services, etc. 3.11. The Application is intended for use by persons located solely on the territory of Ukraine. The Company does not guarantee the compliance of the Application and the procedure for its use with the legislation of other countries or international (interstate) organizations that are not part of the legislation of Ukraine, in case of use of the Application by Users who are permanently or temporarily in territories of countries other than Ukraine.
+
+4. GRANTING ACCESS TO THE APPLICATION
+
+REGISTRATION AND ACCESS 4.1. User registration is free, voluntary, and is carried out in the Application after downloading the Application to a device. 4.2. The right to use the Application for the purpose of receiving Services is granted to persons who have reached the age of 18 and have full legal capacity. 4.3. If the User is not a citizen of Ukraine, they are aware that the Company provides access to the Application to Doctors who have appropriate qualifications, and it may refuse access to the Application if doubts arise regarding the qualification of the relevant foreign specialist. 4.4. The Patient may use the Application and receive Services for the benefit of persons for whom they act as a legal representative (a parent of a minor/underage person, guardian, trustee). In such a case, such a Patient, when using the Application, including when registering such persons, guarantees and confirms that they have all the rights of a legal representative, including the rights to provide, enter, and disseminate personal information about these persons, and bears responsibility provided by current legislation for such actions. The Company bears no responsibility for any consequences in case of illegal provision/dissemination/disclosure of such information by persons who did not have the right to such actions. 4.5. After the User registers in the Application, they will be provided with a user identification code, password, or other piece of information within the framework of the Application's security procedure and User data. The User realizes and agrees that such information is confidential and subject to non-disclosure to any third parties. 4.6. To access the Patient's Personal Account, the Patient is obliged to perform identification actions requested by the Application by entering an email and mobile phone number and confirming them via OTP. 4.7. To access the Doctor's Personal Account, the Doctor is obliged to perform identification actions requested by the Application by entering an email and mobile phone number and confirming them via OTP. 4.8. The Company may establish the following methods of access to the Patient's Personal Account and the Doctor's Personal Account (after registration in the Application): by entering a login and password, or by entering an OTP via SMS message (according to the tariffs of the Patient's mobile operator), or in another way at the discretion of the Company. 4.9. The Company authorizes and grants access to the Application to the Provider exclusively in the presence of evidence of proper qualification or license. For the purpose of appropriate verification of the Provider, the Company has the right, during the registration/authorization process of the Provider, to require them to provide copies of licenses, certificates, diplomas, and any other documents. The Company has the right to verify the validity of documents provided by the Provider during registration/authorization. The Company has the right to verify the Provider's qualification during the period of their use of the Application. The Company has the right to block access of any Provider to the Application at any moment without warning in case of doubts regarding the validity and/or sufficiency of evidence regarding the education and qualification of the Provider. The Company is not obliged but has the right to require the Provider to provide information regarding their legal status (existence of labor relations of the Doctor with an HCF, status of a sole proprietor, availability of license, certificates, etc.). 4.10. The Company has the right at any time without warning and without explanation of such actions, to revoke the license (access) to use the Application by the User and disable any User identification code or password chosen by the User or assigned by the Application for access to the Application, if the Company has any doubts or is convinced that the User violates the terms of the Agreement or uses the Application in violation of the legislation and/or terms of the Agreement.
+
+ACCURACY AND COMPLETENESS OF INFORMATION 4.11. The User is responsible for the accuracy, relevance, and completeness of the information provided by them during registration, as well as its compliance with Legislation and observance of the rights of third parties when providing such information. In case the User enters inaccurate data, the Company is not responsible for the functioning of the Application, except for obligations regarding the preservation of PD confidentiality. 4.12. The Company is not obliged to verify and change information entered by Users during registration and use of the Application. 4.13. If the information posted by the User in the Application does not meet the requirements of the form established and posted in the Application or the provisions of Legislation, or is knowingly false, the Company has the right to deny such User access to the Application. 4.14. By adding personal data on behalf of another person, the User confirms, guarantees, and agrees that they are responsible for the fact that: The User has the right to provide this data, including by posting it in the Application, and the provided data is accurate and current.
+
+PASSWORDS AND ACCOUNT 4.15. The User is independently responsible for the preservation of passwords and the use of the User's account by third parties due to the User's fault (in case of loss or disclosure of the password by the User, hacking of access by hardware means or the User's Internet provider). In case of unauthorized use of the User's account in the Application by third parties due to the User's fault, the User independently bears full responsibility for the damage caused by such unauthorized use to third parties. 4.16. If the User knows or suspects that their identification data for access to the Application (login and/or password) are known to any third party, the User must immediately notify the technical support service of the Application by sending a corresponding message to the email address: support@doctorplus.me. 4.17. By registering in the Application (creating an account), the User agrees to receive text messages (SMS), which are an integral part of the process of using the Application. The User may opt out of receiving SMS from the Company at any time by sending an email to: support@doctorplus.me. In such a case, the User acknowledges that opting out of receiving SMS may lead to refusal to grant access to the Application. 4.18. Communication by Users to each other of any personal and contact data, including phone numbers, emails, messengers, social networks, etc., without the approval of the Application's technical support service, is strictly prohibited.
+
+5. PROCEDURE FOR PROVISION OF SERVICES
+
+GENERAL CONDITIONS 5.1. Patients receive Services provided by Providers using the means of the Application. 5.2. Services include Medical Services, Informational Services, and any other services. Services are provided at the price and on the terms determined by the Provider, in compliance with the provisions of the Agreement. 5.3. In case a fee is established for the use of the Application by Patients, the specifics of such use will be regulated by a separate agreement concluded between the Company and the Patient, which will be provided to them for review during registration in the Application. 5.4. Communication between the Patient and the Provider in the Application must be based on mutual respect for each other's personal and professional qualities. 5.5. It is strictly prohibited to use words, expressions, or any audiovisual manifestations in communication that have an obscene or vulgar meaning, contain illegal, threatening, offensive, indecent, racist, chauvinistic messages, and/or which are discriminatory on linguistic, gender, age, or other grounds, or otherwise may violate human rights and freedoms in accordance with the current legislation of Ukraine. 5.6. The provision of Services by the Provider is recommended to be carried out in the state language. By mutual consent, another language may be used in communication between the Patient and the Provider, which can ensure a more accurate and complete transfer of medical information (symptoms, course of illness and/or treatment, etc.). The Provider must inform about the possibility of providing services in another language by placing relevant information in their Account. 5.7. If before (during) the provision of the Service it turns out that the Provider and the Patient cannot understand each other due to a language barrier, the provision of the Service is terminated, and the Service is considered not provided regardless of the time and effort spent by the Provider. 5.8. The quality of Services provided by the Provider and the conditions for their provision must meet the requirements of Legislation. 5.9. Claims regarding Services provided by the Provider are accepted exclusively by the Provider. 5.10. The Company is not responsible for the quality and any other conditions of Services provided by the Provider, as well as for any consequences of the provision of such Services by the Provider.
+
+REQUEST 5.11. For the purpose of receiving a Service, the Patient forms and submits a Request in the established form. When forming a Request, the Patient establishes the scope of access to information and data posted by them in the Application, and to which the Provider, using the Application, may have access. 5.12. The Request is subject to registration in the Application in the relevant section/category (Patient's cabinet), or in the section of the specified Provider (if such Provider is defined by the Patient in the Request form). 5.13. After registration of the Request, it is sent to the Provider according to the category of the Request, the necessary specialization of the Provider specified in the Request, in the amount of information necessary for the provision of the Service, within the framework of access provided by the Patient to such information and data.
+
+MEDICAL SERVICES 5.14. Medical Services must be provided exclusively by Doctors who have appropriate qualifications and are registered as business entities, have obtained a license to practice medicine, or are officially employed in an HCF that has a license to practice medicine. 5.15. Medical Services are provided using the means of the Application, including in the form of Telemedicine. 5.16. Medical Services are provided in a form ensured by the technical means of the Provider (hardware and software used by the Doctor) and the Patient. 5.17. While using the Application, a Doctor's prescription may be transferred to the Patient. 5.18. The Company is not responsible:
+
+for the consequences of fulfillment or improper fulfillment by the Patient of the Doctor's recommendations, including taking medications, undergoing medical procedures, tests, and fulfilling any other instructions, recommendations of Doctors provided to the Patient in the Application;
+
+for the consequences of the Patient taking medications prescribed by a prescription received through the Application;
+
+for the compliance of medicines, regarding which the Patient has decided to use them, with those prescribed by the Doctor's prescription received by the Patient through the Application;
+
+for any information provided by the Doctor through the Application regarding the characteristics of medicines, ways of their possible purchase and/or certain pharmacists or any other persons related to services regarding the provision/purchase by the Patient of medicines prescribed to them.
+
+INFORMATIONAL AND OTHER SERVICES 5.19. Informational services and any other services may be provided by both Doctors and other Providers. 5.20. Informational services are provided solely for the purpose of providing the Patient with information necessary for organizing the medical care process.
+
+RESULT OF SERVICES 5.21. Based on the results of the provision of Services, the Provider makes an appropriate entry in the relevant section of the Application about execution indicating the date of provision of the Service or refusal/redirection (indicating reasons) in the provision of the Service, the scope of possible recommendations. Access to such information is subsequently granted to the Provider without limitation.
+
+SPECIFICS OF PROVISION OF SERVICES BY SOLE PROPRIETORS 5.22. A Provider who has registered in the Application as a sole proprietor (physical person-entrepreneur) has the right to start providing Services exclusively after concluding an agreement regarding the Payment Service as a merchant. 5.23. The Application has no right to receive and store the login and password that the Provider uses in the Payment Service as a merchant. 5.24. Activation and deactivation of a Provider — sole proprietor as a merchant is performed by the administration of the Application using the login and password from the Payment Service. 5.25. In case of a change in any PD used by the Provider during registration in the Application and/or conclusion of an agreement regarding the Payment Service, the Provider is obliged to notify the administration of the Application and the company providing the Payment Service within 3 (three) days from the moment of registration of such changes. 5.26. Settlements for Services provided with a Provider — sole proprietor are carried out on the terms of the Payment Service.
+
+SPECIFICS OF PROVISION OF SERVICES BY LEGAL ENTITIES - HCF 5.27. In case of registration of an HCF in the Application as a Provider, it has the right to start providing Services exclusively after concluding an agreement regarding the Payment Service as a merchant. 5.28. Upon registration in the Application and conclusion of an agreement regarding the Payment Service, the HCF must provide a list of specialists for registering them in the Application as Doctors, and documents upon the Company's request for verification of their PD and qualifications, as well as the following documents:
+
+copy of all filled pages of the HCF manager's passport;
+
+RNOKPP (Tax ID) of the HCF manager;
+
+charter (other constituent document) of the HCF or description of documents submitted to the state registrar;
+
+decision/protocol on appointment to the position of the HCF manager;
+
+order on the commencement of the manager's duties;
+
+schematic representation of the HCF ownership structure;
+
+last annual financial statement (forms No. 1-m, 2-m) with receipt No. 2;
+
+MoH license for conducting economic activity in medical practice;
+
+other documents upon the request of the financial monitoring service of the Payment Service. 5.29. The Application has no right to receive and store the login and password that the HCF uses in the Payment Service as a merchant. 5.30. Activation and deactivation in the Application of the HCF and Doctors specified in clause 5.27, clause 5.28 of this Agreement is performed by the administration of the Application using the login and password provided by the Payment Service for the HCF as a merchant. 5.31. In case of a change in any PD used by the HCF and Doctors during registration on the Application and/or conclusion of an agreement regarding the Payment Service, the HCF and the relevant Doctor must notify the administration of the Application and the company providing the Payment Service within 3 (three) days from the moment of registration of such changes. 5.32. Settlements for Services provided by Doctors are carried out taking into account the terms and deadlines determined by the agreement regarding the Payment Service. 5.33. Providers (Doctors) who will register in the Application as employees of an HCF will receive payment for the Services provided by them within the framework of their relations with the HCF. The Application does not ensure payment for Services to such Doctors and stops ensuring such payment from the moment of registration of the HCF in the Application and in the Payment Service.
+
+6. USE OF THE APPLICATION
+
+6.1. The Company makes every effort to avoid interruptions in work or unavailability of the Application. The Company does not guarantee that the Application or any information posted on it will always be available, and the connection — uninterrupted. Access to the Application within one session (one initiation of Service; login to the Patient's Personal Account or Doctor's Personal Account) is allowed to the User temporarily (for the period of direct use of the Application, taking into account additional time, the duration of which the Company determines independently). 6.2. The User is responsible for properly performing all actions necessary for successful access to the Application, information regarding which is posted in the Application. 6.3. Any information, including of a medical nature, posted and displayed by Providers for visual review in the Application, is of a general informational nature, for the content of which the Company bears no responsibility. 6.4. Efficiency statistics and User reviews regarding the provided Services and use of the Application, presented in the Application, are based on internal and/or third-party surveys, and may (or may not) be displayed by the Company fully or partially at its own discretion. 6.5. By using the Application, the User confirms that any information provided by them is correct, accurate, and reliable, does not mislead, and the User has the right to provide, disseminate, and post it in the Application. 6.6. The Company grants Users access to the Application for the purpose of providing/receiving Services for personal consumption or in the interests of incapacitated/limitedly capable persons whom they represent. Users are obliged not to use the Application for any commercial purposes not directly related to the provision/receipt of Services using the Application as an end user. 6.7. The Company does not guarantee to the User that their use of the Application will ensure the achievement of any specific goals or results.
+6.8. When using the Application, Users undertake not to engage in the distribution of medicines, dietary supplements, escort services and services of a sexual nature, online gambling, narcotic and psychotropic drugs, tobacco products, alcohol, as well as not to engage in any illegal activity, including but not limited to such activity: terrorist activity and terrorist financing, production/distribution of: pornography, child pornography, goods promoting zoophilic relationships, violence and hatred, weapons, copies of original products made by a third-party manufacturer without an appropriate license from the original manufacturer, etc.
+
+VIRUSES 6.9. The Company does not guarantee to the User that the Application will be secure or free from errors, viruses, or external attacks or their consequences. 6.10. The User is fully responsible for configuring information technologies, computer programs, and equipment for their access to the Application. The User must use their own virus protection. 6.11. By using the Application, the User guarantees and confirms that they will not take actions to knowingly introduce and/or distribute in the Application any viruses, "trojans", logic bombs, and other materials that are harmful or technologically harmful, threatening the correct operation of the Application. The User undertakes not to take actions aimed at gaining unauthorized access to the Application, equipment, databases, and programs ensuring the functioning of the Application or its elements. The User undertakes not to take any actions aimed at using a computer attack to access the Application in connection with a denial of service or a distributed denial-of-service attack. By violating this provision, the User realizes they are committing a crime, liability for which is provided by the Criminal Code of Ukraine. The Company has the right to report any such cases to the relevant law enforcement agencies of Ukraine. The User grants their consent that the Application has the right to provide institutions/organizations/enterprises with access to the User's data for the purpose of detecting, identifying Users violating the obligations set forth in this clause of the Agreement. In case the Company has reasonable suspicions of the User committing violations of the Agreement terms, or in case of detection of such violations, the Company immediately terminates the User's access to the Application.
+
+LINKS TO THE APPLICATION 6.12. The User has the right to link to the Application provided that the User indicates correct data and such actions do not violate Legislation and do not damage the reputation of the Application. 6.13. The User has no right to establish a link to the Application in such a way as to suggest any form of association or approval on the part of the Application; the User has no right to link to the pages of the Application on any site that does not belong to them. 6.14. If the User intends to use any information posted in the Application, the rights to which belong to the Company, such User is obliged, prior to using such information, to obtain appropriate permission from the Company by sending their request for the use of information to the email address: support@doctorplus.me.
+
+LIABILITY 6.15. The User is responsible for fulfilling the terms of the Agreement and undertakes to compensate any losses (both direct and indirect, lost profit) incurred by the Company as a result of the User's violation of the Agreement provisions, in the manner and amount determined in the relevant written demand of the Company.
+
+COMPLAINTS 6.16. The Company accepts all feedback, complaints, suggestions, and the User can contact the Company by phone number +380441234567 (the cost of the call is charged according to the tariffs of the User's communication operator), or send their appeal to the email address support@doctorplus.me. 6.17. In case of receipt of a complaint from the User regarding the functioning of the Application, the Company undertakes to try to resolve the problem in a timely manner through negotiations and elimination of misunderstandings. 6.18. In case the User intends to send a complaint, they must do so as soon as possible, but no later than within 3 (three) days from the moment the User discovered the problem. 6.19. The User submits a complaint in writing to the email address: support@doctorplus.me. The complaint must contain the full surname, first name and patronymic, date of birth, postal address of the User, a full statement of the circumstances of the problem, the User's arguments, as well as, if possible, the solution to the problem proposed by the User. 6.20. In case of sending a relevant complaint on behalf of another person, such User must also attach a copy of the document confirming their authority for such actions. 6.21. The Company considers the complaint within 30 calendar days from the date of receipt. During the consideration of this complaint, the Company carefully and thoroughly analyzes the factual circumstances. 6.22. No later than the specified deadline, the Company sends the User a letter (by the means the complaint was received), indicating the result of the complaint consideration. 6.23. The User has the right to appeal the response received from the Company in accordance with Legislation.
+
+7. INFORMATION PROTECTION AND PRIVACY POLICY 7.1. Users' PD and other data of the Application are stored on cloud servers that have a comprehensive information protection system with confirmed compliance. 7.2. Users' PD and other data of the Application are stored on cloud servers located on the territory of Ukraine. 7.3. The Company has no right to collect, store, and process PD, telephone video and chat calls, advisory opinions, other data transferred/received by the User through the use of the Application. 7.4. The Company does not store or transfer Users' payment card data. Information on Users' payment details is entered on a secure page _____, which complies with PCI DSS Level 1 information security standards and guarantees complete security of Users' data. 7.5. The User fully understands that all information voluntarily provided about them in the Application on cloud servers constitutes personal data, i.e., data used to identify the User and to communicate with them. Upon registration, the User agrees to this Agreement, and also agrees that personal data is stored in the Application's database and is subject to use exclusively in accordance with this Agreement and current legislation. The User's personal data is protected by the Law of Ukraine "On Protection of Personal Data". 7.6. The User gives their consent to the processing of their personal data, including any actions such as collection, registration, accumulation, storage, adaptation, modification, renewal, use and dissemination (distribution, realization, transfer), depersonalization, destruction of personal data, including using information (automated) systems. Processing of personal data includes any actions and/or set of actions related to the collection, registration, accumulation, storage, adaptation, modification, renewal, use, and deletion of the User's personal data aimed at ensuring the operation of the Application services. 7.7. The scope of the User's personal data, regarding which processing is carried out and which may be included in personal data bases, is defined as any information about the User voluntarily posted in their account on the Application. 7.8. The User also consents to other actions that the Company may perform with their personal data in written (paper), electronic, and other forms. The User personal data base is registered in the manner prescribed by law in accordance with the Law of Ukraine "On Protection of Personal Data". 7.9. User files sent during appointment booking and in chats are stored for 30 days, after which they are automatically deleted from the server. 7.10. The dialogue between the User and the Provider in the chat is stored for 6 months from the moment the consultation is completed, after which it is deleted.
+
+8. USE OF COOKIES 8.1. Cookies are fragments of information stored by a web browser (or Application) directly in the memory of the User's device. When using the Application again, the web browser sends these fragments of information from the User's device to the Application to automatically adjust the Application interface to the User's interests and preferences or to facilitate the process of the User logging into the account to use the Application services. 8.2. Cookies used by the Application allow identifying repeated use of the Application, which avoids re-entering certain User identifiers, increasing the convenience of using the Application services. 8.3. The Company uses cookies through the Application also to collect statistical information aimed at increasing the efficiency of User interaction with the Application, as well as to obtain information related to marketing offers. 8.4. The use of cookies is aimed at improving the quality and speed of receiving services by the User in the Application, including:
+
+ensuring User access to protected areas of the Application without the need to re-enter User account data;
+
+retaining in memory previous User actions (e.g., filling out online forms) when returning to the page within the same transaction;
+
+managing objects of selected paid services of the Application;
+
+analyzing errors occurring in the Application to improve the quality of Application services;
+
+retaining in memory User settings from previous use of the Application (e.g., country or language, your interests);
+
+retaining in memory identifiers in the Application (e.g., whether the User is willing to participate in a survey dedicated to customer service quality);
+
+tracking whether any service was offered to the User (e.g., providing online support). 8.5. The use of cookies may be aimed at displaying advertising messages in the Application that correspond to Users' interests. Cookies are used to collect detailed information about the User's actions when using the Application (e.g., what goods and services you choose). 8.6. Information obtained using cookies does not contain Users' personal data. 8.7. The Company has the right to store cookies in the Application and ensures access to them. 8.8. The Company has the right to provide third parties with Application cookie information if required by legislation to protect legal rights or take measures regarding potentially illegal activity. 8.9. The User has the right to use the Application's capabilities (taking into account their notifications) regarding the prohibition of creating cookies or deleting cookies stored in their device's memory by performing the following actions:
+
+in the Application settings, set "I do not accept cookies";
+
+in the Application settings, set "Delete cookies". 8.10. The User realizes and agrees that in cases of disabling cookies, setting a ban on their storage, or deleting cookies, the possibilities of working in the Application with User parameters and preferences, as well as the possibilities of configuring the User's personal interface, may be significantly limited.
+
+9. SETTLEMENTS BETWEEN PROVIDERS AND PATIENTS 9.1. The Patient settles with the Provider for the provided Services through the Patient's Personal Account using the appropriate payment service. The Company does not directly accept funds from Patients for Services provided to them by Providers using access to the Application. 9.2. Information regarding the cost of Services is posted in the Application by Providers and may be changed by them at any time. The Company is not responsible for the indicated information about the price of Services, does not influence and does not change the price of Services. 9.3. The Patient replenishes their personal account in the Patient's Personal Account for an amount not less than the cost of the Service determined by the Provider in the Application. After posting a recommendation letter from the Provider in the Patient's Personal Account, the Service is considered performed and is subject to payment in the appropriate amount. 9.4. The Patient has the right to cancel an appointment for a consultation and return the funds paid for the Service to their account. In case the cancellation of the appointment for a consultation at the Patient's initiative occurred less than 3 hours before the start of the consultation, the funds paid for the Service are not subject to return to the Patient's account. 9.5. The Company is not responsible:
+
+for the discrepancy between the price of Services indicated by the Provider in the Application and the price this Provider demands for the provided Service;
+
+for the completeness and timeliness of the return of excessively paid funds or compensation for improperly provided Services;
+
+for non-payment, untimely or incomplete payment for Services by Patients;
+
+for the content and result of resolving any disputes that may arise between the Provider and the Patient regarding payment and quality of Services. 9.6. The Provider receives payment for the provided Service after providing a recommendation letter to the Patient. Payment is credited to the Provider after the payment service deducts a commission in the amount of 30% of the Service cost indicated by the Provider in the Application. 9.7. Any disputes that may arise between Providers and Patients must be resolved directly between them, without involving the Company at any stage of the process and on any side of the dispute, regardless of the use of the Application in resolving such disputes. 9.8. The Company is not a tax agent in relation to the Provider. The Company does not perform any actions regarding calculation, withholding from income accrued (paid, provided) to the Provider, and regarding the transfer of taxes on behalf of and at the expense of the Provider's funds to the budget and any funds. 9.9. Providers bear personal responsibility for compliance with tax Legislation regarding income received when providing Services to Patients. 9.10. Users realize, confirm, and agree that the Company is not responsible if the issuer of the Patient's payment card refuses to authorize (carry out) the payment for any reason. If such payment is not allowed, the Patient does not have the right to use the relevant function of the Application for which a fee is established, or to receive the relevant Service. The issuer of the User's card may charge the latter commissions for processing payment on the Internet. The Company is not responsible for such commissions, their presence, and amount. 9.11. The User is independently responsible for familiarizing themselves with the terms of service provision by the payment service, the bank card issuer, and other persons providing services in the field of funds transfer, and for compliance with relevant conditions. The Company is not responsible for the functioning of the payment service, funds transfers carried out with its help, or debiting of funds from Users' bank cards, as well as for the preservation of the confidentiality of data provided by Users when using the payment service. 9.12. Users (Patients and Providers), when carrying out any transactions using payment cards, are obliged, upon the request of the payment service, to indicate their personal data (RNOKPP, etc.) in accordance with the current legislation of Ukraine and resolutions of the National Bank of Ukraine. 9.13. When paying for a consultation, the issuing bank may charge a commission for the payment from the User's payment card according to the bank's tariffs.
+
+10. INTELLECTUAL PROPERTY RIGHTS 10.1. All Intellectual Property Rights (hereinafter — Rights) to any Objects related to the Application belong exclusively to the Company. 10.2. Users unconditionally undertake not to violate the Company's Rights, to immediately notify the Company in any possible way about any violations of Rights, including but not limited to such violations: illegal use of Objects, copying of Objects or their parts, etc. 10.3. None of the terms of the Agreement shall be interpreted as a transfer of any Rights or part of Rights to any User or other person, regardless of whether such person registered in the Application or not, except for the fulfillment of the terms of the Agreement. 10.4. The User has no right to modify, reproduce, copy, or otherwise use Objects or their parts, and any unauthorized use of Objects entails consequences provided by current Legislation. In case of actions provided for in this clause, the User undertakes to compensate all direct/indirect losses to the Company, in the amount and terms specified in the relevant written demand of the Company. 10.5. Obligations established in this article of the Agreement regarding compliance with the Company's Rights remain in effect both during the validity of the Agreement and for three years after its termination.
+
+11. AMENDMENTS TO THE AGREEMENT 11.1. The Company reserves the right to review and change the terms of the Agreement. 11.2. In case of changes to the terms of the Agreement, the Company notifies Users about such changes and the update of the Agreement version when Users access the Application. Further use of the Application will be considered acceptance of such revised terms, and the User is responsible for compliance with such terms when using the Application. The User's access to the Application after notification of changes in the Agreement is evidence that the User agrees with the changed terms. 11.3. Changes to the Agreement enter into force from the moment of their publication in the Application and from the moment of acceptance of the changed terms by the User. 11.4. The Company unilaterally has the right to introduce certain promotions that may partially and temporarily change the terms of the Agreement, about which the Company notifies all Users by a generally accessible method, by placing a corresponding notice on the start (home, main) page of the Application and/or by placing a notice about the promotion and its conditions in the User's personal account.
+
+12. FINAL PROVISIONS 12.1. The Agreement enters into force from the day of its public placement in the Application and accession to its terms by the User through User registration in the Application, which indicates full acceptance of the terms of the Agreement. The Agreement, concluded by accepting a public offer in the prescribed manner, has the legal force of an agreement sealed with the signatures of the parties, and the parties bear the rights and obligations provided by it. 12.2. By concluding the Agreement, the User confirms that they unconditionally accept all terms of the Agreement without reservations. By registering in the Application, the User agrees to receive service notifications, updates by email and/or text message containing important information about the Services or the Application. 12.3. The Agreement is valid until the Parties fulfill their obligations under the Agreement and may be terminated by disconnecting the User from the Application:
+
+at the User's initiative by sending a corresponding letter to the Company's address;
+
+at the Company's initiative in case of violation by the User of the terms of the Agreement, as well as after the expiration of a two-year period from the moment of the User's last authentication in the Application. 12.4. All disputes arising between the Parties regarding the conclusion, execution, termination of the Agreement are submitted to the court in accordance with Legislation. 12.5. If the Application contains links to other websites, services, and resources provided by third parties, these links are provided in the Application solely for information. The Company does not control and/or verify the content of these websites or resources, and the Company bears no responsibility for the use and consequences of the use by Users of such websites, services, or resources. 12.6. The Company confirms that it is a payer of the single tax at the rate provided by the Tax Code of Ukraine. 12.7. The User may not transfer any of their rights or obligations under the Agreement. 12.8. All notices to the Company must be provided by the User in writing to the address specified in the Agreement. The Company may send notices to the User to the email or postal address specified by them during registration in the Application. 12.9. If any provision of the Agreement is found to be invalid, all other provisions remain unchanged and valid. 12.10. Users can send any questions regarding the Agreement or the use of the Application by email to support@doctorplus.me, or by contacting by phone +380441234567 seven days a week from 9:00 to 20:00.`
+  };
+
+  const processedText = replacePlaceholders(agreementText[i18n.language] || agreementText.uk, i18n.language);
+
+  // --- ФУНКЦІЯ ДЛЯ ВІДОБРАЖЕННЯ ТЕКСТУ З ЖИРНИМ ШРИФТОМ ---
+  const renderFormattedText = (text) => {
+    return text.split('\n').map((paragraph, index) => {
+      // Якщо рядок порожній, робимо відступ
+      if (!paragraph.trim()) {
+        return <View key={`spacer-${index}`} style={{ height: 10 }} />;
+      }
+
+      // Розбиваємо по маркерах **bold**
+      const parts = paragraph.split('**');
+
+      return (
+        <Text key={index} style={styles.paragraph}>
+          {parts.map((part, partIndex) => {
+            // Непарні індекси (1, 3, 5...) це текст всередині ** **
+            if (partIndex % 2 === 1) {
+              return <Text key={partIndex} style={styles.boldText}>{part}</Text>;
+            }
+            return <Text key={partIndex}>{part}</Text>;
+          })}
+        </Text>
+      );
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -579,10 +548,21 @@ const PartnershipAgreementScreen = () => {
         <Text style={styles.headerTitle}>{t('partnershipAgreementHeader')}</Text>
         <View style={{ width: getResponsiveFontSize(24) }} />
       </View>
-      <ScrollView style={styles.scrollView}>
-        <Text style={styles.bodyText}>
-          {currentPolicyText}
-        </Text>
+
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.cardContainer}>
+          {renderFormattedText(processedText)}
+        </View>
+        
+        <View style={styles.footerNote}>
+          <Text style={styles.footerText}>
+            {t('lastUpdated') || (i18n.language === 'uk' ? 'Остання редакція: Листопад 2023' : 'Last updated: November 2023')}
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -591,7 +571,7 @@ const PartnershipAgreementScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#F5F7FA', // Світло-сірий фон сторінки
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   header: {
@@ -603,27 +583,64 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    elevation: 2, // Тінь для Android
+    shadowColor: "#000", // Тінь для iOS
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   backButton: {
     padding: getResponsiveFontSize(5),
   },
   headerTitle: {
-    fontSize: getResponsiveFontSize(18),
+    fontSize: getResponsiveFontSize(17),
     fontFamily: 'Mont-SemiBold',
     color: '#333',
     textAlign: 'center',
     flex: 1,
   },
   scrollView: {
-    paddingHorizontal: 15,
-    paddingTop: getResponsiveHeight(2),
+    flex: 1,
   },
-  bodyText: {
+  scrollContent: {
+    paddingHorizontal: 15,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  // Картка з текстом
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 25,
+    paddingHorizontal: 20,
+    // Тінь картки
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  paragraph: {
     fontSize: getResponsiveFontSize(14),
     fontFamily: 'Mont-Regular',
-    color: '#555',
-    lineHeight: getResponsiveFontSize(22),
-    marginBottom: getResponsiveHeight(3),
+    color: '#444', // Трохи м'якший чорний для читабельності
+    lineHeight: getResponsiveFontSize(24),
+    marginBottom: 12,
+    textAlign: 'justify', // Вирівнювання тексту
+  },
+  boldText: {
+    fontFamily: 'Mont-Bold',
+    color: '#000',
+    fontSize: getResponsiveFontSize(15),
+  },
+  footerNote: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: getResponsiveFontSize(12),
+    color: '#999',
+    fontFamily: 'Mont-Regular',
   },
 });
 

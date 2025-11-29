@@ -24,7 +24,7 @@ export default {
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": ".",
+      "bundleIdentifier": "com.kis-production.DOCTOR",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",
