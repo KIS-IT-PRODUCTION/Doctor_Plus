@@ -21,13 +21,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../providers/supabaseClient";
 
-// --- ГЛОБАЛЬНІ КОНСТАНТИ ТА ФУНКЦІЇ МАСШТАБУВАННЯ ---
 const { width, height } = Dimensions.get("window");
 const scale = (size) => (width / 375) * size;
 const verticalScale = (size) => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 
-// --- СПИСКИ ДАНИХ (СПЕЦІАЛІЗАЦІЇ, ПРАПОРИ) ---
 const specializationsList = [
   { value: "general_practitioner", nameKey: "general_practitioner" },
   { value: "pediatrician", nameKey: "pediatrician" },
@@ -96,7 +94,6 @@ const COUNTRY_FLAGS_MAP = {
   "EN": "🇬🇧", "UK": "🇺🇦", "DE": "🇩🇪", "PH": "🇵🇭", "HR": "🇭🇷", "CF": "🇨🇫", "TD": "🇹🇩", "CZ": "🇨🇿", "CL": "🇨🇱", "ME": "🇲🇪", "LK": "🇱🇰", "JM": "🇯🇲", "UA": "🇺🇦", "GB": "🇬🇧", "US": "🇺🇸", "CA": "🇨🇦", "FR": "🇫🇷", "PL": "🇵🇱", "IT": "🇮🇹", "ES": "🇪🇸", "JP": "🇯🇵", "CN": "🇨🇳", "IN": "🇮🇳", "AU": "🇦🇺", "BR": "🇧🇷", "TR": "🇹🇷", "SE": "🇸🇪", "CH": "🇨🇭", "NL": "🇳🇱", "NO": "🇳🇴", "DK": "🇩🇰", "FI": "🇫🇮", "ZA": "🇿🇦", "MX": "🇲🇽", "KR": "🇰🇷", "AR": "🇦🇷", "IE": "🇮🇪", "NZ": "🇳🇿", "SG": "🇸🇬", "IL": "🇮🇱", "MY": "🇲🇾", "TH": "🇹🇭", "VN": "🇻🇳", "ID": "🇮🇩", "EG": "🇪🇬", "NG": "🇳🇬", "SA": "🇸🇦", "AE": "🇦🇪", "KW": "🇰🇼", "QA": "🇶🇦", "AT": "🇦🇹", "AZ": "🇦🇿", "AL": "🇦🇱", "DZ": "🇩🇿", "AO": "🇦🇴", "AD": "🇦🇩", "AG": "🇦🇬", "AF": "🇦🇫", "BS": "🇧🇸", "BD": "🇧🇩", "BB": "🇧🇧", "BH": "🇧🇭", "BZ": "🇧🇿", "BE": "🇧🇪", "BJ": "🇧🇯", "BY": "🇧🇾", "BG": "🇧🇬", "BO": "🇧🇴", "BA": "🇧🇦", "BW": "🇧🇼", "BN": "🇧🇳", "BF": "🇧🇫", "BI": "🇧🇮", "BT": "🇧🇹", "VU": "🇻🇺", "VE": "🇻🇪", "AM": "🇦🇲", "GA": "🇬🇦", "HT": "🇭🇹", "GM": "🇬🇲", "GH": "🇬🇭", "GY": "🇬🇾", "GT": "🇬🇹", "GN": "🇬🇳", "GW": "🇬🇼", "HN": "🇭🇳", "GD": "🇬🇩", "GR": "🇬🇷", "GE": "🇬🇪", "DJ": "🇩🇯", "DM": "🇩🇲", "DO": "🇩🇴", "CD": "🇨🇩", "EC": "🇪🇨", "GQ": "🇬🇶", "ER": "🇪🇷", "SZ": "🇸🇿", "EE": "🇪🇪", "ET": "🇪🇹", "YE": "🇾🇪", "ZM": "🇿🇲", "ZW": "🇿🇼", "IR": "🇮🇷", "IS": "🇮🇸", "IQ": "🇮🇶", "JO": "🇯🇴", "CV": "🇨🇻", "KZ": "🇰🇿", "KH": "🇰🇭", "CM": "🇨🇲", "KE": "🇰🇪", "KG": "🇰🇬", "CY": "🇨🇾", "KI": "🇰🇮", "CO": "🇨🇴", "KM": "🇰🇲", "CR": "🇨🇷", "CI": "🇨🇮", "CU": "🇨🇺", "LA": "🇱🇦", "LV": "🇱🇻", "LS": "🇱🇸", "LT": "🇱🇹", "LR": "🇱🇷", "LB": "🇱🇧", "LY": "🇱🇾", "LI": "🇱🇮", "LU": "🇱🇺", "MM": "🇲🇲", "MU": "🇲🇺", "MR": "🇲🇷", "MG": "🇲🇬", "MW": "🇲🇼", "ML": "🇲🇱", "MV": "🇲🇻", "MT": "🇲🇹", "MA": "🇲🇦", "MH": "🇲🇭", "MZ": "🇲🇿", "MD": "🇲🇩", "MC": "🇲🇨", "MN": "🇲🇳", "NA": "🇳🇦", "NR": "🇳🇷", "NP": "🇳🇵", "NE": "🇳🇪", "NI": "🇳🇮", "OM": "🇴🇲", "PK": "🇵🇰", "PW": "🇵🇼", "PA": "🇵🇦", "PG": "🇵🇬", "PY": "🇵🇾", "PE": "🇵🇪", "SS": "🇸🇸", "KP": "🇰🇵", "MK": "🇲🇰", "PT": "🇵🇹", "CG": "🇨🇬", "RU": "🇷🇺", "RW": "🇷🇼", "RO": "🇷🇴", "SV": "🇸🇻", "WS": "🇼🇸", "SM": "🇸🇲", "ST": "🇸🇹", "SC": "🇸🇨", "SN": "🇸🇳", "VC": "🇻🇨", "KN": "🇰🇳", "LC": "🇱🇨", "RS": "🇷🇸", "SY": "🇸🇾", "SK": "🇸🇰", "SI": "🇸🇮", "SB": "🇸🇧", "SO": "🇸🇴", "SD": "🇸🇩", "SR": "🇸🇷", "TL": "🇹🇱", "SL": "🇸🇱", "TJ": "🇹🇯", "TZ": "🇹🇿", "TG": "🇹🇬", "TO": "🇹🇴", "TT": "🇹🇹", "TV": "🇹🇻", "TN": "🇹🇳", "TM": "🇹🇲", "UG": "🇺🇬", "HU": "🇭🇺", "UZ": "🇺🇿", "UY": "🇺🇾", "FM": "🇫🇲", "FJ": "🇫🇯",
 };
 
-// --- ДОПОМІЖНІ ФУНКЦІЇ ---
 const getParsedArray = (value) => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -123,7 +120,6 @@ const getPoints = (doc) => {
 };
 
 
-// --- ДОЧІРНІ КОМПОНЕНТИ ---
 const InfoBox = ({ icon, label, value, children }) => {
   const { t } = useTranslation();
   const isEmpty = !value && (!children || (Array.isArray(children) && children.length === 0));
@@ -216,7 +212,6 @@ const DoctorCard = ({ doctor }) => {
   );
 };
 
-// --- ГОЛОВНИЙ КОМПОНЕНТ ЕКРАНА ---
 const ChooseSpecial = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -232,7 +227,6 @@ const ChooseSpecial = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(300)).current;
 
-  // Функція сортування
   const sortDoctors = useCallback((doctorsToSort, option) => {
     const sorted = [...doctorsToSort];
     switch (option) {
@@ -250,8 +244,6 @@ const ChooseSpecial = () => {
         return sorted.sort((a, b) => (b.consultation_cost || 0) - (a.consultation_cost || 0));
       case "popularity":
       default:
-        // Сортуємо за початковим порядком (адмін-сортування)
-        // Присвоюємо високий індекс лікарям без display_order
         return sorted.sort((a, b) => (a.display_order || 9999) - (b.display_order || 9999));
     }
   }, []);
@@ -266,7 +258,7 @@ const ChooseSpecial = () => {
         .from("anketa_doctor")
         .select("*, profile_doctor(doctor_points), display_order")
         .eq("doctor_check", true)
-        .order('display_order', { ascending: true, nullsFirst: false }); // <--- ЗМІНА ТУТ
+        .order('display_order', { ascending: true, nullsFirst: false });
 
       if (initialSpecialization) {
         query = query.filter("specialization", "cs", `["${initialSpecialization}"]`);
@@ -344,7 +336,6 @@ const ChooseSpecial = () => {
     return t("doctors");
   };
 
-  // Функція для рендерингу основного контенту
   const renderContent = () => {
     if (loading) {
       return (
@@ -417,7 +408,6 @@ const ChooseSpecial = () => {
   );
 };
 
-// --- СТИЛІ ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

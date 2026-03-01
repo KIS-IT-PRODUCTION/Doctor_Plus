@@ -12,7 +12,7 @@
   "close": "Закрити",
   "ok_button": "ОК",
   "ok": "ОК",
-
+  "add_photo": "Додати фото",
   "selectLanguage": "Виберіть мову",
   "ukrainian": "🇺🇦 Українська",
   "english": "🇬🇧 Англійська",
@@ -947,7 +947,7 @@
     "status_confirmed_title": "Підтверджено",
     "status_rejected_title": "Відхилено",
   "deleteProfile_title": "Видалити",
-  "pay_and_hold_funds": "Підьвердити",
+  "pay_and_hold_funds": "Підтвердити",
   "funds_are_held": "Кошти утримуються",
   "paid_successfully": "Оплачено успішно",
   "confirm_consultation_and_pay": "Підтвердити та оплатити",

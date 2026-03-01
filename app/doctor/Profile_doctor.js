@@ -16,6 +16,7 @@ import {
   Text,
   Animated,
   Easing,
+  Dimensions
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,6 +31,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { specializations } from './constant/specializations.js';
 import styles from "./ProfileDoctorStyles";
 
+// Налаштування анімацій для Android
 if (
   Platform.OS === "android" &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -37,6 +39,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// Налаштування сповіщень
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -44,7 +47,6 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-
 
 async function registerForPushNotificationsAsync(userId) {
   let token;
@@ -69,10 +71,7 @@ async function registerForPushNotificationsAsync(userId) {
     if (finalStatus !== "granted") {
       Alert.alert(
         "Помилка",
-        "Не вдалося отримати токен для push-сповіщень! Перевірте дозволи в налаштуваннях вашого пристрою."
-      );
-      console.error(
-        "Failed to get push token for push notification: Permissions not granted!"
+        "Не вдалося отримати токен для push-сповіщень! Перевірте дозволи."
       );
       return;
     }
@@ -83,26 +82,8 @@ async function registerForPushNotificationsAsync(userId) {
           projectId: "e2619b61-6ef5-4958-90bc-a400bbc8c50a",
         })
       ).data;
-      console.log("Expo Push Token obtained:", token);
     } catch (e) {
-      let errorMessage = "Unknown error";
-      if (e instanceof Error) {
-        errorMessage = e.message;
-      } else if (typeof e === "string") {
-        errorMessage = e;
-      } else if (
-        typeof e === "object" &&
-        e !== null &&
-        "message" in e &&
-        typeof e.message === "string"
-      ) {
-        errorMessage = e.message;
-      }
-      console.error("Error getting Expo push token:", errorMessage, e);
-      Alert.alert(
-        "Помилка",
-        `Не вдалося отримати токен сповіщень: ${errorMessage}. Перевірте підключення.`
-      );
+      console.error("Error getting Expo push token:", e);
       return;
     }
   } else {
@@ -111,20 +92,13 @@ async function registerForPushNotificationsAsync(userId) {
   }
 
   if (token && userId) {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("profile_doctor")
       .update({ notification_token: token })
       .eq("user_id", userId);
 
     if (error) {
-      console.error(
-        "Error saving notification token to Supabase:",
-        error.message
-      );
-      Alert.alert("Помилка", `Не вдалося зберегти токен сповіщень: ${error.message}`);
-    } else {
-      console.log("Notification token saved successfully for doctor user_id:", userId);
-      console.log("Saved token:", token);
+      console.error("Error saving notification token:", error.message);
     }
   }
 
@@ -132,22 +106,13 @@ async function registerForPushNotificationsAsync(userId) {
 }
 
 const getStarRating = (points) => {
-  if (points === null || points === undefined || isNaN(points)) {
-    return 0;
-  }
-  if (points >= 1000) {
-    return 5;
-  } else if (points >= 800) {
-    return 4;
-  } else if (points >= 600) {
-    return 3;
-  } else if (points >= 400) {
-    return 2;
-  } else if (points >= 200) {
-    return 1;
-  } else {
-    return 0;
-  }
+  if (points === null || points === undefined || isNaN(points)) return 0;
+  if (points >= 1000) return 5;
+  if (points >= 800) return 4;
+  if (points >= 600) return 3;
+  if (points >= 400) return 2;
+  if (points >= 200) return 1;
+  return 0;
 };
 
 const ValueBox = ({ children, t }) => {
@@ -171,7 +136,7 @@ const ValueBox = ({ children, t }) => {
 };
 
 const COUNTRY_FLAGS_MAP = {
-   "EN": "🇬🇧",
+  "EN": "🇬🇧",
   "UK": "🇺🇦",
   "DE": "🇩🇪",
   "PH": "🇵🇭",
@@ -390,6 +355,100 @@ const LanguageFlags = ({ languages }) => {
   );
 };
 
+// --- КОМПОНЕНТ СЛАЙД-ШОУ ---
+const DocumentSlideshow = ({ title, data, placeholderText, loading, error, setLoading, setError }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollViewRef = useRef(null);
+
+  const getImages = () => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    try {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      if (typeof data === 'string' && data.startsWith('http')) return [data];
+    }
+    return typeof data === 'string' ? [data] : [];
+  };
+
+  const images = getImages();
+  const hasMultiple = images.length > 1;
+
+  const handleScroll = (event) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const windowWidth = Dimensions.get("window").width;
+    // Враховуємо margin/padding (приблизно 80)
+    const index = Math.round(scrollPosition / (windowWidth - 80));
+    setActiveIndex(index);
+  };
+
+  if (images.length === 0) {
+    return (
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionHeader}>{title}</Text>
+        <View style={styles.imageWrapperPlaceholder}>
+          <Text style={styles.noImageText}>{placeholderText}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.sectionContainer}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <View style={styles.slideshowWrapper}>
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.slideshowContent}
+        >
+          {images.map((url, index) => (
+            <View key={index} style={styles.slideContainer}>
+              <Image
+                source={{ uri: url }}
+                style={styles.slideImage}
+                resizeMode="cover"
+                onLoad={() => setLoading && setLoading(false)}
+                onError={() => {
+                  setLoading && setLoading(false);
+                  setError && setError(true);
+                }}
+              />
+              {loading && !error && index === 0 && (
+                <ActivityIndicator
+                  size="large"
+                  color="#0EB3EB"
+                  style={styles.imageLoadingIndicator}
+                />
+              )}
+            </View>
+          ))}
+        </ScrollView>
+        
+        {hasMultiple && (
+          <View style={styles.paginationContainer}>
+            {images.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.paginationDot,
+                  activeIndex === index && styles.paginationDotActive
+                ]}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+// --- ГОЛОВНИЙ КОМПОНЕНТ ---
 const Profile_doctor = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -403,12 +462,13 @@ const Profile_doctor = ({ route }) => {
   const doctorIdFromParams = route.params?.doctorId ? String(route.params.doctorId) : null;
   const isProfileOwner = !doctorIdFromParams || (session?.user?.id === doctorIdFromParams);
 
-  const [currentLoggedInDoctorId, setCurrentLoggedInDoctorId] = useState(null);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
+  const [isProfileCompletionModalVisible, setIsProfileCompletionModalVisible] = useState(false);
 
+  // Стани завантаження фото
   const [loadingAvatar, setLoadingAvatar] = useState(true);
   const [loadingCertificate, setLoadingCertificate] = useState(true);
   const [loadingDiploma, setLoadingDiploma] = useState(true);
@@ -417,10 +477,9 @@ const Profile_doctor = ({ route }) => {
   const [certificateError, setCertificateError] = useState(false);
   const [diplomaError, setDiplomaError] = useState(false);
 
-  const [isProfileCompletionModalVisible, setIsProfileCompletionModalVisible] = useState(false);
-
   const [activeTab, setActiveTab] = useState("Profile_doctor");
 
+  // Анімації
   const timeIconRotateAnim = useRef(new Animated.Value(0)).current;
   const settingsIconRotateAnim = useRef(new Animated.Value(0)).current;
 
@@ -449,14 +508,10 @@ const Profile_doctor = ({ route }) => {
     outputRange: ['0deg', '360deg'],
   });
 
-
   useEffect(() => {
     const userId = session?.user?.id;
     if (userId) {
-      setCurrentLoggedInDoctorId(userId);
       registerForPushNotificationsAsync(userId);
-    } else {
-      setCurrentLoggedInDoctorId(null);
     }
   }, [session]);
 
@@ -479,32 +534,17 @@ const Profile_doctor = ({ route }) => {
         .eq('user_id', userId)
         .single();
 
-      if (anketaError && anketaError.code !== 'PGRST116') {
-        throw anketaError;
-      }
+      if (anketaError && anketaError.code !== 'PGRST116') throw anketaError;
 
       const { data: profileData, error: profileError } = await supabase
           .from('profile_doctor')
-          .select(`
-            user_id,
-            full_name,
-            email,
-            phone,
-            country,
-            doctor_points,
-            language
-          `)
+          .select(`user_id, full_name, email, phone, country, doctor_points, language`)
           .eq('user_id', userId)
           .single();
 
-      if (profileError) {
-          throw profileError;
-      }
+      if (profileError) throw profileError;
       
-      const combinedData = {
-          ...profileData,
-          ...anketaData,
-      };
+      const combinedData = { ...profileData, ...anketaData };
 
       if (anketaData || profileData) {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -517,29 +557,25 @@ const Profile_doctor = ({ route }) => {
       console.error("Помилка при завантаженні профілю лікаря:", err);
       setError(err.message);
     } finally {
-      if (!isRefresh) {
-        setIsLoading(false);
-      }
+      if (!isRefresh) setIsLoading(false);
     }
-  }, [setLoadingAvatar, setLoadingDiploma, setLoadingCertificate]);
+  }, []);
 
   const checkProfileCompleteness = useCallback((profile) => {
     if (!profile) return false;
-    const isComplete =
+    return (
       profile.full_name &&
       profile.avatar_url &&
-      profile.consultation_cost !== null &&
-      profile.consultation_cost !== undefined &&
-      profile.experience_years !== null &&
-      profile.experience_years !== undefined &&
+      profile.consultation_cost != null &&
+      profile.experience_years != null &&
       profile.work_location &&
       profile.achievements &&
       profile.about_me &&
-      (profile.communication_languages && profile.communication_languages.length > 0) &&
-      (profile.specialization && profile.specialization.length > 0) &&
+      (profile.communication_languages?.length > 0) &&
+      (profile.specialization?.length > 0) &&
       profile.diploma_url &&
-      profile.certificate_photo_url;
-    return isComplete;
+      profile.certificate_photo_url
+    );
   }, []);
 
   useEffect(() => {
@@ -560,7 +596,6 @@ const Profile_doctor = ({ route }) => {
   useFocusEffect(
     useCallback(() => {
       setActiveTab("Profile_doctor");
-      return () => {};
     }, [])
   );
 
@@ -570,29 +605,16 @@ const Profile_doctor = ({ route }) => {
       setUnreadNotificationsCount(0);
       return;
     }
-
     try {
-      const { count, error: countError } = await supabase
+      const { count, error } = await supabase
         .from("doctor_notifications")
         .select("id", { count: "exact" })
         .eq("doctor_id", userId)
         .eq("is_read", false);
 
-      if (countError) {
-        console.error(
-          "Error fetching unread notifications count:",
-          countError.message
-        );
-        setUnreadNotificationsCount(0);
-      } else {
-        setUnreadNotificationsCount(count || 0);
-      }
-    } catch (err)      {
-      console.error(
-        "Unexpected error fetching unread notifications count:",
-        err
-      );
-      setUnreadNotificationsCount(0);
+      if (!error) setUnreadNotificationsCount(count || 0);
+    } catch (err) {
+      console.error(err);
     }
   }, [session?.user?.id]);
 
@@ -604,79 +626,40 @@ const Profile_doctor = ({ route }) => {
 
   useEffect(() => {
     const userId = session?.user?.id;
-    if (!userId || !isProfileOwner) {
-      return;
-    }
+    if (!userId || !isProfileOwner) return;
 
     const channel = supabase
       .channel(`doctor_notifications:${userId}`)
-      .on(
-        'postgres_changes',
-        { 
-          event: '*',
-          schema: 'public', 
-          table: 'doctor_notifications',
-          filter: `doctor_id=eq.${userId}`
+      .on('postgres_changes', { 
+          event: '*', schema: 'public', table: 'doctor_notifications', filter: `doctor_id=eq.${userId}`
         },
-        (payload) => {
-          console.log('Realtime: Отримано нове сповіщення!', payload);
-          fetchUnreadNotificationsCount();
-        }
+        () => fetchUnreadNotificationsCount()
       )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Realtime: Підписано на сповіщення!');
-        }
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime Error:', err.message);
-        }
-      });
+      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [session?.user?.id, isProfileOwner, fetchUnreadNotificationsCount]);
 
-
-  const formatYearsText = useCallback(
-    (years) => {
-      if (years === null || years === undefined || isNaN(years) || years < 0) {
-        return t("not_specified");
-      }
-      return t("years_experience", { count: years });
-    },
-    [t]
-  );
+  const formatYearsText = useCallback((years) => {
+    if (years == null || isNaN(years) || years < 0) return t("not_specified");
+    return t("years_experience", { count: years });
+  }, [t]);
 
   const openLanguageModal = () => setIsLanguageModalVisible(true);
   const closeLanguageModal = () => setIsLanguageModalVisible(false);
 
-const handleLanguageSelect = async (langCode) => {
+  const handleLanguageSelect = async (langCode) => {
     try {
       await i18n.changeLanguage(langCode);
       await AsyncStorage.setItem('user_language', langCode);
       closeLanguageModal();
 
-      if (!isProfileOwner || !session?.user?.id) {
-        return;
+      if (isProfileOwner && session?.user?.id) {
+        setDoctorData(prev => ({ ...prev, language: langCode }));
+        await supabase.from('profile_doctor').update({ language: langCode }).eq('user_id', session.user.id);
       }
-
-      setDoctorData(prevData => ({
-        ...prevData,
-        language: langCode
-      }));
-
-      const { error } = await supabase
-        .from('profile_doctor')
-        .update({ language: langCode })
-        .eq('user_id', session.user.id);
-
-      if (error) throw error;
-      
-      console.log("Мову оновлено в БД та AsyncStorage:", langCode);
-
     } catch (error) {
-      console.error("Помилка під час зміни мови:", error.message);
+      console.error(error);
       Alert.alert(t("error_title"), t("error_updating_language"));
       closeLanguageModal();
     }
@@ -689,7 +672,6 @@ const handleLanguageSelect = async (langCode) => {
 
   const handleChooseConsultationTime = () => {
     const targetDoctorId = doctorIdFromParams || session?.user?.id;
-
     if (targetDoctorId) {
       navigation.navigate("ConsultationTime", { doctorId: targetDoctorId });
     } else {
@@ -699,24 +681,7 @@ const handleLanguageSelect = async (langCode) => {
 
   const handleTabPress = (tabName) => {
     setActiveTab(tabName);
-    switch (tabName) {
-      case "Home_doctor":
-        navigation.navigate("Home_doctor");
-        break;
-      case "Records_doctor":
-        navigation.navigate("Records_doctor");
-        break;
-      case "Chat_doctor":
-        navigation.navigate("Chat_doctor");
-        break;
-      case "Support_doctor":
-        navigation.navigate("Support_doctor");
-        break;
-      case "Profile_doctor":
-        break;
-      default:
-        break;
-    }
+    if (tabName !== "Profile_doctor") navigation.navigate(tabName);
   };
 
   const languagesForModal = [
@@ -726,65 +691,45 @@ const handleLanguageSelect = async (langCode) => {
 
   const getParsedArray = useCallback((value) => {
     if (!value) return [];
-    if (Array.isArray(value)) {
-      return value;
-    }
+    if (Array.isArray(value)) return value;
     try {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
-    } catch (err) {
-      console.warn(
-        "Warning: Invalid JSON format for array:",
-        value,
-        err
-      );
+    } catch {
       return [];
     }
   }, []);
 
-  const getLanguages = useCallback(
-    (languagesData) => {
-      const parsedLanguages = getParsedArray(languagesData);
-      return parsedLanguages.map((lang) => {
-        if (typeof lang === 'object' && lang !== null && lang.code) {
-          return String(lang.code).toUpperCase();
-        }
-        return String(lang).toUpperCase();
-      }).filter(code => COUNTRY_FLAGS_MAP[code]);
-    },
-    [getParsedArray]
-  );
+  const getLanguages = useCallback((languagesData) => {
+    const parsedLanguages = getParsedArray(languagesData);
+    return parsedLanguages.map((lang) => {
+      if (typeof lang === 'object' && lang?.code) return String(lang.code).toUpperCase();
+      return String(lang).toUpperCase();
+    }).filter(code => COUNTRY_FLAGS_MAP[code]);
+  }, [getParsedArray]);
 
-  const getSpecializations = useCallback(
-    (specializationData) => {
-      const parsedSpecs = getParsedArray(specializationData);
-      if (parsedSpecs.length > 0) {
-        if (typeof parsedSpecs[0] === "string") {
-          return parsedSpecs
-            .map((specValue) => {
-              const specObj = specializations.find((s) => s.value === specValue);
-              return specObj ? t(specObj.nameKey) : specValue;
-            })
-            .join(", ");
-        } else if (typeof parsedSpecs[0] === "object" && parsedSpecs[0].nameKey) {
-          return parsedSpecs.map((specObj) => t(`categories.${specObj.nameKey}`)).join(", ");
-        }
+  const getSpecializations = useCallback((specializationData) => {
+    const parsedSpecs = getParsedArray(specializationData);
+    if (parsedSpecs.length > 0) {
+      if (typeof parsedSpecs[0] === "string") {
+        return parsedSpecs
+          .map((specValue) => {
+            const specObj = specializations.find((s) => s.value === specValue);
+            return specObj ? t(specObj.nameKey) : specValue;
+          })
+          .join(", ");
+      } else if (typeof parsedSpecs[0] === "object" && parsedSpecs[0].nameKey) {
+        return parsedSpecs.map((specObj) => t(`categories.${specObj.nameKey}`)).join(", ");
       }
-      return t("not_specified");
-    },
-    [getParsedArray, t]
-  );
+    }
+    return t("not_specified");
+  }, [getParsedArray, t]);
 
   const onRetry = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsProfileCompletionModalVisible(false);
-
     const targetId = doctorIdFromParams || session?.user?.id;
-    if (targetId) {
-      fetchDoctorProfile(targetId);
-    } else {
-      console.warn("Retry failed: Doctor ID missing.");
-    }
+    if (targetId) fetchDoctorProfile(targetId);
   }, [doctorIdFromParams, session?.user?.id, fetchDoctorProfile]);
 
   const onBackToHome = useCallback(() => {
@@ -799,13 +744,10 @@ const handleLanguageSelect = async (langCode) => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setIsProfileCompletionModalVisible(false);
-
     const idToRefresh = doctorIdFromParams || session?.user?.id;
     if (idToRefresh) {
       await fetchDoctorProfile(idToRefresh, true);
       await fetchUnreadNotificationsCount();
-    } else {
-      console.warn("Cannot refresh: Doctor ID missing.");
     }
     setRefreshing(false);
   }, [fetchDoctorProfile, fetchUnreadNotificationsCount, doctorIdFromParams, session?.user?.id]);
@@ -832,9 +774,7 @@ const handleLanguageSelect = async (langCode) => {
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle-outline" size={50} color="#D32F2F" />
             <Text style={styles.errorText}>
-              {!isConnected
-                ? t("check_connection")
-                : error || t("error_fetching_doctor_data_general")}
+              {!isConnected ? t("check_connection") : error || t("error_fetching_doctor_data_general")}
             </Text>
             <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
               <Text style={styles.retryButtonText}>{t("retry")}</Text>
@@ -848,13 +788,8 @@ const handleLanguageSelect = async (langCode) => {
         <View style={styles.fullscreenContainer}>
           <View style={styles.noDoctorContainer}>
             <Ionicons name="information-circle-outline" size={50} color="#0EB3EB" />
-            <Text style={styles.noDoctorText}>
-              {t("doctor_not_found")}
-            </Text>
-            <TouchableOpacity
-                style={styles.backToHomeButton}
-                onPress={onBackToHome}
-            >
+            <Text style={styles.noDoctorText}>{t("doctor_not_found")}</Text>
+            <TouchableOpacity style={styles.backToHomeButton} onPress={onBackToHome}>
                 <Text style={styles.backToHomeButtonText}>{t("back_to_home")}</Text>
             </TouchableOpacity>
           </View>
@@ -862,10 +797,7 @@ const handleLanguageSelect = async (langCode) => {
       ) : showProfileContent ? (
         <>
           <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.languageSelectButton}
-              onPress={openLanguageModal}
-            >
+            <TouchableOpacity style={styles.languageSelectButton} onPress={openLanguageModal}>
                 <Text style={styles.languageButtonText}>
                   {(finalDoctorData.language || i18n.language).toUpperCase()}
                 </Text>
@@ -874,16 +806,11 @@ const handleLanguageSelect = async (langCode) => {
 
             <Text style={styles.headerTitle}>{t("profile_doctor")}</Text>
             {isProfileOwner && (
-              <TouchableOpacity
-                style={styles.notificationButton}
-                onPress={() => navigation.navigate("Messege")}
-              >
+              <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate("Messege")}>
                  <Ionicons name="mail-outline" size={24} color="#0EB3EB" />
                   {unreadNotificationsCount > 0 && (
                     <View style={styles.notificationBadge}>
-                      <Text style={styles.notificationNumber}>
-                        {unreadNotificationsCount}
-                      </Text>
+                      <Text style={styles.notificationNumber}>{unreadNotificationsCount}</Text>
                     </View>
                   )}
               </TouchableOpacity>
@@ -914,22 +841,14 @@ const handleLanguageSelect = async (langCode) => {
                       onError={() => {
                         setLoadingAvatar(false);
                         setAvatarError(true);
-                        console.error("Error loading avatar image:", finalDoctorData.avatar_url);
                       }}
                     />
                     {loadingAvatar && !avatarError && (
-                      <ActivityIndicator
-                        size="large"
-                        color="#0EB3EB"
-                        style={styles.avatarLoadingIndicator}
-                      />
+                      <ActivityIndicator size="large" color="#0EB3EB" style={styles.avatarLoadingIndicator} />
                     )}
                   </>
                 ) : (
-                  <Image
-                    source={{ uri: defaultAvatarUrl }}
-                    style={styles.avatar}
-                  />
+                  <Image source={{ uri: defaultAvatarUrl }} style={styles.avatar} />
                 )}
               </View>
               <View style={styles.doctorDetails}>
@@ -992,9 +911,7 @@ const handleLanguageSelect = async (langCode) => {
                 <Animated.View style={{ transform: [{ rotate: timeIconRotate }] }}>
                     <Ionicons name="time-outline" size={24} color="white" style={styles.buttonIcon} />
                 </Animated.View>
-                <Text style={styles.actionButtonText}>
-                  {t("choose_consultation_time")}
-                </Text>
+                <Text style={styles.actionButtonText}>{t("choose_consultation_time")}</Text>
             </TouchableOpacity>
             
             {isProfileOwner && (
@@ -1005,9 +922,7 @@ const handleLanguageSelect = async (langCode) => {
                   <Animated.View style={{ transform: [{ rotate: settingsIconRotate }] }}>
                       <Ionicons name="settings-outline" size={24} color="white" style={styles.buttonIcon} />
                   </Animated.View>
-                  <Text style={styles.actionButtonText}>
-                    {t("profile_doctor_settings")}
-                  </Text>
+                  <Text style={styles.actionButtonText}>{t("profile_doctor_settings")}</Text>
               </TouchableOpacity>
             )}
 
@@ -1029,73 +944,31 @@ const handleLanguageSelect = async (langCode) => {
               </View>
             )}
 
-            {finalDoctorData.diploma_url ? (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
-                <View style={styles.imageWrapper}>
-                  {loadingDiploma && !diplomaError && (
-                    <ActivityIndicator
-                      size="large"
-                      color="#0EB3EB"
-                      style={styles.imageLoadingIndicator}
-                    />
-                  )}
-                  <Image
-                    key={finalDoctorData.diploma_url}
-                    source={{ uri: finalDoctorData.diploma_url }}
-                    style={styles.documentImage}
-                    onLoad={() => setLoadingDiploma(false)}
-                    onError={() => {
-                      setLoadingDiploma(false);
-                      setDiplomaError(true);
-                      console.error("Error loading diploma image:", finalDoctorData.diploma_url);
-                    }}
-                  />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionHeader}>{t("diploma_photo")}</Text>
-                <View style={styles.imageWrapper}>
-                  <Text style={styles.noImageText}>{t("no_diploma_photo")}</Text>
-                </View>
-              </View>
-            )}
-            
-            {finalDoctorData.certificate_photo_url ? (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
-                <View style={styles.imageWrapper}>
-                  {loadingCertificate && !certificateError && (
-                    <ActivityIndicator
-                      size="large"
-                      color="#0EB3EB"
-                      style={styles.imageLoadingIndicator}
-                    />
-                  )}
-                  <Image
-                    key={finalDoctorData.certificate_photo_url}
-                    source={{ uri: finalDoctorData.certificate_photo_url }}
-                    style={styles.documentImage}
-                    onLoad={() => setLoadingCertificate(false)}
-                    onError={() => {
-                      setLoadingCertificate(false);
-                      setCertificateError(true);
-                      console.error("Error loading certificate image:", finalDoctorData.certificate_photo_url);
-                    }}
-                  />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionHeader}>{t("certificate_photo")}</Text>
-                <View style={styles.imageWrapper}>
-                  <Text style={styles.noImageText}>{t("no_certificate_photo")}</Text>
-                </View>
-              </View>
-            )}
+            {/* Слайд-шоу дипломів */}
+            <DocumentSlideshow 
+              title={t("diploma_photo")}
+              data={finalDoctorData.diploma_url}
+              placeholderText={t("no_diploma_photo")}
+              loading={loadingDiploma}
+              error={diplomaError}
+              setLoading={setLoadingDiploma}
+              setError={setDiplomaError}
+            />
+
+            {/* Слайд-шоу сертифікатів */}
+            <DocumentSlideshow 
+              title={t("certificate_photo")}
+              data={finalDoctorData.certificate_photo_url}
+              placeholderText={t("no_certificate_photo")}
+              loading={loadingCertificate}
+              error={certificateError}
+              setLoading={setLoadingCertificate}
+              setError={setCertificateError}
+            />
+
           </ScrollView>
 
+          {/* Модальне вікно мови */}
           <Modal
             animationType="fade"
             transparent={true}
@@ -1104,9 +977,7 @@ const handleLanguageSelect = async (langCode) => {
           >
             <TouchableWithoutFeedback onPress={closeLanguageModal}>
               <View style={styles.modalOverlay}>
-                <TouchableWithoutFeedback
-                  onPress={() => {}}
-                >
+                <TouchableWithoutFeedback onPress={() => {}}>
                   <View style={styles.languageModalContent}>
                     <Text style={styles.modalTitle}>{t("selectLanguage")}</Text>
                     {languagesForModal.map((item) => (
@@ -1126,14 +997,13 @@ const handleLanguageSelect = async (langCode) => {
             </TouchableWithoutFeedback>
           </Modal>
 
+          {/* Модальне вікно заповнення профілю */}
           {isProfileOwner && !checkProfileCompleteness(doctorData) && (
             <Modal
               animationType="fade"
               transparent={true}
               visible={isProfileCompletionModalVisible}
-              onRequestClose={() => {
-                setIsProfileCompletionModalVisible(false);
-              }}
+              onRequestClose={() => setIsProfileCompletionModalVisible(false)}
             >
               <Pressable
                 style={styles.modalOverlay}
@@ -1141,16 +1011,10 @@ const handleLanguageSelect = async (langCode) => {
               >
                 <TouchableWithoutFeedback>
                   <View style={styles.modalView}>
-                    <Ionicons
-                      name="information-circle-outline"
-                      style={styles.modalIcon}
-                    />
+                    <Ionicons name="information-circle-outline" style={styles.modalIcon} />
                     <Text style={styles.modalTitle}>{t("complete_profile_title")}</Text>
                     <Text style={styles.modalText}>{t("complete_profile_message")}</Text>
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={onGoToAnketa}
-                    >
+                    <TouchableOpacity style={styles.modalButton} onPress={onGoToAnketa}>
                       <Text style={styles.modalButtonText}>{t("go_to_profile_settings")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity

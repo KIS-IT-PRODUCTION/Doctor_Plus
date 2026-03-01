@@ -33,8 +33,8 @@ import { consultationLanguages } from './constant/consultationLanguages.js';
 import { specializations } from './constant/specializations.js';
 import { Image } from 'expo-image';
 import { MotiView, AnimatePresence } from 'moti';
-import { getStyles } from './Anketa_Settings.styles.js';
-import { COLORS } from "./Anketa_Settings.styles.js";
+import { getStyles, COLORS } from './Anketa_Settings.styles.js';
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -87,8 +87,6 @@ async function registerForPushNotificationsAsync(userId) {
       .eq("user_id", userId);
     if (error) {
       console.error("Error saving notification token:", error.message);
-    } else {
-      console.log("Notification token saved successfully for doctor user_id:", userId);
     }
   }
   return token;
@@ -162,7 +160,6 @@ const PickerButton = memo(({ label, text, placeholder, onPress, error }) => {
   );
 });
 
-
 const Anketa_Settings = ({ route }) => {
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
@@ -176,9 +173,11 @@ const Anketa_Settings = ({ route }) => {
   const [country, setCountry] = useState(null);
   const [selectedConsultationLanguages, setSelectedConsultationLanguages] = useState([]);
   const [selectedSpecializations, setSelectedSpecializations] = useState([]);
+  
   const [photoUri, setPhotoUri] = useState(null);
-  const [diplomaUri, setDiplomaUri] = useState(null);
-  const [certificateUri, setCertificateUri] = useState(null);
+  const [diplomaUris, setDiplomaUris] = useState([]);
+  const [certificateUris, setCertificateUris] = useState([]);
+
   const [experienceYears, setExperienceYears] = useState(null);
   const [workLocation, setWorkLocation] = useState("");
   const [achievements, setAchievements] = useState("");
@@ -230,7 +229,7 @@ const Anketa_Settings = ({ route }) => {
     return `${years} ${t("years_plural_genitive")}`;
   };
 
-useEffect(() => {
+  useEffect(() => {
     const fetchUserProfile = async () => {
       setIsLoadingProfile(true);
       try {
@@ -257,13 +256,8 @@ useEffect(() => {
           if (profileDoctorData.language && profileDoctorData.language !== i18n.language) {
             i18n.changeLanguage(profileDoctorData.language);
           }
-
-          if (nameFromProfile) {
-            setFullName(nameFromProfile);
-          }
-          if (countryFromProfile) {
-            setCountry(countries.find(c => c.name === countryFromProfile) || null);
-          }
+          if (nameFromProfile) setFullName(nameFromProfile);
+          if (countryFromProfile) setCountry(countries.find(c => c.name === countryFromProfile) || null);
         }
 
         const { data, error } = await supabase
@@ -276,8 +270,6 @@ useEffect(() => {
         
         if (data) {
           setIsProfileCreated(true);
-          
-       
           setFullName(data.full_name || nameFromProfile || ""); 
           setCountry(data.country ? countries.find(c => c.name === data.country) : (countryFromProfile ? countries.find(c => c.name === countryFromProfile) : null));
           const userCountry = countries.find(c => c.ianaTimezone === data.country_timezone || c.name === data.country);
@@ -293,8 +285,31 @@ useEffect(() => {
 
           setSelectedSpecializations(mappedSpecializations);
           setPhotoUri(data.avatar_url || null);
-          setDiplomaUri(data.diploma_url || null);
-          setCertificateUri(data.certificate_photo_url || null);
+
+          let loadedDiplomas = [];
+          if (data.diploma_url) {
+            try {
+              const parsed = JSON.parse(data.diploma_url);
+              if (Array.isArray(parsed)) loadedDiplomas = parsed;
+              else loadedDiplomas = [data.diploma_url];
+            } catch (e) {
+              loadedDiplomas = [data.diploma_url];
+            }
+          }
+          setDiplomaUris(loadedDiplomas);
+
+          let loadedCertificates = [];
+          if (data.certificate_photo_url) {
+            try {
+              const parsed = JSON.parse(data.certificate_photo_url);
+              if (Array.isArray(parsed)) loadedCertificates = parsed;
+              else loadedCertificates = [data.certificate_photo_url];
+            } catch (e) {
+              loadedCertificates = [data.certificate_photo_url];
+            }
+          }
+          setCertificateUris(loadedCertificates);
+
           setExperienceYears(data.experience_years ? parseInt(data.experience_years, 10) : null);
           setWorkLocation(data.work_location || "");
           setAchievements(data.achievements || "");
@@ -393,7 +408,7 @@ useEffect(() => {
     }
   };
 
-  const pickImage = async (setUriState) => {
+  const pickImages = async (setUrisState, isMultiple = false) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(t("permission_denied_title"), t("permission_denied_message"));
@@ -401,13 +416,24 @@ useEffect(() => {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsEditing: !isMultiple,
       aspect: [4, 3],
       quality: 0.7,
+      allowsMultipleSelection: isMultiple,
+      selectionLimit: isMultiple ? 10 : 1,
     });
     if (!result.canceled) {
-      setUriState(result.assets[0].uri);
+      if (isMultiple) {
+        const newUris = result.assets.map(asset => asset.uri);
+        setUrisState(prev => [...prev, ...newUris]);
+      } else {
+        setUrisState(result.assets[0].uri);
+      }
     }
+  };
+
+  const removeImage = (uriToRemove, setUrisState) => {
+    setUrisState(prev => prev.filter(uri => uri !== uriToRemove));
   };
 
   const handleSaveProfile = async () => {
@@ -453,13 +479,17 @@ useEffect(() => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
-      const uploadTasks = [
-        uploadFile(photoUri, "avatars", user.id, "profile"),
-        uploadFile(diplomaUri, "avatars", user.id, "diploma"),
-        uploadFile(certificateUri, "avatars", user.id, "certificate")
-      ];
+      const uploadMultipleFiles = async (uris, folderPrefix) => {
+        const promises = uris.map(async (uri, index) => {
+          if (uri.startsWith('http')) return uri;
+          return await uploadFile(uri, "avatars", user.id, `${folderPrefix}_${index}`);
+        });
+        return Promise.all(promises);
+      };
 
-      const [avatarUrl, diplomaUrl, certUrl] = await Promise.all(uploadTasks);
+      const avatarUrl = await uploadFile(photoUri, "avatars", user.id, "profile");
+      const savedDiplomaUrls = await uploadMultipleFiles(diplomaUris, "diploma");
+      const savedCertificateUrls = await uploadMultipleFiles(certificateUris, "certificate");
 
       const profileData = {
         user_id: user.id,
@@ -477,8 +507,8 @@ useEffect(() => {
         search_tags: searchTags.trim() || null,
         bank_details: bankDetails.trim(),
         avatar_url: avatarUrl,
-        diploma_url: diplomaUrl,
-        certificate_photo_url: certUrl,
+        diploma_url: JSON.stringify(savedDiplomaUrls),
+        certificate_photo_url: JSON.stringify(savedCertificateUrls),
         agreed_to_terms: agreedToTerms,
         doctor_check: doctorCheckStatus,
       };
@@ -669,7 +699,7 @@ useEffect(() => {
                     <Ionicons name="person" size={60} color="#ccc" />
                   </View>
                 )}
-                <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage(setPhotoUri)}>
+                <TouchableOpacity style={styles.uploadButton} onPress={() => pickImages(setPhotoUri, false)}>
                   <Text style={styles.uploadButtonText}>{t("upload_photo")}</Text>
                 </TouchableOpacity>
               </View>
@@ -766,27 +796,63 @@ useEffect(() => {
             <Section title={t('documents')} delay={400}>
                <View style={styles.uploadContainer}>
                 <Text style={styles.inputLabel}>{t("upload_diploma")}</Text>
-                {diplomaUri && (
-                  <TouchableOpacity onPress={() => openImageModal(diplomaUri)}>
-                    <Image source={{ uri: diplomaUri }} style={styles.previewImage} />
-                  </TouchableOpacity>
-                )}
+                
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  {diplomaUris.map((uri, index) => (
+                    <View key={index} style={{ position: 'relative' }}>
+                      <TouchableOpacity onPress={() => openImageModal(uri)}>
+                        <Image source={{ uri: uri }} style={[styles.previewImage, { width: 100, height: 100, borderRadius: 8 }]} />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={{
+                          position: 'absolute', top: -5, right: -5, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#ddd', zIndex: 1
+                        }}
+                        onPress={() => removeImage(uri, setDiplomaUris)}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#FF5252" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.uploadButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]} 
+                  onPress={() => pickImages(setDiplomaUris, true)}
+                >
+                  <Ionicons name="add-circle-outline" size={20} color="#0EB3EB" style={{marginRight: 8}}/>
+                  <Text style={styles.uploadButtonText}>{t('add_photo')}</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage(setDiplomaUri)}>
-                <Text style={styles.uploadButtonText}>{diplomaUri ? t('change_file') : t('upload_diploma')}</Text>
-              </TouchableOpacity>
               
-               <View style={[styles.uploadContainer, { marginTop: 15 }]}>
+               <View style={[styles.uploadContainer, { marginTop: 25 }]}>
                 <Text style={styles.inputLabel}>{t("upload_certificate")}</Text>
-                {certificateUri && (
-                  <TouchableOpacity onPress={() => openImageModal(certificateUri)}>
-                    <Image source={{ uri: certificateUri }} style={styles.previewImage} />
-                  </TouchableOpacity>
-                )}
+                
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  {certificateUris.map((uri, index) => (
+                    <View key={index} style={{ position: 'relative' }}>
+                      <TouchableOpacity onPress={() => openImageModal(uri)}>
+                        <Image source={{ uri: uri }} style={[styles.previewImage, { width: 100, height: 100, borderRadius: 8 }]} />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={{
+                          position: 'absolute', top: -5, right: -5, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#ddd', zIndex: 1
+                        }}
+                        onPress={() => removeImage(uri, setCertificateUris)}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#FF5252" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.uploadButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]} 
+                  onPress={() => pickImages(setCertificateUris, true)}
+                >
+                   <Ionicons name="add-circle-outline" size={20} color="#0EB3EB" style={{marginRight: 8}}/>
+                   <Text style={styles.uploadButtonText}>{t('add_photo')}</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage(setCertificateUri)}>
-                <Text style={styles.uploadButtonText}>{certificateUri ? t('change_file') : t('upload_certificate')}</Text>
-              </TouchableOpacity>
             </Section>
 
             <Section title={t('payment_information')} delay={500}>
@@ -825,7 +891,6 @@ useEffect(() => {
               transition={{ type: 'timing', duration: 400, delay: 600 }}
               style={{width: '100%'}}
             >
-              {/* --- ПОЧАТОК ЗМІН (Умови використання) --- */}
               <View style={[styles.agreementContainer, fieldErrors.agreedToTerms && styles.inputError]}>
                 <Switch 
                   trackColor={{ false: "#767577", true: "#0EB3EB" }} 
@@ -841,7 +906,6 @@ useEffect(() => {
                   <Text style={styles.agreementText} onPress={() => navigation.navigate("PartnershipAgreementScreen")}>{t("terms_of_use")}</Text>
                 </View>
               </View>
-              {/* --- КІНЕЦЬ ЗМІН --- */}
               
               <AnimatePresence>
                 {fieldErrors.agreedToTerms && 
@@ -1072,7 +1136,5 @@ useEffect(() => {
     </SafeAreaView>
   );
 };
-
-const styles = getStyles();
 
 export default Anketa_Settings;

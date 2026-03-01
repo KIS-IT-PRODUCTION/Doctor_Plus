@@ -1,5 +1,7 @@
 import 'dotenv/config';
-
+console.log("Loading config...");
+console.log("SUPABASE_URL exists:", !!process.env.SUPABASE_URL); 
+console.log("SUPABASE_ANON_KEY exists:", !!process.env.SUPABASE_ANON_KEY);
 export default {
   "expo": {
     "name": "Doctor Plus",
@@ -24,7 +26,7 @@ export default {
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kis-production.DOCTOR",
+      "bundleIdentifier": "app.doctor.plus",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos for profile photo, diploma, or certificate selection.",

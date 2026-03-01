@@ -12,6 +12,9 @@ const verticalScale = (size) => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) =>
   size + (scale(size) - size) * factor;
 
+// Розрахунок ширини слайду (ширина екрану мінус відступи батьківських контейнерів)
+const SLIDE_WIDTH = width - 30 - 50; // 30 (container padding) + 50 (section padding)
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -88,26 +91,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontFamily: "Mont-Bold",
   },
-  goToAnketaButton: {
-    borderRadius: 30,
-    marginTop: 20,
-    overflow: 'hidden',
-    shadowColor: "#28A745",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-    backgroundColor: '#28A745',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    minWidth: 150,
-    alignItems: 'center',
-  },
-  goToAnketaButtonText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
   noDoctorContainer: {
     justifyContent: "center",
     alignItems: "center",
@@ -171,10 +154,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 5,
     elevation: 5,
-  },
-  languageButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   languageButtonText: {
     fontSize: 15,
@@ -352,8 +331,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     flex: 1,
   },
-  buttonIcon: {
-  },
   sectionTitleLink: {
     fontSize: 20,
     color: "#0EB3EB",
@@ -366,9 +343,8 @@ const styles = StyleSheet.create({
   sectionContainer: {
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 25,
+    padding: 20, // Зменшено з 25, щоб дати більше місця фото
     marginBottom: 20,
-    borderWidth: 0,
     marginHorizontal: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -378,44 +354,59 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: 18,
-    marginBottom: 12,
+    marginBottom: 15,
     color: "#333",
     fontWeight: "600",
-    borderBottomWidth: 0,
-    paddingBottom: 0,
     textAlign: 'left',
+    paddingLeft: 5,
   },
   sectionContent: {
     fontSize: 16,
     color: "#555",
     lineHeight: 26,
     fontWeight: "400",
-    marginTop: 10,
+    marginTop: 5,
+    paddingHorizontal: 5,
   },
-  imageWrapper: {
-    width: "100%",
-    height: 250,
-    backgroundColor: "#F9F9F9",
+  
+  // --- Стилі для слайд-шоу ---
+  slideshowWrapper: {
     borderRadius: 15,
     overflow: "hidden",
+    marginTop: 5,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  slideshowContent: {
+    alignItems: 'center',
+  },
+  slideContainer: {
+    width: SLIDE_WIDTH, // Ширина одного слайду
+    height: 250,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9F9F9',
+  },
+  slideImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: "cover", // Або "contain", якщо важливо бачити весь документ
+  },
+  imageWrapperPlaceholder: {
+    width: "100%",
+    height: 150,
+    backgroundColor: "#F9F9F9",
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    marginTop: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  documentImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
+    borderStyle: 'dashed',
   },
   imageLoadingIndicator: {
     position: "absolute",
+    zIndex: 10,
   },
   noImageText: {
     fontSize: 16,
@@ -423,15 +414,36 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontStyle: "italic",
     fontWeight: "400",
-    paddingVertical: 25,
   },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
+    backgroundColor: 'white',
+    width: '100%',
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D1D1D1',
+    marginHorizontal: 4,
+  },
+  paginationDotActive: {
+    backgroundColor: '#0EB3EB',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  // ---------------------------
+
   centeredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-
   modalView: {
     margin: moderateScale(20),
     backgroundColor: "white",
@@ -439,10 +451,7 @@ const styles = StyleSheet.create({
     padding: moderateScale(35),
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
@@ -464,15 +473,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: width * 0.8,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
- modalTitle: {
+  modalTitle: {
     fontSize: 22,
     fontFamily: "Mont-Bold",
     marginBottom: 20,
@@ -494,7 +500,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexWrap: 'wrap',
   },
-   modalButton: {
+  modalButton: {
     backgroundColor: "#0EB3EB",
     borderRadius: moderateScale(10),
     paddingVertical: moderateScale(5),
@@ -508,7 +514,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: moderateScale(16),
     fontFamily: "Mont-SemiBold",
-
   },
   modalText: {
     fontSize: moderateScale(16),

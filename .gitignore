@@ -20,5 +20,7 @@ yarn-error.log*
 pnpm-debug.log*
 *.swp
 *.swo
+.@kis_production__DOCTOR.jks
+.AuthKey_Z8HUYVN49U.p8
 
 

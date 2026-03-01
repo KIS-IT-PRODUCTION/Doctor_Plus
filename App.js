@@ -383,3 +383,88 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
 });
+
+
+
+// import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+// import { createClient } from 'npm:@supabase/supabase-js@2';
+
+// const LIQPAY_PUBLIC_KEY = Deno.env.get('LIQPAY_PUBLIC_KEY');
+// const LIQPAY_PRIVATE_KEY = Deno.env.get('LIQPAY_PRIVATE_KEY');
+// const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+// const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+// const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// serve(async (req) => {
+//   try {
+//     const { bookingId } = await req.json();
+//     if (!bookingId) throw new Error('Відсутній bookingId');
+
+//     // 1. Отримуємо дані бронювання
+//     const { data: booking, error: bookingError } = await supabaseAdmin
+//       .from('patient_bookings')
+//       .select('amount')
+//       .eq('id', bookingId)
+//       .single();
+
+//     if (bookingError || !booking) throw new Error(`Бронювання ${bookingId} не знайдено`);
+
+//     // 2. Отримуємо ключі отримувачів
+//     const { data: config } = await supabaseAdmin.from('app_config').select('key, value');
+//     const companyKey = config?.find(c => c.key === 'company_public_key')?.value;
+//     const fopKey = config?.find(c => c.key === 'fop_public_key')?.value;
+
+//     if (!companyKey || !fopKey) throw new Error('Ключі отримувачів не налаштовані в app_config');
+
+//     const totalAmount = booking.amount;
+//     const companyAmount = parseFloat((totalAmount * 0.12).toFixed(2));
+//     const fopAmount = parseFloat((totalAmount - companyAmount).toFixed(2));
+    
+//     // Створюємо унікальний Order ID
+//     const orderId = `booking_${bookingId}_${Date.now()}`;
+
+//     // --- ВАЖЛИВО: ЗБЕРІГАЄМО ORDER_ID В БАЗУ ПЕРЕД ОПЛАТОЮ ---
+//     const { error: updateError } = await supabaseAdmin
+//       .from('patient_bookings')
+//       .update({ 
+//         liqpay_data: { order_id: orderId } // Тепер Callback знайде цей запис
+//       })
+//       .eq('id', bookingId);
+
+//     if (updateError) throw new Error(`Помилка оновлення бронювання: ${updateError.message}`);
+
+//     const params = {
+//       public_key: LIQPAY_PUBLIC_KEY,
+//       version: 3,
+//       action: 'hold',
+//       amount: totalAmount,
+//       currency: 'UAH',
+//       description: `Консультація #${bookingId}`,
+//       order_id: orderId,
+//       server_url: `${SUPABASE_URL}/functions/v1/liqpay-callback`,
+//       split_rules: [
+//         { public_key: companyKey, amount: companyAmount, commission_payer: 'receiver' },
+//         { public_key: fopKey, amount: fopAmount, commission_payer: 'receiver' }
+//       ]
+//     };
+
+//     // --- БЕЗПЕЧНЕ КОДУВАННЯ (UTF-8) ---
+//     const encoder = new TextEncoder();
+//     const jsonData = JSON.stringify(params);
+//     const dataString = btoa(String.fromCharCode(...encoder.encode(jsonData)));
+
+//     const signString = LIQPAY_PRIVATE_KEY + dataString + LIQPAY_PRIVATE_KEY;
+//     const hashBuffer = await crypto.subtle.digest("SHA-1", encoder.encode(signString));
+//     const signature = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+    
+//     return new Response(JSON.stringify({ success: true, data: dataString, signature }), {
+//       status: 200,
+//       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+//     });
+
+//   } catch (error) {
+//     console.error("Init Error:", error.message);
+//     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+//   }
+// });

@@ -109,6 +109,7 @@
   "error_fetching_doctor_data": "Error retrieving doctor data",
   "loading_profile_data": "Loading profile data...",
   "retry": "Retry",
+  "add_photo": "Add Photo",
   "doctor_not_found": "Doctor profile not found.",
   "back_to_home": "Back to Home",
   "more_about_doctor": "More about the doctor",

@@ -1,6 +1,6 @@
 import { StyleSheet, Platform, StatusBar } from 'react-native';
 
- export const COLORS = {
+export const COLORS = {
   primary: '#0EB3EB',
   background: '#F4F7F8',
   card: '#FFFFFF',
@@ -92,7 +92,6 @@ export const getStyles = () => StyleSheet.create({
     justifyContent: 'center',
     marginVertical: 5,
   },
-  // 👇 ОНОВЛЕНА ЛОГІКА ДЛЯ 3 СТАТУСІВ
   doctorStatusContainer: (type) => {
     let backgroundColor;
     switch (type) {
@@ -149,7 +148,7 @@ export const getStyles = () => StyleSheet.create({
     fontSize: 14,
     fontFamily: "Mont-Medium",
     color: COLORS.secondaryText,
-    marginBottom: 4,
+    marginBottom: 6,
     marginLeft: 4,
   },
   inputContainer: {
@@ -173,6 +172,9 @@ export const getStyles = () => StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
     paddingVertical: 12,
+  },
+  multilineInputContainer: {
+     height: 'auto',
   },
   inputError: {
     borderColor: COLORS.danger,
@@ -205,12 +207,6 @@ export const getStyles = () => StyleSheet.create({
     fontSize: 16,
     fontFamily: "Mont-Medium"
   },
-  selectButtonTextExpanded: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontFamily: "Mont-Medium",
-    flexWrap: "wrap"
-  },
   avatarUploadContainer: {
     alignItems: "center",
     gap: 15,
@@ -241,26 +237,70 @@ export const getStyles = () => StyleSheet.create({
     height: 48,
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: 'flex-start', // Кнопка не розтягується на всю ширину
+    marginTop: 5,
   },
   uploadButtonText: {
     color: COLORS.white,
     fontSize: 16,
     fontFamily: "Mont-Medium"
   },
+  
+  // --- Стилі для документів ---
   uploadContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     width: "100%",
+    flexDirection: "column", // Змінено на column для вертикального розташування (Лейбл -> Фото -> Кнопка)
+    alignItems: "flex-start",
+  },
+  photosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12, // Відступи між фото
+    marginBottom: 12,
+    width: '100%',
+  },
+  photoWrapper: {
+    position: 'relative',
+    width: 100,
+    height: 100,
+    // Тінь для фото
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   previewImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
     resizeMode: "cover",
     borderWidth: 1,
     borderColor: COLORS.border,
+    backgroundColor: COLORS.lightGrey,
   },
+  deletePhotoBtn: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: COLORS.white,
+    borderRadius: 15,
+    width: 26,
+    height: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    zIndex: 10,
+    // Тінь для кнопки
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 3,
+  },
+  // ---------------------------
+
   labelWithIconContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -294,7 +334,7 @@ export const getStyles = () => StyleSheet.create({
     color: "#337AB7",
     marginLeft: 4, 
   },
-privacyPolicyText: {
+  privacyPolicyText: {
     fontSize: 14,
     lineHeight: 18,
     color: "black",
@@ -316,7 +356,6 @@ privacyPolicyText: {
     fontSize: 18,
     fontFamily: "Mont-Bold",
   },
-
   centeredView: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -496,7 +535,8 @@ privacyPolicyText: {
     borderRadius: 8,
     fontSize: 16,
     lineHeight: 28,
-  },signOutButton: {
+  },
+  signOutButton: {
     flex: 1,
     backgroundColor: COLORS.transparent,
     borderRadius: 30,
